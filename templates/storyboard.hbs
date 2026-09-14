@@ -1,0 +1,34 @@
+<div class="lumenn-frame storyboard">
+  <div class="toolbar">
+    {{#if isGM}}
+      <button data-action="create-storyboard">+ Storyboard</button>
+      <button data-action="create-beat">+ Beat</button>
+      <button class="mode-toggle {{mode}}" data-action="toggle-mode">
+        {{#if (lumenn-eq mode "edit")}}Edição{{else}}Ao Vivo{{/if}}
+      </button>
+    {{/if}}
+  </div>
+  <div class="beats-canvas">
+    <svg class="connectors"></svg>
+    {{#each beats}}
+      <div class="beat-node {{#if isActive}}active{{/if}} {{#if isConnected}}connected{{/if}} {{#unless isValid}}invalid{{/unless}}"
+           data-id="{{id}}">
+        <div class="beat-name">{{sceneName}}</div>
+        <div class="beat-detail">{{audioLabel}}</div>
+        {{#if (lumenn-eq ../mode "edit")}}
+          <div class="beat-actions">
+            <button data-action="edit-beat" data-id="{{id}}">Edit</button>
+            <button data-action="delete-beat" data-id="{{id}}">Del</button>
+            <button data-action="connect-beat" data-id="{{id}}">Link</button>
+          </div>
+        {{else}}
+          {{#if isConnected}}
+            <div class="beat-actions">
+              <button data-action="navigate-beat" data-id="{{id}}">Go</button>
+            </div>
+          {{/if}}
+        {{/if}}
+      </div>
+    {{/each}}
+  </div>
+</div>

@@ -1,0 +1,17 @@
+{
+  "LUMENN_FRAME.Title": "Lumenn Frame",
+  "LUMENN_FRAME.Toolbar.CreateStoryboard": "+ Storyboard",
+  "LUMENN_FRAME.Toolbar.CreateBeat": "+ Beat",
+  "LUMENN_FRAME.Toolbar.EditMode": "Edição",
+  "LUMENN_FRAME.Toolbar.LiveMode": "Ao Vivo",
+  "LUMENN_FRAME.Beat.Go": "Ir",
+  "LUMENN_FRAME.Beat.Edit": "Editar",
+  "LUMENN_FRAME.Beat.Delete": "Excluir",
+  "LUMENN_FRAME.Beat.Link": "Vincular",
+  "LUMENN_FRAME.Config.Scene": "Cena",
+  "LUMENN_FRAME.Config.AudioType": "Tipo de áudio",
+  "LUMENN_FRAME.Config.Track": "Faixa",
+  "LUMENN_FRAME.Config.Playlist": "Playlist",
+  "LUMENN_FRAME.Config.Crossfade": "Crossfade (ms)",
+  "LUMENN_FRAME.Config.Save": "Salvar"
+}

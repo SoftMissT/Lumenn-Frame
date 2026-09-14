@@ -1,0 +1,157 @@
+.lumenn-frame.storyboard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #1a1a2e;
+  color: #e0e0e0;
+}
+
+.lumenn-frame .toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+  align-items: center;
+}
+
+.lumenn-frame .toolbar button {
+  padding: 4px 10px;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.lumenn-frame .toolbar button:hover {
+  background: #0f3460;
+}
+
+.lumenn-frame .toolbar button.active {
+  background: #00d9ff;
+  color: #000;
+  border-color: #00d9ff;
+}
+
+.lumenn-frame .mode-toggle {
+  margin-left: auto;
+}
+
+.lumenn-frame .mode-toggle.edit {
+  background: #4a4a6a;
+}
+
+.lumenn-frame .mode-toggle.live {
+  background: #00d9ff;
+  color: #000;
+}
+
+.lumenn-frame .beats-canvas {
+  flex: 1;
+  position: relative;
+  overflow: auto;
+  min-height: 400px;
+}
+
+.lumenn-frame .beat-node {
+  position: absolute;
+  width: 120px;
+  min-height: 60px;
+  background: #16213e;
+  border: 2px solid #0f3460;
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s;
+}
+
+.lumenn-frame .beat-node:hover {
+  border-color: #00d9ff;
+}
+
+.lumenn-frame .beat-node.active {
+  border-color: #00d9ff;
+  box-shadow: 0 0 12px rgba(0, 217, 255, 0.4);
+}
+
+.lumenn-frame .beat-node.connected {
+  opacity: 1;
+  cursor: pointer;
+}
+
+.lumenn-frame .beat-node:not(.connected) {
+  opacity: 0.45;
+}
+
+.lumenn-frame .beat-node.invalid {
+  border-color: #e74c3c;
+}
+
+.lumenn-frame .beat-node .beat-name {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lumenn-frame .beat-node .beat-detail {
+  font-size: 10px;
+  color: #999;
+}
+
+.lumenn-frame .beat-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.lumenn-frame .beat-actions button {
+  font-size: 10px;
+  padding: 2px 6px;
+  border: 1px solid #333;
+  border-radius: 3px;
+  background: #1a1a2e;
+  color: #ccc;
+  cursor: pointer;
+}
+
+.lumenn-frame .beat-actions button:hover {
+  background: #333;
+}
+
+.lumenn-frame svg.connectors {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.lumenn-frame .beat-config {
+  background: #1a1a2e;
+  color: #e0e0e0;
+}
+
+.lumenn-frame .beat-config label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.lumenn-frame .beat-config select,
+.lumenn-frame .beat-config input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  background: #16213e;
+  color: #e0e0e0;
+  margin-bottom: 10px;
+}

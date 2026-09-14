@@ -1,0 +1,39 @@
+<div class="lumenn-frame beat-config">
+  <label>Scene</label>
+  <select name="sceneId">
+    <option value="">— Nenhuma —</option>
+    {{#each scenes}}
+      <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+    {{/each}}
+  </select>
+
+  <label>Tipo de áudio</label>
+  <select name="audioType">
+    <option value="track">Track</option>
+    <option value="playlist">Playlist</option>
+  </select>
+
+  <label>Track / Playlist</label>
+  <select name="audioTrackId">
+    <option value="">— Nenhum —</option>
+    {{#each playlists}}
+      <optgroup label="{{name}}">
+        {{#each sounds}}
+          <option value="{{uuid}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+        {{/each}}
+      </optgroup>
+    {{/each}}
+  </select>
+
+  <select name="audioPlaylistId" style="display:none">
+    <option value="">— Nenhuma —</option>
+    {{#each playlists}}
+      <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+    {{/each}}
+  </select>
+
+  <label>Crossfade (ms, vazio = padrão global: {{defaultCrossfade}})</label>
+  <input type="number" name="crossfadeDuration" value="{{beat.crossfadeDuration}}" min="0" step="250" placeholder="{{defaultCrossfade}}" />
+
+  <button type="submit">Salvar</button>
+</div>

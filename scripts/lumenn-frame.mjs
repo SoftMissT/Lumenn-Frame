@@ -1,4 +1,6 @@
 import { LumennBeatStore } from "./beat-store.mjs";
+import { LumennAudioEngine, LumennInvalidAudioSourceError } from "./audio-engine.mjs";
+import { LumennTransitionController } from "./transition-controller.mjs";
 import { LumennStoryboardApp } from "./storyboard-app.mjs";
 import { registerHandlebarsHelpers } from "./handlebars-helpers.mjs";
 
@@ -8,10 +10,17 @@ Hooks.once("init", () => {
   registerHandlebarsHelpers();
   LumennBeatStore.registerSettings();
 
+  // Artigo II: o motor é validável isoladamente via macro —
+  // as classes ficam expostas na API pública do módulo.
   game.modules.get(MODULE_ID).api = {
     openStoryboard() {
       new LumennStoryboardApp().render(true);
     },
+    LumennAudioEngine,
+    LumennInvalidAudioSourceError,
+    LumennBeatStore,
+    LumennTransitionController,
+    LumennStoryboardApp,
   };
 
   if (game.user.isGM) {
@@ -27,8 +36,4 @@ Hooks.once("init", () => {
   }
 
   console.log(`${MODULE_ID}: initialized`);
-});
-
-Hooks.once("ready", () => {
-  console.log(`${MODULE_ID}: ready`);
 });

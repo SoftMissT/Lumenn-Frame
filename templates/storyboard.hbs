@@ -6,6 +6,9 @@
       <button class="mode-toggle {{mode}}" data-action="toggle-mode">
         {{#if (lumenn-eq mode "edit")}}Edição{{else}}Ao Vivo{{/if}}
       </button>
+      {{#if needsStartBeat}}
+        <span class="hint">Defina o Beat inicial ("Início") antes de navegar.</span>
+      {{/if}}
     {{/if}}
   </div>
   <div class="beats-canvas">
@@ -17,6 +20,7 @@
         <div class="beat-detail">{{audioLabel}}</div>
         {{#if (lumenn-eq ../mode "edit")}}
           <div class="beat-actions">
+            <button data-action="set-start-beat" data-id="{{id}}" title="Definir como Beat ativo inicial">Início</button>
             <button data-action="edit-beat" data-id="{{id}}">Edit</button>
             <button data-action="delete-beat" data-id="{{id}}">Del</button>
             <button data-action="connect-beat" data-id="{{id}}">Link</button>

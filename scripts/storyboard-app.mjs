@@ -6,9 +6,11 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 /**
  * LumennStoryboardApp — canvas de storyboard com Beats e conectores.
  * Dois modos: Edição (CRUD) e Ao Vivo (navegação).
+ * No modo Edição, "Início" define o Beat ativo sem disparar transição —
+ * é o que destrava a navegação (activeBeatId não nasce mais em deadlock).
  */
 export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV2) {
-  #controller = null;
+  #controller = new LumennTransitionController();
   #storyboardId = null;
   #mode = "edit";
 
@@ -27,10 +29,6 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     },
   };
 
-  get storyboardId() {
-    return this.#storyboardId;
-  }
-
   get mode() {
     return this.#mode;
   }
@@ -43,10 +41,6 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
 
     if (active && !this.#storyboardId) {
       this.#storyboardId = active.id;
-    }
-
-    if (this.#storyboardId && !this.#controller) {
-      this.#controller = new LumennTransitionController(this.#storyboardId);
     }
 
     const scenes = Array.from(game.scenes.values()).map((s) => ({
@@ -88,7 +82,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       playlists,
       mode: this.#mode,
       isGM: game.user.isGM,
-      connectedBeats: activeBeat?.connections ?? [],
+      needsStartBeat: game.user.isGM && !!active && !active.activeBeatId,
     };
   }
 
@@ -104,6 +98,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
   }
 
   #handleAction(event) {
+    event.preventDefault();
     const action = event.currentTarget.dataset.action;
     const id = event.currentTarget.dataset.id;
 
@@ -114,7 +109,6 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
         break;
       case "select-storyboard":
         this.#storyboardId = id;
-        this.#controller = new LumennTransitionController(id);
         this.render();
         break;
       case "create-storyboard":
@@ -123,6 +117,9 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
         break;
       case "create-beat":
         this.#createBeat(event);
+        break;
+      case "set-start-beat":
+        this.#setStartBeat(id);
         break;
       case "edit-beat":
         this.#editBeat(id);
@@ -134,7 +131,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
         this.#navigateToBeat(id);
         break;
       case "connect-beat":
-        this.#connectBeat(event, id);
+        this.#connectBeat(id);
         break;
     }
   }
@@ -145,6 +142,12 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     const x = rect ? event.clientX - rect.left : 100;
     const y = rect ? event.clientY - rect.top : 100;
     LumennBeatStore.createBeat(this.#storyboardId, { position: { x, y } });
+    this.render();
+  }
+
+  #setStartBeat(beatId) {
+    if (!this.#storyboardId || !game.user.isGM) return;
+    LumennBeatStore.setActiveBeat(this.#storyboardId, beatId);
     this.render();
   }
 
@@ -164,15 +167,15 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
   }
 
   async #navigateToBeat(beatId) {
-    if (!this.#controller || this.#mode !== "live") return;
-    const result = await this.#controller.goToBeat(beatId);
-    if (result.sceneChanged) {
-      ui.notifications.info("Scene changed");
-    }
+    if (this.#mode !== "live" || !game.user.isGM) return;
+    const result = await this.#controller.goToBeat(this.#storyboardId, beatId);
     this.render();
+    if (result.sceneChanged) {
+      ui.notifications.info(game.i18n.localize("LUMENN_FRAME.InfoSceneChanged"));
+    }
   }
 
-  #connectBeat(event, beatId) {
+  #connectBeat(beatId) {
     if (!this.#storyboardId || !game.user.isGM) return;
     const storyboard = LumennBeatStore.getStoryboard(this.#storyboardId);
     const activeBeat = storyboard?.beats.find((b) => b.id === storyboard.activeBeatId);
@@ -190,13 +193,11 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     const canvas = html.querySelector(".beats-canvas");
     if (!canvas) return;
 
-    const beats = canvas.querySelectorAll(".beat-node");
     const storyboard = LumennBeatStore.getStoryboard(this.#storyboardId);
     if (!storyboard) return;
 
-    beats.forEach((el) => {
-      const beatId = el.dataset.id;
-      const beat = storyboard.beats.find((b) => b.id === beatId);
+    canvas.querySelectorAll(".beat-node").forEach((el) => {
+      const beat = storyboard.beats.find((b) => b.id === el.dataset.id);
       if (!beat) return;
       el.style.left = `${beat.position.x}px`;
       el.style.top = `${beat.position.y}px`;
@@ -210,27 +211,17 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     if (!svg) return;
     svg.innerHTML = "";
 
-    const activeBeat = storyboard.activeBeatId
-      ? storyboard.beats.find((b) => b.id === storyboard.activeBeatId)
-      : null;
-
     storyboard.beats.forEach((beat) => {
       beat.connections.forEach((connId) => {
         const target = storyboard.beats.find((b) => b.id === connId);
         if (!target) return;
-
-        const isActive =
-          activeBeat &&
-          ((activeBeat.id === beat.id && storyboard.activeBeatId === beat.id) ||
-            beat.id === activeBeat.id);
-        const color = isActive ? "#00d9ff" : "#666";
 
         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
         line.setAttribute("x1", beat.position.x + 60);
         line.setAttribute("y1", beat.position.y + 30);
         line.setAttribute("x2", target.position.x + 60);
         line.setAttribute("y2", target.position.y + 30);
-        line.setAttribute("stroke", color);
+        line.setAttribute("stroke", beat.id === storyboard.activeBeatId ? "#00d9ff" : "#666");
         line.setAttribute("stroke-width", "2");
         svg.appendChild(line);
       });
@@ -255,7 +246,11 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     if (beat.sceneId && !game.scenes.get(beat.sceneId)) return false;
     if (beat.audioSource?.id) {
       if (beat.audioSource.type === "track") {
-        return !!fromUuidSync(beat.audioSource.id);
+        try {
+          return !!fromUuidSync(beat.audioSource.id);
+        } catch {
+          return false;
+        }
       }
       if (beat.audioSource.type === "playlist") {
         return !!game.playlists.get(beat.audioSource.id);
@@ -265,9 +260,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
   }
 }
 
-class BeatConfigDialog extends foundry.applications.api.HandlebarsApplicationMixin(
-  foundry.applications.api.ApplicationV2,
-) {
+class BeatConfigDialog extends HandlebarsApplicationMixin(ApplicationV2) {
   #storyboardId;
   #beat;
 
@@ -343,5 +336,9 @@ class BeatConfigDialog extends foundry.applications.api.HandlebarsApplicationMix
 
   get _storyboardId() {
     return this.#storyboardId;
+  }
+
+  get _beat() {
+    return this.#beat;
   }
 }

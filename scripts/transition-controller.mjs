@@ -1,68 +1,66 @@
 import { LumennBeatStore } from "./beat-store.mjs";
-import { LumennAudioEngine } from "./audio-engine.mjs";
+import { LumennAudioEngine, LumennInvalidAudioSourceError } from "./audio-engine.mjs";
 
 /**
- * LumennTransitionController — única peça que conhece o motor de áudio e Scene.activate().
- * Valida permissão e conectividade antes de agir.
+ * LumennTransitionController — única peça que conhece o motor de áudio e
+ * Scene.activate() (Specs §2.3). Valida permissão (RF-009) e conectividade
+ * (RF-010) antes de agir. Fonte inválida não quebra a navegação (RF-011):
+ * a Scene ainda é ativada e o Beat é sinalizado na UI.
  */
 export class LumennTransitionController {
-  #engine;
-  #storyboardId;
-
-  constructor(storyboardId) {
-    this.#engine = new LumennAudioEngine();
-    this.#storyboardId = storyboardId;
-  }
+  #engine = new LumennAudioEngine();
 
   get engine() {
     return this.#engine;
   }
 
-  get storyboardId() {
-    return this.#storyboardId;
-  }
-
   /**
-   * Navega para um Beat conectado.
-   * @param {string} targetBeatId
-   * @returns {Promise<{ sceneChanged: boolean, audioResult: string }>}
+   * Navega para um Beat conectado ao ativo (Specs §4.2).
+   * @returns {Promise<{sceneChanged: boolean, audioResult: string}>}
+   * audioResult: "kept" | "crossfaded" | "faded-out" | "started" |
+   *              "ignored" | "invalid-source" | "error"
    */
-  async goToBeat(targetBeatId) {
-    if (!game.user.isGM) return { sceneChanged: false, audioResult: "kept" };
+  async goToBeat(storyboardId, targetBeatId) {
+    const ignored = { sceneChanged: false, audioResult: "ignored" };
+    if (!game.user.isGM) return ignored;
 
-    const currentBeat = LumennBeatStore.getActiveBeat(this.#storyboardId);
-    if (!currentBeat) return { sceneChanged: false, audioResult: "kept" };
+    const storyboard = LumennBeatStore.getStoryboard(storyboardId);
+    if (!storyboard) return ignored;
+    const currentBeat = storyboard.beats.find((b) => b.id === storyboard.activeBeatId) ?? null;
+    if (!currentBeat) return ignored;
+    if (!currentBeat.connections.includes(targetBeatId)) return ignored;
 
-    if (!currentBeat.connections.includes(targetBeatId)) {
-      return { sceneChanged: false, audioResult: "kept" };
-    }
-
-    const targetBeat = LumennBeatStore.getStoryboard(this.#storyboardId)
-      ?.beats.find((b) => b.id === targetBeatId);
-    if (!targetBeat) return { sceneChanged: false, audioResult: "kept" };
+    const targetBeat = storyboard.beats.find((b) => b.id === targetBeatId);
+    if (!targetBeat) return ignored;
 
     let sceneChanged = false;
     if (targetBeat.sceneId) {
       const scene = game.scenes.get(targetBeat.sceneId);
-      if (scene) {
+      if (scene && !scene.active) {
         await scene.activate();
         sceneChanged = true;
       }
     }
 
     const duration = LumennBeatStore.getBeatCrossfadeDuration(targetBeat);
-    const audioResult = await this.#engine.transition(
-      currentBeat.audioSource,
-      targetBeat.audioSource,
-      duration,
-    );
+    let audioResult;
+    try {
+      audioResult = await this.#engine.transition(
+        currentBeat.audioSource,
+        targetBeat.audioSource,
+        duration,
+      );
+    } catch (err) {
+      if (err instanceof LumennInvalidAudioSourceError) {
+        audioResult = "invalid-source";
+        ui.notifications.warn(game.i18n.localize("LUMENN_FRAME.WarnInvalidAudioSource"));
+      } else {
+        console.error("lumenn-frame: falha na transição de áudio", err);
+        audioResult = "error";
+      }
+    }
 
-    LumennBeatStore.setActiveBeat(this.#storyboardId, targetBeatId);
-
+    LumennBeatStore.setActiveBeat(storyboardId, targetBeatId);
     return { sceneChanged, audioResult };
-  }
-
-  stopAudio() {
-    this.#engine.stop();
   }
 }

@@ -1,41 +1,37 @@
 # Changelog
 
-## [0.1.1] — 2026-09-14
-
-Correções de auditoria contra o SDD (3 críticos que travavam o módulo em runtime) + fechamento dos bloqueios de API.
-
-### Corrigido
-- **Deadlock de navegação**: `activeBeatId` nascia `null` e nada podia defini-lo — nem `goToBeat` (exige Beat ativo) nem `Link` (conecta a partir do ativo). Novo botão **"Início"** no modo Edição define o Beat ativo sem disparar transição.
-- **Resolução de playlist quebrada**: motor usava `fromUuidSync()` com id cru de Playlist (que espera UUID `Playlist.xyz`). Agora resolve via `game.playlists.get()`; tracks continuam por UUID.
-- **`PlaylistSound#sound` é lazy** (doc oficial v13): null até o som tocar. Motor reescrito para transições **dirigidas por documento** (`update({fadeDuration, playing})`, `Playlist#playAll/stopAll`) — Sound#fade local não é transmitido aos clientes; agora o crossfade é ouvido por todos os jogadores.
-- `LumennInvalidAudioSourceError` tipado (Specs §4.1): fonte destino inválida sinaliza o Beat sem quebrar a navegação (RF-011).
-- Assinatura do controller conforme Specs §2.3: `goToBeat(storyboardId, targetBeatId)`.
-
-### Adicionado
-- `macros/test-audio-engine.mjs` — suíte manual do motor (Artigo II da Constitution, Blueprint Fase 2): CT-001/002/003/006/007, started, playlist, fonte inválida; mede despacho (RNF-002 ≤ 100ms).
-- Classes expostas em `game.modules.get("lumenn-frame").api` para teste isolado.
-
-### Verificado na doc oficial v13 (bloqueios do Research/Specs §8 fechados)
-- `Scene#activate()` — "Set this scene as currently active".
-- `PlaylistSound#sound` — "created lazily when playback is required".
-- `Playlist#playAll/stopAll`, `PlaylistSound#update({fadeDuration, playing})`, `updateEmbeddedDocuments` (batch).
-
-### Emenda técnica (requer propagação ao Specs §4.1)
-Transições usam documentos em vez de `Sound#fade()` direto: fades locais não sincronizam entre clientes. O patch de `fadeDuration` persiste no som (efeito colateral necessário para duração por Beat — RF-006/RF-012).
-
-## [0.1.0] — 2026-09-14
-
-Primeira implementação completa das 4 camadas (Blueprint §3.1).
-
-- `LumennAudioEngine` (motor de continuidade), `LumennBeatStore` (CRUD via `game.settings` world), `LumennTransitionController` (orquestrador GM-only), `LumennStoryboardApp` (ApplicationV2 + Handlebars, modos Edição/Ao Vivo).
-- Schema do Beat conforme Specs §3.1 (sceneId, audioSource, crossfadeDuration, connections, position).
-- Settings: `storyboards` (world, oculto), `defaultCrossfadeDuration` (world, configurável).
-- i18n en/pt-BR, CSS, templates Handlebars, helpers customizados.
+Todas as entregas abaixo estão dentro da **0.0.1** (em desenvolvimento — a versão só sobe depois do gate de validação em Foundry real). Semver: 0.0.x até a primeira validação de runtime; então 0.1.0.
 
 ## [0.0.1] — 2026-09-14
 
-Bootstrap do módulo Foundry VTT.
-
-- Manifesto `module.json` (`lumenn-frame`, compatibilidade 13.350–14.999).
-- Entrypoint ESM vazio.
+### Bootstrap
+- Manifesto `module.json` (`lumenn-frame`, compatibilidade **13.350 → 14.999**, verified 14.367 — stable atual).
 - Estrutura `scripts/`, `styles/`, `templates/`, `lang/` (en, pt-BR).
+
+### Implementação (4 camadas, Blueprint §3.1)
+- `LumennAudioEngine` — motor de continuidade isolado (manter/crossfade/fade-out).
+- `LumennBeatStore` — CRUD sobre `game.settings` escopo `world`; schema do Beat conforme Specs §3.1.
+- `LumennTransitionController` — `goToBeat(storyboardId, targetBeatId)`; GM-only (RF-009), conexão validada (RF-010), fonte inválida não quebra navegação (RF-011).
+- `LumennStoryboardApp` + `BeatConfigDialog` — **ApplicationV2 + HandlebarsApplicationMixin** em todas as janelas; modos Edição/Ao Vivo.
+- Settings: `storyboards` (world, oculto), `defaultCrossfadeDuration` (world, configurável, RF-012).
+
+### Correções de auditoria SDD (3 críticos de runtime)
+- **Deadlock de navegação**: `activeBeatId` nascia `null` e nada o definia. Botão **"Início"** (modo Edição) define o Beat ativo sem disparar transição.
+- **Playlist quebrada**: `fromUuidSync()` com id cru de Playlist não resolve — agora `game.playlists.get()` (tracks seguem por UUID).
+- **`PlaylistSound#sound` é lazy** (doc oficial: "created lazily when playback is required") — motor reescrito para **transições dirigidas por documento** (`update({fadeDuration, playing})`, `Playlist#playAll/stopAll`). `Sound#fade` local não é transmitido entre clientes; com documento, todos os jogadores ouvem o crossfade.
+- `LumennInvalidAudioSourceError` tipado (Specs §4.1).
+
+### Artigo II — motor validável isoladamente
+- `macros/test-audio-engine.mjs`: CT-001/002/003/006/007 + started + playlist inteira + fonte inválida; mede despacho (RNF-002 ≤ 100ms); restaura o estado ao final.
+- Classes expostas em `game.modules.get("lumenn-frame").api`.
+
+### APIs verificadas na doc oficial (bloqueios do Research/Specs §8 fechados)
+- v13: `Scene#activate()`; `PlaylistSound#sound` (lazy); `PlaylistSound#update({fadeDuration, playing})`; `Playlist#playAll/stopAll`; `Playlist#updateEmbeddedDocuments`.
+- Stable atual da faixa: **v14.367** (18/08/2026). APIs usadas são estáveis v13→v14 (documentos + ApplicationV2).
+
+### Emenda técnica (pendente de propagação ao Specs §4.1)
+Transições via documento em vez de `Sound#fade()` direto — fades locais não sincronizam entre clientes. O patch de `fadeDuration` persiste no som (necessário para RF-006/RF-012).
+
+### Gate antes de subir versão
+- [ ] Rodar `macros/test-audio-engine.mjs` em mundo real (v14.367 e, se possível, 13.350+).
+- [ ] CT-001..CT-008 manuais conforme Specs §5.

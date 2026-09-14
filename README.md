@@ -2,7 +2,7 @@
 
 Módulo standalone para Foundry VTT v13+. Dá ao mestre um storyboard visual de cenas (Beats) com continuidade de áudio.
 
-Versão atual: **0.0.1** — bootstrap. O módulo ativa sem erros; motor de áudio, dados e canvas ainda não estão nesta fatia.
+Versão atual: **0.0.1** bootstrap. O módulo ativa sem erros; motor de áudio, dados e canvas ainda não estão nesta fatia.
 
 ## Instalação
 

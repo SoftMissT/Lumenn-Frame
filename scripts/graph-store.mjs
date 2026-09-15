@@ -1,6 +1,8 @@
 const MODULE_ID = "lumenn-frame";
 const SCHEMA_VERSION = 2;
 
+import { LumennSettings } from "./settings.mjs";
+
 const DEFAULT_COLORS = { scene: "#f0a321", audio: "#2dd4bf", note: "#73707c" };
 
 /**
@@ -12,7 +14,6 @@ export class LumennGraphStore {
   static #GRAPHS_KEY = "graphs";
   static #LEGACY_KEY = "storyboards";
   static #LEGACY_BACKUP_KEY = "legacyBackup";
-  static #DEFAULT_CROSSFADE_KEY = "defaultCrossfadeDuration";
 
   static registerSettings() {
     game.settings.register(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, {
@@ -28,15 +29,6 @@ export class LumennGraphStore {
       config: false,
       type: String,
       default: "",
-    });
-    game.settings.register(MODULE_ID, LumennGraphStore.#DEFAULT_CROSSFADE_KEY, {
-      name: "LUMENN_FRAME.Settings.DefaultCrossfade.Name",
-      hint: "LUMENN_FRAME.Settings.DefaultCrossfade.Hint",
-      scope: "world",
-      config: true,
-      type: Number,
-      default: 3000,
-      range: { min: 500, max: 10000, step: 250 },
     });
   }
 
@@ -58,14 +50,15 @@ export class LumennGraphStore {
   }
 
   static getDefaultCrossfadeDuration() {
-    return game.settings.get(
-      MODULE_ID,
-      LumennGraphStore.#DEFAULT_CROSSFADE_KEY,
-    );
+    return LumennSettings.get("defaultCrossfadeDuration");
   }
 
   static getDefaultColors() {
-    return { ...DEFAULT_COLORS };
+    return {
+      scene: LumennSettings.get("defaultSceneColor") ?? DEFAULT_COLORS.scene,
+      audio: LumennSettings.get("defaultAudioColor") ?? DEFAULT_COLORS.audio,
+      note: LumennSettings.get("defaultNoteColor") ?? DEFAULT_COLORS.note,
+    };
   }
 
   /* ── CRUD de Graphs ─────────────────────────────────────────────── */
@@ -110,9 +103,20 @@ export class LumennGraphStore {
     const data = game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY);
     const graph = data.graphs.find((g) => g.id === graphId);
     if (!graph) return null;
-    graph.nodes.push(node);
+    // Defaults das Settings aplicados quando o caller não os define.
+    const d = LumennSettings.getNodeDefaults(node.type);
+    const n = {
+      id: node.id ?? `node_${foundry.utils.randomID(16)}`,
+      type: node.type,
+      position: node.position ?? { x: 80, y: 80 },
+      color: node.color ?? d.color,
+      size: node.size ?? d.size,
+      notes: node.notes ?? "",
+      data: node.data ?? (node.type === "audio" ? { audioType: null, audioId: null, volume: 0.75, loop: true, fadeIn: null, fadeOut: null } : {}),
+    };
+    graph.nodes.push(n);
     await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
-    return node;
+    return n;
   }
 
   static async updateNode(graphId, nodeId, patch) {
@@ -160,6 +164,18 @@ export class LumennGraphStore {
       (e) => e.type === edge.type && e.from === edge.from && e.to === edge.to,
     );
     if (dup || edge.from === edge.to) return null;
+    if (edge.type === "flow" && !edge.transition) {
+      const t = LumennSettings.getTransitionDefaults();
+      edge.transition = {
+        scene: { type: t.sceneType, duration: t.sceneDuration },
+        audio: {
+          mode: t.audioMode,
+          crossfadeDuration: t.crossfade,
+          fadeInDuration: t.fadeIn,
+          fadeOutDuration: t.fadeOut,
+        },
+      };
+    }
     graph.edges.push(edge);
     await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
     return edge;

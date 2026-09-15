@@ -2,6 +2,37 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.16] - 2026-09-15
+
+> Graph Editor usability hotfix (runtime validation). Build for Foundry 14.367 (primary), 13.350+ backward compatible.
+
+### Fixed / Added
+
+- **Ports visíveis e clicáveis** em modo Edição (FLOW âmbar / AUDIO teal, hit area ≥24px via `::after`, `overflow: visible` no node com wrapper interno clippado, hover forte)
+- **Connect tool** com tooltip "Conectar" + status bar contextual (`Conectar: arraste FLOW OUT → FLOW IN` / `Áudio: arraste AUDIO OUT → AUDIO IN`)
+- **Connection drag** confiável: alvo rastreado durante o move (fallback `elementFromPoint`), ghost edge, target highlight, auto-seleção da edge nova → Inspector da transição abre imediatamente
+- **Fallback UX no Inspector**: Scene Node mostra `Conexões` — outgoing `[+ Adicionar destino]`, `[Associar áudio]`, lista incoming/outgoing com delete
+- **Edge selection** melhorada: hit path 16px, hover ilumina a linha (cursor pointer), tooltip `A → B — editar transição`
+- **Transition Inspector completo**: Scene (Cut/Fade + duration) e Audio (Auto/Keep/Crossfade/Fade Out/Fade In + crossfade, fade in, fade out) — campos sempre visíveis
+- **Labels nas FLOW edges** no centro do grafo: `Fade 1.0s · ♫ Auto 3.0s` (ocultas em zoom < 45%; configurável via setting)
+- **Settings completas** (novo `scripts/settings.mjs`): Transitions (scene type/fade duration, audio mode/crossfade/fade in/fade out), Graph Editor (node sizes/colors, initial zoom, zoom speed, open in workspace), Live (dim unreachable, transition labels, confirm transition, player fade, player audio sync)
+- **Defaults centralizados**: novas FLOW edges usam os defaults das Settings (via `LumennSettings.getTransitionDefaults`); novos nodes usam cor/tamanho das Settings; alterar setting global **não** sobrescreve edges existentes
+- Zoom inicial/velocidade da roda vindos das Settings; abrir em Workspace opcional
+- Confirmação opcional de transição em Live (setting)
+
+### Compatibility
+
+- Primary target Foundry 14.367 · minimum 13.350 · maximum 14.999
+- V14-first architecture; V13 adapter in `foundry-compat.mjs`
+
+### Runtime Validation Pending
+
+- Real audio crossfade (audible runtime test)
+- Scene fade overlay timing
+- GM → Player two-client test
+- Foundry 14.367 runtime QA (GM + Player)
+- Foundry 13.350 compatibility smoke test
+
 ## [0.0.15] - 2026-09-15
 
 > Graph Editor 2.0 **public runtime validation release** for Foundry VTT 14.367 (primary), backward compatible with 13.350+. This is the current `Latest` channel build.

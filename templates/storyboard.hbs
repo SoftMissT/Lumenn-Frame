@@ -45,24 +45,26 @@
         <div class="lf-node lf-node-{{this.type}}{{#if this.isActive}} active{{/if}}{{#if this.isNavigable}} navigable{{/if}}{{#if this.isDimmed}} dimmed{{/if}}{{#if this.selected}} selected{{/if}}{{#if this.targetHi}} target-hi{{/if}}"
              data-id="{{this.id}}"
              style="left:{{this.position.x}}px;top:{{this.position.y}}px;width:{{this.width}}px;height:{{this.height}}px;--node-color:{{this.color}};">
-          <div class="lf-node-head" style="background:{{this.color}}"></div>
-          {{#if (lumenn-eq this.type 'scene')}}
-          <div class="lf-node-thumb">
-            {{#if this.sceneThumb}}<img src="{{this.sceneThumb}}" alt="{{this.sceneName}}" loading="lazy">{{else}}<span class="lf-node-thumb-ph">&#127916;</span>{{/if}}
+          <div class="lf-node-content">
+            <div class="lf-node-head" style="background:{{this.color}}"></div>
+            {{#if (lumenn-eq this.type 'scene')}}
+            <div class="lf-node-thumb">
+              {{#if this.sceneThumb}}<img src="{{this.sceneThumb}}" alt="{{this.sceneName}}" loading="lazy">{{else}}<span class="lf-node-thumb-ph">&#127916;</span>{{/if}}
+            </div>
+            <div class="lf-node-title">{{this.sceneName}}</div>
+            <div class="lf-node-tag">{{#if this.isActive}}<span class="lf-badge-live">{{../label.setInitial}}</span>{{/if}}&#127916; Scene</div>
+            {{/if}}
+            {{#if (lumenn-eq this.type 'audio')}}
+            <div class="lf-node-title">&#9835; {{this.audioLabel}}</div>
+            <div class="lf-node-tag">{{this.audioBadge}}</div>
+            <div class="lf-node-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            {{/if}}
+            {{#if (lumenn-eq this.type 'note')}}
+            <div class="lf-node-title">{{this.data.title}}</div>
+            <div class="lf-node-body">{{this.data.body}}</div>
+            <div class="lf-node-tag">&#182; Note</div>
+            {{/if}}
           </div>
-          <div class="lf-node-title">{{this.sceneName}}</div>
-          <div class="lf-node-tag">{{#if this.isActive}}<span class="lf-badge-live">{{../label.setInitial}}</span>{{/if}}&#127916; Scene</div>
-          {{/if}}
-          {{#if (lumenn-eq this.type 'audio')}}
-          <div class="lf-node-title">&#9835; {{this.audioLabel}}</div>
-          <div class="lf-node-tag">{{this.audioBadge}}</div>
-          <div class="lf-node-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-          {{/if}}
-          {{#if (lumenn-eq this.type 'note')}}
-          <div class="lf-node-title">{{this.data.title}}</div>
-          <div class="lf-node-body">{{this.data.body}}</div>
-          <div class="lf-node-tag">&#182; Note</div>
-          {{/if}}
           <div class="lf-ports">
             {{#if (lumenn-eq this.type 'scene')}}
             <span class="lf-port lf-port-in" data-port="flow-in" data-node="{{this.id}}" title="FLOW IN"></span>
@@ -76,6 +78,9 @@
         </div>
         {{/each}}
       </div>
+      {{#if showConnectHint}}
+      <div class="lf-connect-hint">{{connectHint}}</div>
+      {{/if}}
       {{#if transitioning}}
       <div class="lf-transitioning"><span class="lf-transitioning-dot"></span>{{label.transition}}</div>
       {{/if}}
@@ -99,6 +104,37 @@
           <option value="{{this.id}}" {{#if (lumenn-eq this.id ../inspector.node.data.sceneId)}}selected{{/if}}>{{this.name}}</option>
           {{/each}}
         </select>
+        {{/if}}
+        {{#if (lumenn-eq inspector.nodeType 'scene')}}
+        <h3 class="lf-insp-title">{{label.connections}}</h3>
+        {{#if editable}}
+        <label class="lf-insp-label">{{label.outgoing}}</label>
+        {{#if inspector.flowTargets.length}}
+        <select data-insp-pick="flowTarget">
+          {{#each inspector.flowTargets}}<option value="{{this.id}}">{{this.name}}</option>{{/each}}
+        </select>
+        <div class="lf-insp-actions"><button data-insp-action="add-flow">{{label.addDestination}}</button></div>
+        {{else}}
+        <p class="lf-insp-p">{{label.noScenes}}</p>
+        {{/if}}
+        <label class="lf-insp-label">{{label.attachAudio}}</label>
+        {{#if inspector.audioNodes.length}}
+        <select data-insp-pick="audioAttach">
+          {{#each inspector.audioNodes}}<option value="{{this.id}}">{{this.name}}</option>{{/each}}
+        </select>
+        <div class="lf-insp-actions"><button data-insp-action="attach-audio">{{label.attachAudio}}</button></div>
+        {{else}}
+        <p class="lf-insp-p">{{label.noAudioNodes}}</p>
+        {{/if}}
+        {{/if}}
+        {{#if inspector.nodeEdges.length}}
+        <label class="lf-insp-label">{{label.incoming}} / {{label.outgoing}}</label>
+        <ul class="lf-insp-edges">
+          {{#each inspector.nodeEdges}}
+          <li><span class="lf-insp-edge-dir">{{#if (lumenn-eq this.from ../inspector.node.id)}}&rarr;{{else}}&larr;{{/if}}</span>{{this.fromLabel}} &rarr; {{this.toLabel}}<button class="lf-insp-x" data-insp-action="delete-edge" data-insp-edge="{{this.id}}" title="{{../../label.delete}}">&#10005;</button></li>
+          {{/each}}
+        </ul>
+        {{/if}}
         {{/if}}
         {{#if (lumenn-eq inspector.nodeType 'audio')}}
         <h3 class="lf-insp-title">{{label.audio}}</h3>
@@ -180,6 +216,10 @@
         </select>
         <label class="lf-insp-label">{{label.crossfadeDur}} (ms)</label>
         <input type="number" min="0" step="100" data-insp="transition.audio.crossfadeDuration" value="{{inspector.edge.transition.audio.crossfadeDuration}}">
+        <label class="lf-insp-label">{{label.fadeIn}} (ms)</label>
+        <input type="number" min="0" step="100" data-insp="transition.audio.fadeInDuration" value="{{inspector.edge.transition.audio.fadeInDuration}}">
+        <label class="lf-insp-label">{{label.fadeOut}} (ms)</label>
+        <input type="number" min="0" step="100" data-insp="transition.audio.fadeOutDuration" value="{{inspector.edge.transition.audio.fadeOutDuration}}">
         {{#if editable}}
         <div class="lf-insp-actions">
           {{#if inspector.reverse}}

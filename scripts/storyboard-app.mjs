@@ -1,6 +1,7 @@
 import { LumennGraphStore } from "./graph-store.mjs";
 import { LumennTransitionController } from "./transition-controller.mjs";
 import { LumennCompat } from "./foundry-compat.mjs";
+import { LumennSettings } from "./settings.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 const { DragDrop } = foundry.applications.ux;
@@ -99,6 +100,8 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
   constructor(options = {}) {
     super(options);
     this.#dragDrop = this.#createDragDropHandlers();
+    // Zoom inicial vindo das Settings (default 100%).
+    this.#camera.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, LumennSettings.getCameraDefaults().zoom));
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         if (this.#connectState) {
@@ -189,9 +192,6 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
           x: Math.round(point.x + col * (w + gap)),
           y: Math.round(point.y + row * (h + gap)),
         },
-        color: LumennGraphStore.getDefaultColors()[item.type] ?? "#73707c",
-        size: "normal",
-        notes: "",
         data: { ...(item.data ?? {}) },
       };
       const createdNode = await LumennGraphStore.addNode(this.#graphId, node);
@@ -219,9 +219,6 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         id: `node_${foundry.utils.randomID(16)}`,
         type: "audio",
         position: { x: node.position.x + w + 40, y: node.position.y },
-        color: LumennGraphStore.getDefaultColors().audio,
-        size: "normal",
-        notes: "",
         data: {
           audioType: doc.documentName === "Playlist" ? "playlist" : "track",
           audioId: doc.documentName === "Playlist" ? doc.id : doc.uuid,
@@ -400,6 +397,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         isNavigable: this.#mode === "live" && navigable.has(n.id),
         isDimmed:
           this.#mode === "live" &&
+          LumennSettings.get("dimUnreachable") &&
           n.id !== activeGraph.activeNodeId &&
           !navigable.has(n.id),
         selected: this.#selected.kind === "node" && this.#selected.id === n.id,
@@ -423,6 +421,16 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     const inspector = this.#buildInspector(activeGraph);
 
+    // Hint contextual de conexão (descobribilidade dos ports).
+    let connectHint = null;
+    if (this.#editable() && this.#connectState) {
+      connectHint = this.#connectState.port.startsWith("flow")
+        ? L("LUMENN_FRAME.Connect.HintFlowDrag")
+        : L("LUMENN_FRAME.Connect.HintAudioDrag");
+    } else if (this.#editable() && this.#tool === "connect") {
+      connectHint = L("LUMENN_FRAME.Connect.HintIdle");
+    }
+
     return {
       graphs,
       activeGraph,
@@ -434,7 +442,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       editable: this.#editable(),
       selectedKind: this.#selected.kind,
       connecting: !!this.#connectState,
+      showConnectHint: !!connectHint,
+      connectHint,
       transitioning: this.#transitioning,
+      showEdgeLabels: LumennSettings.get("showTransitionLabels"),
       inspector,
       navigableIds: [...navigable],
       label: {
@@ -491,6 +502,16 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         transition: L("LUMENN_FRAME.Transitioning"),
         from: L("LUMENN_FRAME.Edge.From"),
         to: L("LUMENN_FRAME.Edge.To"),
+        fadeIn: L("LUMENN_FRAME.Inspector.FadeIn"),
+        fadeOut: L("LUMENN_FRAME.Inspector.FadeOut"),
+        connections: L("LUMENN_FRAME.Inspector.Connections"),
+        outgoing: L("LUMENN_FRAME.Inspector.Outgoing"),
+        incoming: L("LUMENN_FRAME.Inspector.Incoming"),
+        addDestination: L("LUMENN_FRAME.Inspector.AddDestination"),
+        attachAudio: L("LUMENN_FRAME.Inspector.AttachAudio"),
+        noScenes: L("LUMENN_FRAME.Inspector.NoScenes"),
+        noAudioNodes: L("LUMENN_FRAME.Inspector.NoAudioNodes"),
+        editTransition: L("LUMENN_FRAME.Edge.EditTransition"),
       },
     };
   }
@@ -595,6 +616,14 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     root
       .querySelector(".lf-edges")
       ?.addEventListener("click", (e) => this.#edgeClick(e));
+
+    // Classe de modo para CSS (ports visíveis em edição, etc).
+    root.classList.toggle("editing", this.#mode === "edit");
+    // Workspace automático na 1ª abertura, se configurado.
+    if (!this._workspaceAuto && LumennSettings.get("openInWorkspace") && !this.#expanded) {
+      this._workspaceAuto = true;
+      this.#toggleWorkspace(root);
+    }
   }
 
   #bindNode(root, node) {
@@ -698,9 +727,6 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         x: Math.round(point.x - w / 2),
         y: Math.round(point.y - h / 2),
       },
-      color: LumennGraphStore.getDefaultColors()[type] ?? "#73707c",
-      size: "normal",
-      notes: "",
       data:
         type === "scene"
           ? { sceneId: null }
@@ -738,7 +764,8 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       "wheel",
       (e) => {
         e.preventDefault();
-        const factor = Math.pow(1.1, -e.deltaY * 0.01);
+        const s = LumennSettings.get("zoomSpeed") / 100;
+        const factor = Math.pow(1 + s, -e.deltaY * 0.01);
         this.#zoomAt(
           this.#clientToScreen(e, viewport),
           this.#camera.zoom * factor,
@@ -861,6 +888,8 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       );
       path.setAttribute("d", d);
       path.setAttribute("fill", "none");
+      path.setAttribute("class", "lf-edge");
+      path.setAttribute("data-edge-id", e.id);
       const selected =
         this.#selected.kind === "edge" && this.#selected.id === e.id;
       if (e.type === "flow") {
@@ -897,6 +926,32 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       }
       svg.appendChild(path);
 
+      // Label central da FLOW edge (config da transição visível no grafo).
+      if (e.type === "flow" && LumennSettings.get("showTransitionLabels") && this.#camera.zoom >= 0.45) {
+        const label = this.#edgeLabelText(e);
+        if (label) {
+          const lx = midX;
+          const ly = (a.y + b.y) / 2 + bend - 4;
+          const text = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text",
+          );
+          text.setAttribute("x", lx);
+          text.setAttribute("y", ly);
+          text.setAttribute("text-anchor", "middle");
+          text.setAttribute("font-size", "11");
+          text.setAttribute("font-family", "var(--lf-font-body)");
+          text.style.fill = "var(--lf-text)";
+          text.style.stroke = "#101014";
+          text.setAttribute("stroke-width", "3");
+          text.setAttribute("stroke-linejoin", "round");
+          text.setAttribute("paint-order", "stroke");
+          text.setAttribute("class", "lf-edge-label");
+          text.textContent = label;
+          svg.appendChild(text);
+        }
+      }
+
       const hit = document.createElementNS(
         "http://www.w3.org/2000/svg",
         "path",
@@ -904,9 +959,13 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       hit.setAttribute("d", d);
       hit.setAttribute("fill", "none");
       hit.setAttribute("stroke", "transparent");
-      hit.setAttribute("stroke-width", "12");
+      hit.setAttribute("stroke-width", "16");
       hit.setAttribute("class", "lf-edge-hit");
       hit.setAttribute("data-edge-id", e.id);
+      hit.setAttribute(
+        "title",
+        `${this.#nodeLabel(from)} → ${this.#nodeLabel(to)} — ${game.i18n.localize("LUMENN_FRAME.Edge.EditTransition")}`,
+      );
       svg.appendChild(hit);
     }
     const ghost = document.createElementNS(
@@ -945,6 +1004,23 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if (ghost) ghost.setAttribute("d", this.#ghostPath());
   }
 
+  /** Texto do label central da FLOW edge: "Fade 1.0s · ♫ Auto 3.0s". */
+  #edgeLabelText(e) {
+    const t = e.transition;
+    if (!t) return null;
+    const L = (k) => game.i18n.localize(k);
+    const sec = (v) => `${((v ?? 0) / 1000).toFixed(1)}s`;
+    const sceneLbl = (t.scene?.type === "fade" ? L("LUMENN_FRAME.Edge.Fade") : L("LUMENN_FRAME.Edge.Cut"));
+    const modeKey = {
+      auto: "LUMENN_FRAME.Edge.Auto",
+      keep: "LUMENN_FRAME.Edge.Keep",
+      crossfade: "LUMENN_FRAME.Edge.Crossfade",
+      fadeout: "LUMENN_FRAME.Edge.FadeOut",
+      fadein: "LUMENN_FRAME.Edge.FadeIn",
+    }[t.audio?.mode ?? "auto"];
+    return `${sceneLbl} ${sec(t.scene?.duration)} · ♫ ${L(modeKey)} ${sec(t.audio?.crossfadeDuration)}`;
+  }
+
   /* ── Connect (port → port) ──────────────────────────────────────── */
 
   #startConnect(e, port) {
@@ -958,7 +1034,8 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       port: port.dataset.port,
       x: e.clientX,
       y: e.clientY,
-      targetHi: null,
+      targetNodeId: null,
+      targetPort: null,
     };
     this.#updateGhost();
     const move = (ev) => {
@@ -980,17 +1057,18 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const el = document
       .elementFromPoint(ev.clientX, ev.clientY)
       ?.closest?.("[data-port]");
-    const prev = this.#connectState?.targetHi;
-    const next = el ? el.dataset.node : null;
-    if (prev === next) return;
-    this.#connectState.targetHi = next;
+    const nodeId = el?.dataset?.node ?? null;
+    const port = el?.dataset?.port ?? null;
+    if (this.#connectState.targetNodeId === nodeId) return;
+    this.#connectState.targetNodeId = nodeId;
+    this.#connectState.targetPort = port;
     const root = this.element;
     root
       .querySelectorAll(".lf-node.target-hi")
       .forEach((n) => n.classList.remove("target-hi"));
-    if (next)
+    if (nodeId)
       root
-        .querySelector(`.lf-node[data-id="${next}"]`)
+        .querySelector(`.lf-node[data-id="${nodeId}"]`)
         ?.classList.add("target-hi");
   }
 
@@ -1002,12 +1080,13 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       .querySelectorAll(".lf-node.target-hi")
       .forEach((n) => n.classList.remove("target-hi"));
     if (!state) return;
-    const el = document
+    // Usa o alvo rastreado durante o move; fallback elementFromPoint.
+    const hitEl = document
       .elementFromPoint(ev.clientX, ev.clientY)
       ?.closest?.("[data-port]");
-    const toNodeId = el?.dataset?.node;
-    const toPort = el?.dataset?.port;
-    if (!el || !toNodeId || toNodeId === state.nodeId) return;
+    const toNodeId = state.targetNodeId ?? hitEl?.dataset?.node ?? null;
+    const toPort = state.targetPort ?? hitEl?.dataset?.port ?? null;
+    if (!toNodeId || toNodeId === state.nodeId) return;
     const valid =
       (state.port === "flow-out" && toPort === "flow-in") ||
       (state.port === "audio-out" && toPort === "audio-in");
@@ -1018,19 +1097,9 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       from: state.nodeId,
       to: toNodeId,
     };
-    if (edge.type === "flow") {
-      edge.transition = {
-        scene: { type: "cut", duration: 0 },
-        audio: {
-          mode: "auto",
-          crossfadeDuration: LumennGraphStore.getDefaultCrossfadeDuration(),
-          fadeInDuration: null,
-          fadeOutDuration: null,
-        },
-      };
-    }
     LumennGraphStore.addEdge(this.#graphId, edge).then((created) => {
       if (created) {
+        // Auto-seleciona a edge nova → Inspector da transição abre imediatamente.
         this.#selected = { kind: "edge", id: created.id };
         this.render();
       }
@@ -1152,10 +1221,27 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.render();
       });
     } else if (action === "delete-edge") {
-      LumennGraphStore.deleteEdge(this.#graphId, this.#selected.id).then(() => {
+      const edgeId = e.currentTarget.dataset.inspEdge ?? this.#selected.id;
+      LumennGraphStore.deleteEdge(this.#graphId, edgeId).then(() => {
         this.#selected = { kind: null, id: null };
         this.render();
       });
+    } else if (action === "add-flow") {
+      const targetId = root.querySelector('[data-insp-pick="flowTarget"]')?.value;
+      if (targetId && this.#selected.kind === "node") {
+        const edge = { id: `edge_${foundry.utils.randomID(16)}`, type: "flow", from: this.#selected.id, to: targetId };
+        LumennGraphStore.addEdge(this.#graphId, edge).then((created) => {
+          if (created) { this.#selected = { kind: "edge", id: created.id }; this.render(); }
+        });
+      }
+    } else if (action === "attach-audio") {
+      const audioId = root.querySelector('[data-insp-pick="audioAttach"]')?.value;
+      if (audioId && this.#selected.kind === "node") {
+        const edge = { id: `edge_${foundry.utils.randomID(16)}`, type: "audio", from: audioId, to: this.#selected.id };
+        LumennGraphStore.addEdge(this.#graphId, edge).then((created) => {
+          if (created) { this.#selected = { kind: "edge", id: created.id }; this.render(); }
+        });
+      }
     } else if (action === "add-return") {
       LumennGraphStore.addReturn(this.#graphId, this.#selected.id).then(() =>
         this.render(),
@@ -1233,6 +1319,15 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       (e) => e.type === "flow" && e.from === graph.activeNodeId && e.to === id,
     );
     if (!edge) return;
+    if (LumennSettings.get("confirmSceneTransition")) {
+      const ok = await foundry.applications.api.DialogV2.confirm({
+        title: game.i18n.localize("LUMENN_FRAME.Toolbar.LiveMode"),
+        content: game.i18n.localize("LUMENN_FRAME.ConfirmTransition"),
+        yes: { label: game.i18n.localize("LUMENN_FRAME.Edge.Go") },
+        no: { label: game.i18n.localize("LUMENN_FRAME.Config.Cancel") },
+      });
+      if (!ok) return;
+    }
     this.#transitioning = true;
     await this.render();
     try {
@@ -1306,7 +1401,30 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     };
     if (this.#selected.kind === "node") {
       const node = graph?.nodes?.find((n) => n.id === this.#selected.id);
-      if (node) return { ...base, kind: "node", node, nodeType: node.type };
+      if (node) {
+        const edges = (graph?.edges ?? [])
+          .filter((e) => e.from === node.id || e.to === node.id)
+          .map((e) => ({
+            ...e,
+            fromLabel: this.#nodeLabel(
+              graph.nodes.find((n) => n.id === e.from),
+            ),
+            toLabel: this.#nodeLabel(graph.nodes.find((n) => n.id === e.to)),
+          }));
+        return {
+          ...base,
+          kind: "node",
+          node,
+          nodeType: node.type,
+          nodeEdges: edges,
+          flowTargets: (graph?.nodes ?? [])
+            .filter((n) => n.type === "scene" && n.id !== node.id)
+            .map((n) => ({ id: n.id, name: this.#nodeLabel(n) })),
+          audioNodes: (graph?.nodes ?? [])
+            .filter((n) => n.type === "audio")
+            .map((n) => ({ id: n.id, name: this.#nodeLabel(n) })),
+        };
+      }
     }
     if (this.#selected.kind === "edge") {
       const edge = graph?.edges?.find((e) => e.id === this.#selected.id);

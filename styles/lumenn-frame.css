@@ -297,6 +297,38 @@
   pointer-events: none;
 }
 
+/* ── Edge hover / labels ──────────────────────────────────────────── */
+.lf-edge {
+  transition: stroke-width var(--lf-transition), filter var(--lf-transition);
+}
+.lf-edge:hover {
+  stroke-width: 4px;
+  filter: brightness(1.45);
+}
+.lf-edge-label {
+  font-weight: 600;
+  user-select: none;
+}
+
+/* ── Connect hint ─────────────────────────────────────────────────── */
+.lf-connect-hint {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 14px;
+  border: 1px solid var(--lf-amber-dim);
+  border-radius: 999px;
+  background: #101014f2;
+  color: var(--lf-amber);
+  font-family: var(--lf-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 8;
+  pointer-events: none;
+  animation: lf-fadeIn .18s ease;
+}
+
 /* ── Nodes ─────────────────────────────────────────────────────────── */
 .lf-node {
   position: absolute;
@@ -306,10 +338,20 @@
   border: 2px solid var(--lf-badge-border);
   border-radius: 6px;
   box-shadow: var(--lf-shadow);
-  overflow: hidden;
+  overflow: visible;      /* ports externos não podem ser recortados */
   z-index: 3;
   cursor: grab;
   transition: border-color var(--lf-transition), box-shadow var(--lf-transition);
+}
+
+/* Conteúdo interno clippado (thumbnail/título), mantendo o card arredondado. */
+.lf-node-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 4px;
 }
 
 .lf-node:hover {
@@ -448,18 +490,27 @@
 
 .lf-port {
   position: absolute;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: var(--lf-badge);
+  background: var(--lf-ink);
   border: 2px solid var(--lf-badge-border);
   box-sizing: border-box;
   pointer-events: auto;
   cursor: crosshair;
-  opacity: 0;
-  transition: opacity var(--lf-transition), border-color var(--lf-transition), transform var(--lf-transition);
+  opacity: .35;
+  z-index: 5;
+  transition: opacity var(--lf-transition), border-color var(--lf-transition), box-shadow var(--lf-transition), transform var(--lf-transition);
 }
-
+/* Hit area expandida (mín. ~24px) sem inflar o círculo visual. */
+.lf-port::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+}
+/* Em modo Edição os ports ficam sempre visíveis; FLOW âmbar, AUDIO teal. */
+.lumenn-frame.graph-editor.editing .lf-port { opacity: 1; }
 .lf-node:hover .lf-port,
 .lf-node.selected .lf-port,
 .lf-viewport.connect-mode .lf-port {
@@ -467,8 +518,21 @@
 }
 
 .lf-port:hover {
+  transform: scale(1.35);
+  box-shadow: 0 0 8px currentColor;
+}
+
+.lf-port-in,
+.lf-port-out {
+  border-color: var(--lf-amber);
+  color: var(--lf-amber);
+}
+
+.lf-port-audio {
   border-color: var(--lf-teal);
-  transform: scale(1.3);
+  color: var(--lf-teal);
+  width: 12px;
+  height: 12px;
 }
 
 .lf-port-in {
@@ -488,8 +552,6 @@
 .lf-port-audio {
   left: -7px;
   top: 62%;
-  width: 10px;
-  height: 10px;
 }
 
 /* ── Empty state / transition overlay ──────────────────────────────── */
@@ -635,6 +697,43 @@
   opacity: .85;
   line-height: 1.4;
 }
+
+.lf-insp-edges {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.lf-insp-edges li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--lf-text);
+  background: var(--lf-badge);
+  border: 1px solid var(--lf-badge-border);
+  border-radius: 3px;
+  padding: 3px 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lf-insp-edge-dir { color: var(--lf-muted); flex: 0 0 auto; }
+.lf-insp-x {
+  flex: 0 0 auto;
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--lf-muted);
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+}
+.lf-insp-x:hover { color: var(--lf-danger); }
 
 .lf-swatches {
   display: flex;

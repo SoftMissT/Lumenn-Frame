@@ -1,19 +1,16 @@
 <div class="lf-root">
-  <div class="lf-titlebar">
-    <h1>Lumenn Frame</h1>
+  <div class="lf-toolbar">
     {{#if storyboards.length}}
     <select class="lf-storyboard-selector" data-storyboard-selector>
       {{#each storyboards}}
       <option value="{{this.id}}" {{#if (lumenn-eq this.id ../activeStoryboard.id)}}selected{{/if}}>{{this.name}}</option>
       {{/each}}
     </select>
+    <span class="lf-divider"></span>
     {{/if}}
-    <span class="lf-spacer"></span>
-  </div>
-
-  <div class="lf-toolbar">
     {{#if isGM}}
     <button data-action="create-storyboard">{{label.createStoryboard}}</button>
+    <button data-action="rename-storyboard">{{label.renameStoryboard}}</button>
     <button data-action="create-beat">{{label.createBeat}}</button>
     <button data-action="delete-storyboard">{{label.deleteStoryboard}}</button>
     <span class="lf-divider"></span>

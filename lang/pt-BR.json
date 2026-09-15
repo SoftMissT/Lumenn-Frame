@@ -5,6 +5,7 @@
   "LUMENN_FRAME.Toolbar.CreateStoryboard": "+ Storyboard",
   "LUMENN_FRAME.Toolbar.CreateBeat": "+ Beat",
   "LUMENN_FRAME.Toolbar.DeleteStoryboard": "Excluir Storyboard",
+  "LUMENN_FRAME.Toolbar.RenameStoryboard": "Renomear Storyboard",
   "LUMENN_FRAME.Toolbar.EditMode": "Edição",
   "LUMENN_FRAME.Toolbar.LiveMode": "Ao Vivo",
   "LUMENN_FRAME.Toolbar.NeedsStartBeat": "Defina o Beat inicial (\"Início\") antes de navegar.",
@@ -36,6 +37,6 @@
   "LUMENN_FRAME.ConfirmDeleteStoryboard": "Excluir este Storyboard e todos os seus Beats?",
   "LUMENN_FRAME.ConfirmDeleteBeat": "Excluir este Beat?",
   "LUMENN_FRAME.EmptyState": "Nenhum Beat ainda",
-  "LUMENN_FRAME.EmptyHint": "Arraste uma Scene ou Playlist para o canvas para criar um Beat, ou clique em \"+ Beat\" acima.",
-  "LUMENN_FRAME.DropHint": "Solte uma Scene ou Playlist da barra lateral aqui."
+  "LUMENN_FRAME.EmptyHint": "Arraste uma Scene, Playlist ou Pasta para o canvas para criar Beats, ou clique em \"+ Beat\" acima.",
+  "LUMENN_FRAME.DropHint": "Solte uma Scene, Playlist ou Pasta da barra lateral aqui."
 }

@@ -65,9 +65,8 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     this.element.querySelector(".beats-canvas")?.classList.remove("drag-over");
     if (!game.user?.isGM || this.#mode !== "edit") return;
 
-    // Sidebar drags carry JSON: {type: "Scene"|"Playlist"|"PlaylistSound", uuid, ...}
     const data = TextEditor.getDragEventData(event);
-    const uuid = data?.uuid ?? event.dataTransfer?.getData("text/plain") ?? "";
+    const uuid = data?.uuid;
     if (!uuid) return;
     let doc;
     try { doc = await fromUuid(uuid); } catch { return; }
@@ -92,15 +91,26 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       return this.render();
     }
 
-    // ── Drop on empty canvas: create new beat ──
-    const beatData = { position };
-    if (doc.documentName === "Scene") beatData.sceneId = doc.id;
-    else if (doc.documentName === "Playlist") beatData.audioSource = { type: "playlist", id: doc.id };
-    else if (doc.documentName === "PlaylistSound") beatData.audioSource = { type: "track", id: doc.uuid };
-    else return;
-
-    LumennBeatStore.createBeat(this.#storyboardId, beatData);
+    // ── Drop on empty canvas ──
+    const docs = this.#resolveDropDocs(doc);
+    let offsetX = 0;
+    for (const d of docs) {
+      const beatData = { position: { x: position.x + offsetX, y: position.y } };
+      if (d.documentName === "Scene") beatData.sceneId = d.id;
+      else if (d.documentName === "Playlist") beatData.audioSource = { type: "playlist", id: d.id };
+      else if (d.documentName === "PlaylistSound") beatData.audioSource = { type: "track", id: d.uuid };
+      else continue;
+      LumennBeatStore.createBeat(this.#storyboardId, beatData);
+      offsetX += 140;
+    }
     this.render();
+  }
+
+  #resolveDropDocs(doc) {
+    if (doc.documentName === "Folder") {
+      return doc.contents.filter((c) => ["Scene", "Playlist", "PlaylistSound"].includes(c.documentName));
+    }
+    return [doc];
   }
 
   /* ── Context ─────────────────────────────────────────────────────── */
@@ -154,6 +164,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       needsStartBeat: !!activeStoryboard && !activeStoryboard.activeBeatId,
       label: {
         createStoryboard: L("LUMENN_FRAME.Toolbar.CreateStoryboard"),
+        renameStoryboard: L("LUMENN_FRAME.Toolbar.RenameStoryboard"),
         createBeat: L("LUMENN_FRAME.Toolbar.CreateBeat"),
         deleteStoryboard: L("LUMENN_FRAME.Toolbar.DeleteStoryboard"),
         editMode: L("LUMENN_FRAME.Toolbar.EditMode"),
@@ -201,7 +212,8 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     const id = event.currentTarget.dataset.id;
     if (!game.user?.isGM) return;
     if (action === "toggle-mode") { this.#mode = this.#mode === "edit" ? "live" : "edit"; return this.render(); }
-    if (action === "create-storyboard") { const s = LumennBeatStore.createStoryboard(); this.#storyboardId = s?.id ?? this.#storyboardId; return this.render(); }
+    if (action === "create-storyboard") return this.#createStoryboard();
+    if (action === "rename-storyboard") return this.#renameStoryboard();
     if (action === "delete-storyboard") return this.#confirmDeleteStoryboard();
     if (action === "create-beat") { const r = this.element.querySelector(".beats-canvas")?.getBoundingClientRect(); LumennBeatStore.createBeat(this.#storyboardId, { position: { x: Math.max(10, (event.clientX - (r?.left ?? 0)) - 60), y: Math.max(10, (event.clientY - (r?.top ?? 0)) - 30) } }); return this.render(); }
     if (action === "set-start-beat") { LumennBeatStore.setActiveBeat(this.#storyboardId, id); return this.render(); }
@@ -238,6 +250,31 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
   }
 
   /* ── Delete confirmations ────────────────────────────────────────── */
+
+  async #createStoryboard() {
+    const name = await foundry.applications.api.DialogV2.prompt({
+      title: game.i18n.localize("LUMENN_FRAME.Toolbar.CreateStoryboard"),
+      content: `<input type="text" name="name" value="Novo Storyboard" autofocus>`,
+      ok: { label: game.i18n.localize("LUMENN_FRAME.Config.Save") },
+    });
+    if (!name) return;
+    const s = LumennBeatStore.createStoryboard(name);
+    this.#storyboardId = s?.id ?? this.#storyboardId;
+    this.render();
+  }
+
+  async #renameStoryboard() {
+    const s = LumennBeatStore.getStoryboard(this.#storyboardId);
+    if (!s) return;
+    const name = await foundry.applications.api.DialogV2.prompt({
+      title: game.i18n.localize("LUMENN_FRAME.Toolbar.RenameStoryboard"),
+      content: `<input type="text" name="name" value="${s.name}" autofocus>`,
+      ok: { label: game.i18n.localize("LUMENN_FRAME.Config.Save") },
+    });
+    if (!name) return;
+    LumennBeatStore.renameStoryboard(this.#storyboardId, name);
+    this.render();
+  }
 
   async #confirmDeleteStoryboard() {
     const confirmed = await foundry.applications.api.DialogV2.confirm({

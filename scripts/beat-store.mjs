@@ -50,6 +50,16 @@ export class LumennBeatStore {
     return storyboard;
   }
 
+  static renameStoryboard(storyboardId, name) {
+    if (!game.user.isGM) return false;
+    const storyboards = this.getAll();
+    const storyboard = storyboards.find((s) => s.id === storyboardId);
+    if (!storyboard) return false;
+    storyboard.name = name;
+    game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
+    return true;
+  }
+
   static deleteStoryboard(storyboardId) {
     if (!game.user.isGM) return false;
     const storyboards = this.getAll().filter((s) => s.id !== storyboardId);

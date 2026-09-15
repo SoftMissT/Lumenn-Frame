@@ -2,6 +2,17 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.12] 2026-09-15
+
+### Correções
+
+- **Janela arrastável**: o `.lf-titlebar` custom do template duplicava o header auto-gerado pelo ApplicationV2, criando duas áreas de drag conflitantes e bloqueando o arraste nativo. Removido do template; o `.window-header` do framework agora é a única área de drag.
+- **Seletor de storyboard clicável**: o `<select>` foi movido do titlebar removido para a toolbar, com `pointer-events: auto` explícito no CSS (`lumenn-frame.css`) — os overlays de grain/vignette não bloqueiam mais o clique.
+- **Renomear storyboard**: novo `LumennBeatStore.renameStoryboard(storyboardId, name)` + action `rename-storyboard` com `DialogV2.prompt`. Criar storyboard agora também pede o nome (antes nascia fixo como "Novo Storyboard").
+- **Drag de pastas**: `#onDrop` agora trata `documentName === "Folder"` — `#resolveDropDocs` itera `folder.contents` e cria um Beat para cada Scene/Playlist/PlaylistSound, com offset horizontal de 140px para não empilhar.
+- **`#onDrop` limpo**: removido o fallback `event.dataTransfer.getData("text/plain")` — `TextEditor.getDragEventData` já parseia o payload JSON da sidebar.
+- i18n: `Toolbar.RenameStoryboard` + hints atualizados (en/pt-BR) para mencionar pastas.
+
 ## [0.0.11] 2026-09-15
 
 ### Correções

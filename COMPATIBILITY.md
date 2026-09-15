@@ -1,30 +1,57 @@
 # Lumenn Frame — Foundry Compatibility
 
-Target: **Foundry VTT 13.350 – 14.999**.
-Toda diferença de API entre gerações fica concentrada em `scripts/foundry-compat.mjs` (`LumennCompat`). Nenhum `if (game.release.generation === 13)` espalhado pelo código.
+## Direção oficial
 
-> [!warning] Status de validação
-> A `v0.0.15-alpha.2` ainda **não foi testada em runtime** (nem v13 nem v14).
-> `module.json` declara `verified: "13.350"` como baseline de desenvolvimento; **não** é uma afirmação de teste. O teste real de v13.350/13.351 e v14 atual (GM + Player) está pendente na test matrix.
+```
+PRIMARY TARGET          Foundry VTT 14.367
+BACKWARD COMPATIBILITY  Foundry VTT 13.350+
+SUPPORTED RANGE         13.350 → 14.999
+```
 
-| API                                                      | v13.350                                  | v14 atual                     | Adapter                                                     | Fallback                                         |
-| :------------------------------------------------------- | :--------------------------------------- | :---------------------------- | :---------------------------------------------------------- | :----------------------------------------------- |
-| `ApplicationV2` (DEFAULT_OPTIONS, position, setPosition) | ✓ (namespace `foundry.applications.api`) | não testado — mesmo namespace | `LumennCompat.getViewportSize()` p/ workspace               | —                                                |
-| `DragDrop` (`foundry.applications.ux`)                   | ✓                                        | não testado                   | —                                                           | —                                                |
-| `TextEditor.getDragEventData`                            | ✓ (`foundry.applications.ux.TextEditor`) | não testado                   | `LumennCompat.getDragData`                                  | `JSON.parse(dataTransfer.getData("text/plain"))` |
-| `fromUuid` / `fromUuidSync`                              | ✓ (globals)                              | não testado                   | `LumennCompat.resolveUuid/Sync`                             | —                                                |
-| `Scene.activate()`                                       | ✓ (verificado no SDD)                    | não testado                   | `LumennCompat.activateScene`                                | —                                                |
-| `Scene.preload()`                                        | ✓                                        | não testado                   | `LumennCompat.preloadScene`                                 | no-op                                            |
-| Module sockets (`game.socket`, `"socket": true`)         | ✓                                        | não testado                   | `LumennCompat.socketOn/Emit`                                | no-op se indisponível                            |
-| `Playlist#playAll/stopAll/updateEmbeddedDocuments`       | ✓ (verificado no SDD)                    | não testado                   | —                                                           | —                                                |
-| `PlaylistSound#update({fadeDuration, playing})`          | ✓ (verificado no SDD)                    | não testado                   | `LumennCompat.updatePlaylistSound` / `getPlaylistSoundFade` | —                                                |
-| `DialogV2.prompt/confirm` (`foundry.applications.api`)   | ✓                                        | não testado                   | —                                                           | leitura via `button.form.elements`               |
-| `game.settings.set` (Promise)                            | ✓                                        | não testado                   | store com `await`                                           | —                                                |
-| Folder drag payload (`uuid`)                             | ✓                                        | não testado                   | `LumennCompat.getDragData`                                  | —                                                |
-| `ResizeObserver`                                         | ✓ (DOM padrão)                           | ✓ (DOM padrão)                | —                                                           | —                                                |
+**V14.367 é a API canônica.** V13.350 é compatibilidade retroativa via `scripts/foundry-compat.mjs` (`LumennCompat`), **somente** onde há diferença verificada. Nenhuma API exclusiva de uma geração fora da camada de compatibilidade.
+
+`module.json`:
+```json
+"compatibility": { "minimum": "13.350", "verified": "14.367", "maximum": "14.999" }
+```
+
+> `verified: "14.367"` = meta de validação efetiva. **Pendente:** testar a implementação final no Foundry 14.367 (GM + Player) antes de declarar a build como estável. V13.350 exige smoke test de compatibilidade.
+
+## Matriz de API
+
+| Área | V14.367 | V13.350 | Estratégia |
+| :-- | :-- | :-- | :-- |
+| ApplicationV2 (DEFAULT_OPTIONS, position, setPosition) | `foundry.applications.api.ApplicationV2` | mesmo namespace | idêntico; sem adapter |
+| DragDrop | `foundry.applications.ux.DragDrop` | mesmo namespace | idêntico; sem adapter |
+| TextEditor.getDragEventData | `foundry.applications.ux.TextEditor.getDragEventData` | mesmo namespace | `LumennCompat.getDragData` (fallback parse manual) |
+| fromUuid / fromUuidSync | globals | globals | `LumennCompat.resolveUuid/Sync` |
+| Scene.activate() | `Scene#activate()` | idêntico | `LumennCompat.activateScene` |
+| Scene.preload() | `Scene#preload()` | idêntico | `LumennCompat.preloadScene` (fallback no-op) |
+| Playlist playAll/stopAll/updateEmbeddedDocuments | documento Playlist | idêntico | sem adapter (verificado no SDD) |
+| PlaylistSound update({fadeDuration, playing}) | documento PlaylistSound | idêntico | `LumennCompat.updatePlaylistSound` / `setPlaylistSoundFade` |
+| PlaylistSound fadeDuration (leitura) | `sound.fadeDuration` | idêntico; fallback `sound.data.fadeDuration` | `LumennCompat.getPlaylistSoundFade` |
+| Module socket | `game.socket`, `"socket": true` | idêntico | `LumennCompat.socketOn/Emit`, `broadcastTransition` |
+| DialogV2.prompt/confirm | `foundry.applications.api.DialogV2` | mesmo namespace | sem adapter (leitura via `button.form.elements`) |
+| game.settings.set | Promise | Promise | store com `await` |
+| Folder drag payload (uuid) | `TextEditor.getDragEventData` | idêntico | `LumennCompat.getDragData` |
+| ResizeObserver | DOM padrão | DOM padrão | sem adapter |
+
+## Documentação dos métodos da camada (`foundry-compat.mjs`)
+
+Cada método traz no JSDoc: implementação **V14**, fallback **V13**, fonte.
+
+| Método | V14 impl | V13 fallback | Fonte |
+| :-- | :-- | :-- | :-- |
+| `getDragData` | `foundry.applications.ux.TextEditor.getDragEventData` | `JSON.parse(dataTransfer.getData("text/plain"))` | Context7 (DragDrop/AppV2) |
+| `resolveUuid` / `resolveUuidSync` | `fromUuid` / `fromUuidSync` | — | Context7 (Documents) |
+| `activateScene` | `Scene#activate()` | — | Research-Lumenn-Frame |
+| `preloadScene` | `Scene#preload()` | no-op | idem |
+| `updatePlaylistSound` / `setPlaylistSoundFade` | `PlaylistSound#update` | — | Research-Lumenn-Frame + audio-engine |
+| `getPlaylistSoundFade` | `sound.fadeDuration` | `sound.data.fadeDuration` | idem |
+| `socketOn` / `socketEmit` / `broadcastTransition` | `game.socket` | no-op se indisponível | Context7 (sockets) |
+| `expandWorkspace` | `ApplicationV2#setPosition` | — | Context7 (AppV2) |
 
 ## Regras
-
-1. Usar **sempre** `LumennCompat.*` para acesso a essas APIs no código do módulo.
-2. Feature detection quando a API permite; `getGeneration()` apenas quando necessário (hoje: nenhum uso direto além do compat).
+1. Usar **sempre** `LumennCompat.*` para acesso a essas APIs.
+2. Adapters só após diferença **verificada** (V14 vs V13).
 3. Adicionar linha aqui antes de introduzir qualquer nova API Foundry no módulo.

@@ -1,21 +1,24 @@
 /**
- * LumennCompat — camada central de compatibilidade Foundry v13.350 ↔ v14.999.
+ * LumennCompat — camada central de compatibilidade Foundry.
  *
- * REGRA ZERO: toda diferença de API entre gerações fica concentrada aqui.
- * O resto do módulo usa somente as APIs internas expostas por este objeto.
- * Feature detection quando possível; generation check apenas quando necessário.
+ * PRIMÁRIO:  Foundry VTT 14.367 (API canônica).
+ * RETROATIVO: Foundry VTT 13.350+ (adapter apenas onde há diferença verificada).
+ * Faixa: 13.350 → 14.999.
+ *
+ * Regra: cada método documenta a implementação V14, o fallback V13 e a fonte.
+ * Nenhuma API exclusiva de uma geração é usada fora desta camada.
  */
 
 export const SOCKET_NAME = "module.lumenn-frame";
 
 export const LumennCompat = {
-  /** Geração do Foundry (ex.: 13, 14). */
+  /** Geração do Foundry (ex.: 14). V14 é a referência canônica. */
   getGeneration() {
-    return game.release?.generation ?? 13;
+    return game.release?.generation ?? 14;
   },
 
   isV14() {
-    return (game.release?.generation ?? 13) >= 14;
+    return (game.release?.generation ?? 14) >= 14;
   },
 
   isGM() {
@@ -26,7 +29,12 @@ export const LumennCompat = {
     return game.userId;
   },
 
-  /** Extrai o payload do drag de forma compatível v13/v14. */
+  /**
+   * Extrai o payload do drag (sidebar) de forma compatível.
+   * V14: `foundry.applications.ux.TextEditor.getDragEventData(event)`.
+   * V13: mesmo namespace (idêntico). Fallback: parse manual do `text/plain`.
+   * Fonte: Context7 (ApplicationV2/DragDrop), idêntico v13→v14.
+   */
   getDragData(event) {
     const TE = foundry.applications?.ux?.TextEditor;
     if (TE?.getDragEventData) return TE.getDragEventData(event);
@@ -37,7 +45,10 @@ export const LumennCompat = {
     }
   },
 
-  /** Resolve um UUID para o documento (await). */
+  /**
+   * Resolve UUID -> documento (await).
+   * V14: `fromUuid` global. V13: idêntico. Fonte: Context7 (Documents id vs uuid).
+   */
   async resolveUuid(uuid) {
     if (!uuid) return null;
     try {
@@ -47,7 +58,7 @@ export const LumennCompat = {
     }
   },
 
-  /** Resolve um UUID sincronamente. */
+  /** V14/V13: `fromUuidSync` global (idêntico). Fonte: Context7. */
   resolveUuidSync(uuid) {
     if (!uuid) return null;
     try {
@@ -57,31 +68,49 @@ export const LumennCompat = {
     }
   },
 
-  /** Ativa uma Scene (GM). */
+  /**
+   * Ativa uma Scene (GM only).
+   * V14: `Scene#activate()`. V13: idêntico. Fonte: Research-Lumenn-Frame (doc oficial).
+   */
   async activateScene(scene) {
     if (!scene?.activate) return null;
     return scene.activate();
   },
 
-  /** Pré-carrega uma Scene, se a API existir. */
+  /** Pré-carrega uma Scene. V14: `Scene#preload()`. V13: idêntico. Fallback: no-op. */
   preloadScene(scene) {
     if (scene?.preload) return Promise.resolve(scene.preload());
     return Promise.resolve(null);
   },
 
-  /** Atualiza um PlaylistSound (fade/playing) de forma compatível. */
+  /**
+   * Atualiza um PlaylistSound (fade/playing).
+   * V14: `PlaylistSound#update({fadeDuration, playing})`. V13: idêntico (schema de documento).
+   * Fonte: Research-Lumenn-Frame + audio-engine.mjs (verificado).
+   */
   async updatePlaylistSound(sound, data) {
     if (!sound?.update) return null;
     return sound.update(data);
   },
 
-  /** Lê o fadeDuration de um PlaylistSound sem assumir shape. */
+  /**
+   * Lê fadeDuration de um PlaylistSound sem assumir shape.
+   * V14: `sound.fadeDuration`. V13: idêntico; fallback `sound.data.fadeDuration`.
+   */
   getPlaylistSoundFade(sound) {
     if (!sound) return null;
     return sound.fadeDuration ?? sound.data?.fadeDuration ?? null;
   },
 
-  /* ── Sockets (module socket, v13+; requer "socket": true no manifest) ── */
+  /** Grava fadeDuration de forma tolerante ao shape (v13/v14). */
+  setPlaylistSoundFade(sound, value) {
+    if (sound?.update) return sound.update({ fadeDuration: value });
+    return null;
+  },
+
+  /* ── Sockets (module socket) ─────────────────────────────────────── */
+  // V14: `game.socket.emit/on` com `"socket": true` no manifest. V13: idêntico.
+  // Fonte: Context7 (sockets).
 
   socketOn(handler) {
     if (game.socket?.on) {
@@ -99,12 +128,29 @@ export const LumennCompat = {
     return false;
   },
 
+  /** Alias semântico: broadcast de uma transição narrativa para os clientes. */
+  broadcastTransition(payload) {
+    return this.socketEmit({ type: "transition", ...payload });
+  },
+
   get activeGM() {
     return game.users?.activeGM ?? null;
   },
 
-  /** Tamanho da viewport do navegador (para Workspace expandido). */
+  /** Tamanho da viewport (navegador) para Workspace expandido. */
   getViewportSize() {
     return { width: window.innerWidth, height: window.innerHeight };
+  },
+
+  /**
+   * Expande uma ApplicationV2 para ocupar quase toda a viewport.
+   * V14: `ApplicationV2#setPosition({left, top, width, height})`. V13: idêntico.
+   * Fonte: Context7 (ApplicationV2 position/setPosition).
+   */
+  expandWorkspace(app) {
+    const { width, height } = this.getViewportSize();
+    const prev = { ...(app.position ?? {}) };
+    app.setPosition({ left: 8, top: 8, width: width - 16, height: height - 16 });
+    return prev;
   },
 };

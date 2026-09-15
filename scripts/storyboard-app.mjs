@@ -360,14 +360,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       if (this.#prevPosition) this.setPosition(this.#prevPosition);
       this.#expanded = false;
     } else {
-      const { width, height } = LumennCompat.getViewportSize();
-      this.#prevPosition = { ...this.position };
-      this.setPosition({
-        left: 8,
-        top: 8,
-        width: width - 16,
-        height: height - 16,
-      });
+      this.#prevPosition = LumennCompat.expandWorkspace(this);
       this.#expanded = true;
     }
     const btn = root.querySelector("[data-action='workspace-toggle']");

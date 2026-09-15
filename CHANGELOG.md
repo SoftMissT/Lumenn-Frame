@@ -24,7 +24,7 @@ As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver
 - GM/Player sync via module socket (`module.lumenn-frame`; `socket: true`); players espelham o fade
 - Schema v2 (`graphs`: nodes[] + edges[]) + migração não-destrutiva do schema v1 (backup + idempotente)
 - `foundry-compat.mjs` (camada central de compat) + `COMPATIBILITY.md`
-- `module.json`: `socket: true`, min 13.350 / max 14.999, verified 13.350 (baseline, sem claim de teste)
+- `module.json`: `socket: true`, min 13.350 / max 14.999, verified 14.367 (target primário; validação runtime pendente)
 
 ### Bloqueado / pendente (ver relatório)
 

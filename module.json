@@ -1,7 +1,7 @@
 {
   "id": "lumenn-frame",
   "title": "Lumenn Frame",
-  "description": "Storyboard visual de cenas (Beats) com continuidade de áudio para o mestre. Standalone, Foundry VTT v13.350+.",
+  "description": "Lumenn Frame is a cinematic graph editor for Foundry VTT, providing Scene, Audio and Note nodes, directional narrative flow edges, configurable scene/audio transitions, audio continuity, an infinite pan/zoom canvas with Fit All, a contextual Inspector, live GM navigation and GM-to-player synchronization. Primary target Foundry 14.367, backward compatible with 13.350+.",
   "version": "0.0.15-alpha.2",
   "license": "GPL-3.0",
   "url": "https://github.com/SoftMissT/Lumenn-Frame",

@@ -2,37 +2,70 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
-## 0.0.15-alpha.2
+## [0.0.15-alpha.2] - 2026-09-15
 
-> **Graph Editor 2.0** (drift reset). Build de validação de runtime — implementação completa no código; **QA v13/v14 (GM+Player) ainda pendente**.
+> Graph Editor 2.0 — runtime validation build for Foundry VTT 14.367 (primary), backward compatible with 13.350+. **Not a stable release.**
 
-### Implementado (Fase única pós-drift-reset)
+### Added
 
-- Workspace `[Expandir]/[Restaurar]` via `ApplicationV2.setPosition`
-- Canvas infinito (coordenadas ±, sem clamps)
-- Câmera: pan (Space+drag, botão do meio), zoom centrado no cursor, `- 100% + Fit`
-- Toolbar esquerda: Select / Hand / Connect / Scene / Audio / Note
-- Scene / Audio / Note Nodes com cores, tamanhos (compact/normal/large) e aparência distinta
-- Inspector lateral contextual (graph/node/edge)
-- Ports (FLOW IN/OUT, AUDIO IN/OUT) + criação de edges por drag port→port com ghost + target highlight + Escape
-- FLOW edges (direcionais; A→B/B→A independentes; recíprocas com curva offset) e AUDIO edges (tracejadas, associação não-navegável)
-- Edge selection (hit target grosso) + transição por edge (scene cut/fade; audio auto/keep/crossfade/fadeout/fadein)
-- `[Adicionar retorno B → A]` + estado Bidirectional
-- Drag/drop: Scene→Scene Node, Playlist/PlaylistSound→Audio Node, Folder→grid
-- Live Mode (pan/zoom/select; move/edit/connect/delete bloqueados; navegação só por outgoing FLOW)
-- Transições executadas: Scene fade overlay + `Scene.activate()`; crossfade real por Audio Nodes via `LumennAudioEngine.applyMode`
-- GM/Player sync via module socket (`module.lumenn-frame`; `socket: true`); players espelham o fade
-- Schema v2 (`graphs`: nodes[] + edges[]) + migração não-destrutiva do schema v1 (backup + idempotente)
-- `foundry-compat.mjs` (camada central de compat) + `COMPATIBILITY.md`
-- `module.json`: `socket: true`, min 13.350 / max 14.999, verified 14.367 (target primário; validação runtime pendente)
+- Workspace expansion (`Expand`/`Restore`)
+- Infinite canvas / camera
+- Pan (Space + drag, middle mouse)
+- Zoom (cursor-centered)
+- Fit All / 100% reset
+- Scene Nodes
+- Audio Nodes
+- Note Nodes
+- Per-node colors
+- Per-node sizes (`compact` / `normal` / `large`)
+- Inspector (contextual: graph / node / edge)
+- FLOW ports
+- AUDIO ports
+- Port-to-port connection UX (ghost + target highlight + Escape)
+- Directional FLOW edges
+- AUDIO attachment edges
+- Reciprocal flow support (`A→B` / `B→A` independent)
+- Selectable edges (thick hit target)
+- Transition Inspector
+- `Add return B → A` action
+- Graph Schema v2 (`graphs`: nodes[] + edges[])
+- Legacy migration (schema v1 → v2, backup + idempotent)
+- Foundry compatibility layer (`scripts/foundry-compat.mjs`)
+- Module socket infrastructure (`socket: true`)
 
-### Bloqueado / pendente (ver relatório)
+### Transitions
 
-- Runtime QA v13.350/13.351 e v14 (GM + Player) — sem ambiente de teste disponível
-- Crossfade audível com áudio real — requer teste de runtime
-- verified v14 — não testado
+- Per-FLOW-edge Scene transition configuration (`Cut` / `Fade`)
+- Per-FLOW-edge Audio transition configuration (`Auto` / `Keep` / `Crossfade` / `Fade Out` / `Fade In`)
+- Configurable Scene transition duration
+- Configurable Audio crossfade duration
+- Audio source resolution through Audio Nodes
 
-## 0.0.15-alpha.1
+### Compatibility
+
+- Primary target Foundry 14.367
+- Minimum Foundry 13.350
+- Maximum Foundry 14.999
+- V14-first compatibility architecture
+- V13 compatibility adapter (`foundry-compat.mjs`)
+- `COMPATIBILITY.md` matrix (V14 implementation / V13 fallback / source)
+
+### Changed
+
+- Beat-centric data model replaced by Graph Schema v2
+- Audio is now represented by dedicated Audio Nodes (not a generic Beat field)
+- Node actions moved toward the contextual Inspector (away from tiny per-card buttons)
+- Camera navigation replaces scroll-bound canvas behavior
+
+### Known Validation Gaps
+
+- Real audio crossfade still requires runtime QA
+- Scene fade overlay requires runtime QA
+- GM → Player synchronization requires two-client QA
+- Foundry 14.367 runtime QA pending
+- Foundry 13.350 compatibility smoke test pending
+
+## [0.0.15-alpha.1]
 
 > **ALPHA / runtime validation build** — Graph Editor 2.0, **Phase A: Camera only**. Nenhuma feature de Fase B (schema v2, ports, Inspector, novos node types) incluída.
 

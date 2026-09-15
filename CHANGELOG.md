@@ -2,6 +2,13 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.7] 2026-09-15
+
+### Correção
+
+- CSS: variáveis movidas de `:root` (seletor global) para `.lumenn-frame` — `:root` em Foundry v13+ interfere na camada de temas.
+- CSS: cadeia de altura corrigida (`display:flex` + `min-height:0` no container, `.lf-root` e `.lf-canvas`) — canvas colapsava para 0 de altura e a janela ficava escura/vazia.
+
 ## [0.0.6] 2026-09-15
 
 ### Correção

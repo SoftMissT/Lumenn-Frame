@@ -1,8 +1,8 @@
 import { LumennBeatStore } from "./beat-store.mjs";
 import { LumennTransitionController } from "./transition-controller.mjs";
 
-const { ApplicationV2, HandlebarsApplicationMixin, DragDrop } = foundry.applications.api;
-const { TextEditor } = foundry.applications.ux ?? foundry.applications ?? foundry;
+const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+const { DragDrop } = foundry.applications.ux;
 
 /** GM storyboard editor/live controller. Domain state remains in BeatStore. */
 export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV2) {

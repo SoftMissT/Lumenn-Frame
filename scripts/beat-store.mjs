@@ -18,8 +18,8 @@ export class LumennBeatStore {
     });
 
     game.settings.register(MODULE_ID, LumennBeatStore.#DEFAULT_CROSSFADE_KEY, {
-      name: "Default Crossfade Duration (ms)",
-      hint: "Duração padrão do crossfade entre Beats. Cada Beat pode sobrescrever este valor.",
+      name: "LUMENN_FRAME.Settings.DefaultCrossfade.Name",
+      hint: "LUMENN_FRAME.Settings.DefaultCrossfade.Hint",
       scope: "world",
       config: true,
       type: Number,

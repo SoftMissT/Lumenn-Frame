@@ -1,5 +1,7 @@
 {
   "LUMENN_FRAME.Title": "Lumenn Frame",
+  "LUMENN_FRAME.Settings.DefaultCrossfade.Name": "Duração padrão do Crossfade (ms)",
+  "LUMENN_FRAME.Settings.DefaultCrossfade.Hint": "Duração padrão do crossfade entre Beats. Cada Beat pode sobrescrever este valor.",
   "LUMENN_FRAME.Toolbar.CreateStoryboard": "+ Storyboard",
   "LUMENN_FRAME.Toolbar.CreateBeat": "+ Beat",
   "LUMENN_FRAME.Toolbar.DeleteStoryboard": "Excluir Storyboard",

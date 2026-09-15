@@ -1,70 +1,72 @@
-<div class="lf-titlebar">
-  <h1>Lumenn Frame</h1>
-  {{#if storyboards.length}}
-  <select class="lf-storyboard-selector" data-storyboard-selector>
-    {{#each storyboards}}
-    <option value="{{this.id}}" {{#if (lumenn-eq this.id ../activeStoryboard.id)}}selected{{/if}}>{{this.name}}</option>
-    {{/each}}
-  </select>
-  {{/if}}
-  <span class="lf-spacer"></span>
-</div>
-
-<div class="lf-toolbar">
-  {{#if isGM}}
-  <button data-action="create-storyboard">{{label.createStoryboard}}</button>
-  <button data-action="create-beat">{{label.createBeat}}</button>
-  <button data-action="delete-storyboard">{{label.deleteStoryboard}}</button>
-  <span class="lf-divider"></span>
-  {{#if needsStartBeat}}<button class="lf-start-btn" disabled>{{label.needsStartBeat}}</button>{{/if}}
-  <div class="lf-mode-toggle">
-    <button class="{{#if (lumenn-eq mode 'edit')}}active{{/if}}" data-action="toggle-mode">{{label.editMode}}</button>
-    <button class="{{#if (lumenn-eq mode 'live')}}active{{/if}}" data-action="toggle-mode">{{label.liveMode}}</button>
+<div class="lf-root">
+  <div class="lf-titlebar">
+    <h1>Lumenn Frame</h1>
+    {{#if storyboards.length}}
+    <select class="lf-storyboard-selector" data-storyboard-selector>
+      {{#each storyboards}}
+      <option value="{{this.id}}" {{#if (lumenn-eq this.id ../activeStoryboard.id)}}selected{{/if}}>{{this.name}}</option>
+      {{/each}}
+    </select>
+    {{/if}}
+    <span class="lf-spacer"></span>
   </div>
-  {{/if}}
-</div>
 
-<div class="lf-canvas">
-  {{#if beats.length}}
-  <div class="beats-canvas" style="position:relative;min-height:100%;">
-    <svg class="connectors"></svg>
-    {{#each beats}}
-    <div class="beat-node{{#if isActive}} active{{/if}}{{#if isConnected}} connected{{/if}}{{#if isNavigable}} navigable{{/if}}{{#if isDimmed}} dimmed{{/if}}{{#unless isValid}} invalid{{/unless}}"
-         data-id="{{this.id}}"
-         {{#if isNavigable}}data-navigable="true"{{/if}}
-         style="left:{{this.position.x}}px;top:{{this.position.y}}px;">
-      <div class="beat-thumb">
-        {{#if this.sceneThumb}}
-          <img src="{{this.sceneThumb}}" alt="{{this.sceneName}}" loading="lazy">
-        {{else}}
-          <span class="beat-placeholder">&#127909;</span>
+  <div class="lf-toolbar">
+    {{#if isGM}}
+    <button data-action="create-storyboard">{{label.createStoryboard}}</button>
+    <button data-action="create-beat">{{label.createBeat}}</button>
+    <button data-action="delete-storyboard">{{label.deleteStoryboard}}</button>
+    <span class="lf-divider"></span>
+    {{#if needsStartBeat}}<button class="lf-start-btn" disabled>{{label.needsStartBeat}}</button>{{/if}}
+    <div class="lf-mode-toggle">
+      <button class="{{#if (lumenn-eq mode 'edit')}}active{{/if}}" data-action="toggle-mode">{{label.editMode}}</button>
+      <button class="{{#if (lumenn-eq mode 'live')}}active{{/if}}" data-action="toggle-mode">{{label.liveMode}}</button>
+    </div>
+    {{/if}}
+  </div>
+
+  <div class="lf-canvas">
+    {{#if beats.length}}
+    <div class="beats-canvas" style="position:relative;min-height:100%;">
+      <svg class="connectors"></svg>
+      {{#each beats}}
+      <div class="beat-node{{#if isActive}} active{{/if}}{{#if isConnected}} connected{{/if}}{{#if isNavigable}} navigable{{/if}}{{#if isDimmed}} dimmed{{/if}}{{#unless isValid}} invalid{{/unless}}"
+           data-id="{{this.id}}"
+           {{#if isNavigable}}data-navigable="true"{{/if}}
+           style="left:{{this.position.x}}px;top:{{this.position.y}}px;">
+        <div class="beat-thumb">
+          {{#if this.sceneThumb}}
+            <img src="{{this.sceneThumb}}" alt="{{this.sceneName}}" loading="lazy">
+          {{else}}
+            <span class="beat-placeholder">&#127909;</span>
+          {{/if}}
+        </div>
+        <div class="beat-label">{{this.sceneName}}</div>
+        <div class="beat-meta">
+          {{#if this.isActive}}<span class="beat-badge start-badge">{{../label.start}}</span>{{/if}}
+          {{#if this.audioLabel}}<span class="beat-badge"><i class="audio-kind-icon {{#if (lumenn-eq this.audioKind 'playlist')}}fa-solid fa-list-ul{{else}}fa-solid fa-music{{/if}}"></i>{{this.audioLabel}}</span>{{/if}}
+          {{#unless this.isValid}}<span class="beat-badge invalid-badge">{{../label.invalid}}</span>{{/unless}}
+        </div>
+        {{#if (lumenn-and ../isGM (lumenn-eq ../mode "edit"))}}
+        <div class="beat-actions">
+          {{#unless this.isActive}}<button class="start-action" data-action="set-start-beat" data-id="{{this.id}}" title="{{../label.start}}">&#9733;</button>{{/unless}}
+          <button data-action="edit-beat" data-id="{{this.id}}" title="{{../label.edit}}">&#9998;</button>
+          <button data-action="connect-beat" data-id="{{this.id}}" title="{{../label.link}}">&#9741;</button>
+          <button data-action="delete-beat" data-id="{{this.id}}" title="{{../label.delete}}">&#10005;</button>
+        </div>
         {{/if}}
       </div>
-      <div class="beat-label">{{this.sceneName}}</div>
-      <div class="beat-meta">
-        {{#if this.isActive}}<span class="beat-badge start-badge">{{../label.start}}</span>{{/if}}
-        {{#if this.audioLabel}}<span class="beat-badge"><i class="audio-kind-icon {{#if (lumenn-eq this.audioKind 'playlist')}}fa-solid fa-list-ul{{else}}fa-solid fa-music{{/if}}"></i>{{this.audioLabel}}</span>{{/if}}
-        {{#unless this.isValid}}<span class="beat-badge invalid-badge">{{../label.invalid}}</span>{{/unless}}
-      </div>
-      {{#if (lumenn-and ../isGM (lumenn-eq ../mode "edit"))}}
-      <div class="beat-actions">
-        {{#unless this.isActive}}<button class="start-action" data-action="set-start-beat" data-id="{{this.id}}" title="{{../label.start}}">&#9733;</button>{{/unless}}
-        <button data-action="edit-beat" data-id="{{this.id}}" title="{{../label.edit}}">&#9998;</button>
-        <button data-action="connect-beat" data-id="{{this.id}}" title="{{../label.link}}">&#9741;</button>
-        <button data-action="delete-beat" data-id="{{this.id}}" title="{{../label.delete}}">&#10005;</button>
-      </div>
-      {{/if}}
+      {{/each}}
     </div>
-    {{/each}}
+    {{#if transitioning}}
+    <div class="lf-transitioning"><span class="lf-transitioning-dot"></span>{{label.transitioning}}</div>
+    {{/if}}
+    {{else}}
+    <div class="lf-empty-state">
+      <div class="lf-empty-icon">&#127909;</div>
+      <div class="lf-empty-title">{{label.emptyState}}</div>
+      <div class="lf-empty-hint">{{label.emptyHint}}<br>{{label.dropHint}}</div>
+    </div>
+    {{/if}}
   </div>
-  {{#if transitioning}}
-  <div class="lf-transitioning"><span class="lf-transitioning-dot"></span>{{label.transitioning}}</div>
-  {{/if}}
-  {{else}}
-  <div class="lf-empty-state">
-    <div class="lf-empty-icon">&#127909;</div>
-    <div class="lf-empty-title">{{label.emptyState}}</div>
-    <div class="lf-empty-hint">{{label.emptyHint}}<br>{{label.dropHint}}</div>
-  </div>
-  {{/if}}
 </div>

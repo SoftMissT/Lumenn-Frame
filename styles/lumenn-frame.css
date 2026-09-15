@@ -24,8 +24,6 @@
 
 /* ── Base container ────────────────────────────────────────────────── */
 .lumenn-frame.storyboard {
-  display: flex;
-  flex-direction: column;
   height: 100%;
   background: var(--lf-ink);
   color: var(--lf-text);
@@ -33,6 +31,12 @@
   font-size: 13px;
   overflow: hidden;
   position: relative;
+}
+
+.lumenn-frame.storyboard .lf-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 /* Film grain overlay */

@@ -352,7 +352,6 @@ class BeatConfigDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     title: "LUMENN_FRAME.Config.Title",
     tag: "form",
     position: { width: 440, height: "auto" },
-    form: { closeOnSubmit: true },
   };
 
   static PARTS = {

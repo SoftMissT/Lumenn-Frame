@@ -2,6 +2,46 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.3] 2026-09-15
+
+### UI/UX — Cinematic Edit Bay
+
+- Redesign completo do canvas: tema dark near-black (`#0c0c0f`), film grain, vignette, conectores bezier com seta, fontes Modesto Condensed + Montserrat.
+- Thumbnails de Scene nos Beat cards (16:9) + ícone de tipo de áudio (faixa/playlist).
+- Seletor de fonte de áudio com **abas** "Nenhum / Faixa / Playlist" (PDR Decisão #4).
+- Empty state com instruções de drag-and-drop.
+
+### Drag & Drop
+
+- Arrastar Scene da sidebar → cria Beat; sobre Beat existente → substitui Scene.
+- Arrastar Playlist/PlaylistSound → define a fonte de áudio do Beat.
+- `DragDrop` (ApplicationV2) em `foundry.applications.ux`.
+
+### Conformidade SDD (reconciliação)
+
+- **Navegação ao vivo** (US-002/RF-004): clique no Beat conectado (modo Ao Vivo) → `Scene.activate()` + transição de áudio.
+- **Indicador de transição** (US-D001): overlay "Transicionando…" durante o crossfade.
+- **Beats não-conectados esmaecidos** (PDR Clarification #2/RF-010) no modo Ao Vivo.
+- **Ações de edição ocultas no Ao Vivo** (US-D002).
+- **Confirmação de delete** (storyboard + Beat) via `DialogV2.confirm`.
+- **i18n completo** en/pt-BR em todos os templates e settings.
+
+### Correções
+
+- `DragDrop` importado de `foundry.applications.ux` (não `applications.api`).
+- Manifest apontando para `releases/latest/download/module.json` (convenção do repo), com `module.json` + zip como assets do release.
+- Settings `name`/`hint` localizados via i18n.
+
+### SDD
+
+- Arquivos canônicos `Specs/Requirements/Blueprint` restaurados (RF-013, `currentMode`, CT-009/010/011).
+- Emenda do motor dirigido por documento propagada ao **Specs §4.1** + **Blueprint §3.3**.
+
+### Gate antes de subir versão
+
+- [ ] Rodar `macros/test-audio-engine.mjs` em mundo real (v14.367 e, se possível, 13.350+).
+- [ ] CT-001..CT-011 manuais conforme Specs §5.
+
 ## [0.0.2] 2026-09-14
 
 ### Correção de HUD e controles

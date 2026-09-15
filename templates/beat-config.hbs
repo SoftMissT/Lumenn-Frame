@@ -23,15 +23,13 @@
 
 <div class="bc-section">
   <div class="bc-section-title">{{label.audioType}}</div>
-  <div class="bc-row">
-    <label for="lf-config-audio-type">{{label.audioType}}</label>
-    <select id="lf-config-audio-type" name="audioType">
-      <option value="none" {{#unless beat.audioSource}}selected{{/unless}}>{{label.none}}</option>
-      <option value="track" {{#if (lumenn-eq beat.audioSource.type "track")}}selected{{/if}}>{{label.track}}</option>
-      <option value="playlist" {{#if (lumenn-eq beat.audioSource.type "playlist")}}selected{{/if}}>{{label.playlist}}</option>
-    </select>
+  <div class="bc-tabs" role="tablist">
+    <button type="button" class="bc-tab{{#unless beat.audioSource}} active{{/unless}}" data-audio-type="none">{{label.none}}</button>
+    <button type="button" class="bc-tab{{#if (lumenn-eq beat.audioSource.type 'track')}} active{{/if}}" data-audio-type="track">{{label.track}}</button>
+    <button type="button" class="bc-tab{{#if (lumenn-eq beat.audioSource.type 'playlist')}} active{{/if}}" data-audio-type="playlist">{{label.playlist}}</button>
   </div>
-  <div class="bc-row" style="{{#unless (lumenn-eq beat.audioSource.type 'track')}}display:none;{{/unless}}">
+  <input type="hidden" name="audioType" value="{{#if beat.audioSource}}{{beat.audioSource.type}}{{else}}none{{/if}}">
+  <div class="bc-row bc-tab-panel" data-panel="track">
     <label for="lf-config-track">{{label.audioTrack}}</label>
     <select id="lf-config-track" name="audioTrackId">
       {{#each playlists}}
@@ -41,7 +39,7 @@
       {{/each}}
     </select>
   </div>
-  <div class="bc-row" style="{{#unless (lumenn-eq beat.audioSource.type 'playlist')}}display:none;{{/unless}}">
+  <div class="bc-row bc-tab-panel" data-panel="playlist">
     <label for="lf-config-playlist">{{label.audioPlaylist}}</label>
     <select id="lf-config-playlist" name="audioPlaylistId">
       {{#each playlists}}

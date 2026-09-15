@@ -138,6 +138,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
         sceneName: scene?.name ?? (b.sceneId ? game.i18n.localize("LUMENN_FRAME.Beat.InvalidScene") : game.i18n.localize("LUMENN_FRAME.Beat.NoScene")),
         sceneThumb: scene?.thumbnail ?? scene?.background?.src ?? null,
         audioLabel: this.#audioLabel(b.audioSource, playlists),
+        audioKind: b.audioSource?.type ?? null,
         isValid: this.#valid(b),
       };
     });
@@ -165,6 +166,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
         delete: L("LUMENN_FRAME.Beat.Delete"),
         link: L("LUMENN_FRAME.Beat.Link"),
         go: L("LUMENN_FRAME.Beat.Go"),
+        invalid: L("LUMENN_FRAME.Beat.Invalid"),
         transitioning: L("LUMENN_FRAME.Transitioning"),
         emptyState: L("LUMENN_FRAME.EmptyState"),
         emptyHint: L("LUMENN_FRAME.EmptyHint"),
@@ -396,12 +398,13 @@ class BeatConfigDialog extends HandlebarsApplicationMixin(ApplicationV2) {
 
   async _onRender(context, options) {
     await super._onRender(context, options);
+    const audioType = this.element.querySelector('[name="audioType"]');
     const sync = () => {
-      const type = this.element.querySelector('[name="audioType"]')?.value;
-      this.element.querySelector('[name="audioTrackId"]').style.display = type === "track" ? "block" : "none";
-      this.element.querySelector('[name="audioPlaylistId"]').style.display = type === "playlist" ? "block" : "none";
+      const type = audioType?.value ?? "none";
+      this.element.querySelectorAll(".bc-tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.audioType === type));
+      this.element.querySelectorAll(".bc-tab-panel").forEach((panel) => { panel.style.display = panel.dataset.panel === type ? "flex" : "none"; });
     };
-    this.element.querySelector('[name="audioType"]')?.addEventListener("change", sync);
+    this.element.querySelectorAll(".bc-tab").forEach((tab) => tab.addEventListener("click", () => { audioType.value = tab.dataset.audioType; sync(); }));
     sync();
     this.element.addEventListener("submit", (e) => {
       e.preventDefault();

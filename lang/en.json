@@ -15,6 +15,7 @@
   "LUMENN_FRAME.Beat.SetStart": "Start",
   "LUMENN_FRAME.Transitioning": "Transitioning…",
   "LUMENN_FRAME.Beat.InvalidScene": "Invalid Scene",
+  "LUMENN_FRAME.Beat.Invalid": "Invalid",
   "LUMENN_FRAME.Beat.NoScene": "No Scene",
   "LUMENN_FRAME.Beat.NoAudio": "No Audio",
   "LUMENN_FRAME.Beat.InvalidAudio": "Invalid Audio",

@@ -43,7 +43,8 @@
       <div class="beat-label">{{this.sceneName}}</div>
       <div class="beat-meta">
         {{#if this.isActive}}<span class="beat-badge start-badge">{{../label.start}}</span>{{/if}}
-        {{#if this.audioLabel}}<span class="beat-badge">{{this.audioLabel}}</span>{{/if}}
+        {{#if this.audioLabel}}<span class="beat-badge"><i class="audio-kind-icon {{#if (lumenn-eq this.audioKind 'playlist')}}fa-solid fa-list-ul{{else}}fa-solid fa-music{{/if}}"></i>{{this.audioLabel}}</span>{{/if}}
+        {{#unless this.isValid}}<span class="beat-badge invalid-badge">{{../label.invalid}}</span>{{/unless}}
       </div>
       {{#if (lumenn-and ../isGM (lumenn-eq ../mode "edit"))}}
       <div class="beat-actions">

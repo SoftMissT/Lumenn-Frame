@@ -329,6 +329,16 @@
   white-space: nowrap;
 }
 
+.beat-node .beat-badge .audio-kind-icon {
+  font-size: 9px;
+  opacity: .8;
+}
+
+.beat-node .beat-badge.invalid-badge {
+  border-color: var(--lf-danger);
+  color: var(--lf-danger);
+}
+
 .beat-node.active .beat-badge.start-badge {
   border-color: var(--lf-amber-dim);
   color: var(--lf-amber);
@@ -475,6 +485,47 @@
   flex-direction: column;
   gap: 4px;
   margin-bottom: 8px;
+}
+
+/* Audio source tabs (PDR Decisão #4) */
+.beat-config .bc-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  border: 1px solid var(--lf-badge-border);
+  border-radius: var(--lf-radius);
+  overflow: hidden;
+}
+
+.beat-config .bc-tab {
+  flex: 1 1 0;
+  padding: 5px 0;
+  font-family: var(--lf-font-body);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--lf-muted);
+  background: var(--lf-badge);
+  border: none;
+  cursor: pointer;
+  transition: background var(--lf-transition), color var(--lf-transition);
+}
+
+.beat-config .bc-tab:not(:first-child) {
+  border-left: 1px solid var(--lf-badge-border);
+}
+
+.beat-config .bc-tab:hover {
+  color: var(--lf-text);
+}
+
+.beat-config .bc-tab.active {
+  background: var(--lf-amber);
+  color: var(--lf-ink);
+}
+
+.beat-config .bc-tab-panel {
+  display: none;
 }
 
 .beat-config .bc-row:last-child {

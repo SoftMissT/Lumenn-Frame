@@ -3,342 +3,77 @@ import { LumennTransitionController } from "./transition-controller.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
-/**
- * LumennStoryboardApp — canvas de storyboard com Beats e conectores.
- * Dois modos: Edição (CRUD) e Ao Vivo (navegação).
- * No modo Edição, "Início" define o Beat ativo sem disparar transição —
- * é o que destrava a navegação (activeBeatId não nasce mais em deadlock).
- */
+/** GM storyboard editor/live controller. Domain state remains in BeatStore. */
 export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV2) {
   #controller = new LumennTransitionController();
   #storyboardId = null;
   #mode = "edit";
 
-  static DEFAULT_OPTIONS = {
-    id: "lumenn-storyboard",
-    classes: ["lumenn-frame", "storyboard"],
-    title: "Lumenn Frame",
-    tag: "div",
-    position: { width: 800, height: 600 },
-    window: { resizable: true },
-  };
+  static DEFAULT_OPTIONS = { id: "lumenn-storyboard", classes: ["lumenn-frame", "storyboard"], title: "Lumenn Frame", tag: "div", position: { width: 900, height: 650 }, window: { resizable: true } };
+  static PARTS = { main: { template: "modules/lumenn-frame/templates/storyboard.hbs" } };
 
-  static PARTS = {
-    main: {
-      template: "modules/lumenn-frame/templates/storyboard.hbs",
-    },
-  };
-
-  get mode() {
-    return this.#mode;
-  }
-
-  async _prepareContext(options) {
+  async _prepareContext() {
     const storyboards = LumennBeatStore.getAll();
-    const active = this.#storyboardId
-      ? LumennBeatStore.getStoryboard(this.#storyboardId)
-      : storyboards[0] ?? null;
-
-    if (active && !this.#storyboardId) {
-      this.#storyboardId = active.id;
-    }
-
-    const scenes = Array.from(game.scenes.values()).map((s) => ({
-      id: s.id,
-      name: s.name,
-      thumb: s.thumb,
-    }));
-
-    const playlists = Array.from(game.playlists.values()).map((p) => ({
-      id: p.id,
-      name: p.name,
-      sounds: Array.from(p.sounds.values()).map((ps) => ({
-        id: ps.id,
-        name: ps.name,
-        uuid: ps.uuid,
-      })),
-    }));
-
-    const activeBeat = active?.activeBeatId
-      ? active.beats.find((b) => b.id === active.activeBeatId)
-      : null;
-
-    const beats = (active?.beats ?? []).map((b) => ({
-      ...b,
-      isActive: b.id === active?.activeBeatId,
-      isConnected: activeBeat?.connections.includes(b.id) ?? false,
-      sceneName: game.scenes.get(b.sceneId)?.name ?? "—",
-      audioLabel: b.audioSource?.id
-        ? this.#resolveAudioLabel(b.audioSource, playlists)
-        : "—",
-      isValid: this.#isBeatValid(b),
-    }));
-
-    return {
-      storyboards,
-      activeStoryboard: active,
-      beats,
-      scenes,
-      playlists,
-      mode: this.#mode,
-      isGM: game.user.isGM,
-      needsStartBeat: game.user.isGM && !!active && !active.activeBeatId,
-    };
+    const activeStoryboard = storyboards.find(s => s.id === this.#storyboardId) ?? storyboards[0] ?? null;
+    if (activeStoryboard) this.#storyboardId = activeStoryboard.id;
+    const activeBeat = activeStoryboard?.beats.find(b => b.id === activeStoryboard.activeBeatId) ?? null;
+    const scenes = [...game.scenes.values()].map(s => ({ id: s.id, name: s.name }));
+    const playlists = [...game.playlists.values()].map(p => ({ id: p.id, name: p.name, sounds: [...p.sounds.values()].map(ps => ({ id: ps.id, uuid: ps.uuid, name: ps.name })) }));
+    const beats = (activeStoryboard?.beats ?? []).map(b => ({ ...b, position: b.position ?? { x: 80, y: 80 }, isActive: b.id === activeStoryboard.activeBeatId, isConnected: !!activeBeat?.connections?.includes(b.id), sceneName: game.scenes.get(b.sceneId)?.name ?? "Cena inválida", audioLabel: this.#audioLabel(b.audioSource, playlists), isValid: this.#valid(b) }));
+    return { storyboards, activeStoryboard, beats, scenes, playlists, mode: this.#mode, isGM: !!game.user?.isGM, needsStartBeat: !!activeStoryboard && !activeStoryboard.activeBeatId };
   }
 
   async _onRender(context, options) {
     await super._onRender(context, options);
-
-    const html = this.element;
-    html.querySelectorAll("[data-action]").forEach((el) => {
-      el.addEventListener("click", this.#handleAction.bind(this));
-    });
-
-    this.#renderBeats(html);
+    const root = this.element;
+    root.querySelectorAll("[data-action]").forEach(el => el.addEventListener("click", e => this.#action(e)));
+    const selector = root.querySelector("select[data-storyboard-selector]");
+    selector?.addEventListener("change", e => { this.#storyboardId = e.target.value; this.render(); });
+    this.#installDrag(root);
+    this.#drawConnectors(root);
   }
 
-  #handleAction(event) {
+  #action(event) {
     event.preventDefault();
     const action = event.currentTarget.dataset.action;
     const id = event.currentTarget.dataset.id;
-
-    switch (action) {
-      case "toggle-mode":
-        this.#mode = this.#mode === "edit" ? "live" : "edit";
-        this.render();
-        break;
-      case "select-storyboard":
-        this.#storyboardId = id;
-        this.render();
-        break;
-      case "create-storyboard":
-        LumennBeatStore.createStoryboard("Novo Storyboard");
-        this.render();
-        break;
-      case "create-beat":
-        this.#createBeat(event);
-        break;
-      case "set-start-beat":
-        this.#setStartBeat(id);
-        break;
-      case "edit-beat":
-        this.#editBeat(id);
-        break;
-      case "delete-beat":
-        this.#deleteBeat(id);
-        break;
-      case "navigate-beat":
-        this.#navigateToBeat(id);
-        break;
-      case "connect-beat":
-        this.#connectBeat(id);
-        break;
-    }
+    if (!game.user?.isGM) return;
+    if (action === "toggle-mode") { this.#mode = this.#mode === "edit" ? "live" : "edit"; return this.render(); }
+    if (action === "create-storyboard") { const s = LumennBeatStore.createStoryboard(); this.#storyboardId = s?.id ?? this.#storyboardId; return this.render(); }
+    if (action === "delete-storyboard") { LumennBeatStore.deleteStoryboard(this.#storyboardId); this.#storyboardId = null; return this.render(); }
+    if (action === "create-beat") { const r = this.element.querySelector(".beats-canvas")?.getBoundingClientRect(); LumennBeatStore.createBeat(this.#storyboardId, { position: { x: Math.max(10, (event.clientX - (r?.left ?? 0)) - 60), y: Math.max(10, (event.clientY - (r?.top ?? 0)) - 30) } }); return this.render(); }
+    if (action === "set-start-beat") { LumennBeatStore.setActiveBeat(this.#storyboardId, id); return this.render(); }
+    if (action === "edit-beat") return this.#editBeat(id);
+    if (action === "delete-beat") { LumennBeatStore.deleteBeat(this.#storyboardId, id); return this.render(); }
+    if (action === "connect-beat") return this.#toggleConnection(id);
+    if (action === "navigate-beat" && this.#mode === "live") return this.#navigate(id);
   }
 
-  #createBeat(event) {
-    if (!this.#storyboardId || !game.user.isGM) return;
-    const rect = this.element.querySelector(".beats-canvas")?.getBoundingClientRect();
-    const x = rect ? event.clientX - rect.left : 100;
-    const y = rect ? event.clientY - rect.top : 100;
-    LumennBeatStore.createBeat(this.#storyboardId, { position: { x, y } });
-    this.render();
+  async #navigate(id) { const result = await this.#controller.goToBeat(this.#storyboardId, id, this.#mode === "live" ? "ao-vivo" : "edicao"); if (result.audioResult === "invalid-source") ui.notifications.warn("Lumenn Frame: Beat inválido; a cena foi ativada, mas o áudio não existe."); this.render(); }
+  #toggleConnection(id) { const s = LumennBeatStore.getStoryboard(this.#storyboardId); const a = s?.beats.find(b => b.id === s.activeBeatId); if (!a || a.id === id) return; if (a.connections.includes(id)) LumennBeatStore.disconnectBeats(this.#storyboardId, a.id, id); else LumennBeatStore.connectBeats(this.#storyboardId, a.id, id); this.render(); }
+  #editBeat(id) { const beat = LumennBeatStore.getStoryboard(this.#storyboardId)?.beats.find(b => b.id === id); if (beat) new BeatConfigDialog(this.#storyboardId, beat).render(true); }
+
+  #installDrag(root) {
+    if (this.#mode !== "edit") return;
+    const canvas = root.querySelector(".beats-canvas");
+    canvas?.querySelectorAll(".beat-node").forEach(node => node.addEventListener("pointerdown", e => {
+      if (e.target.closest("button")) return; e.preventDefault(); node.setPointerCapture(e.pointerId);
+      const start = { x: e.clientX, y: e.clientY, ...((LumennBeatStore.getStoryboard(this.#storyboardId)?.beats.find(b => b.id === node.dataset.id)?.position) ?? { x: 0, y: 0 }) };
+      const move = ev => { node.style.left = `${start.x + ev.clientX - e.clientX}px`; node.style.top = `${start.y + ev.clientY - e.clientY}px`; };
+      const up = ev => { node.releasePointerCapture(ev.pointerId); node.removeEventListener("pointermove", move); node.removeEventListener("pointerup", up); LumennBeatStore.updateBeat(this.#storyboardId, node.dataset.id, { position: { x: Math.max(0, start.x + ev.clientX - e.clientX), y: Math.max(0, start.y + ev.clientY - e.clientY) } }); this.#drawConnectors(root); };
+      node.addEventListener("pointermove", move); node.addEventListener("pointerup", up, { once: true });
+    }));
   }
-
-  #setStartBeat(beatId) {
-    if (!this.#storyboardId || !game.user.isGM) return;
-    LumennBeatStore.setActiveBeat(this.#storyboardId, beatId);
-    this.render();
-  }
-
-  #editBeat(beatId) {
-    if (!this.#storyboardId || !game.user.isGM) return;
-    const storyboard = LumennBeatStore.getStoryboard(this.#storyboardId);
-    const beat = storyboard?.beats.find((b) => b.id === beatId);
-    if (!beat) return;
-
-    new BeatConfigDialog(this.#storyboardId, beat).render(true);
-  }
-
-  #deleteBeat(beatId) {
-    if (!this.#storyboardId || !game.user.isGM) return;
-    LumennBeatStore.deleteBeat(this.#storyboardId, beatId);
-    this.render();
-  }
-
-  async #navigateToBeat(beatId) {
-    if (this.#mode !== "live" || !game.user.isGM) return;
-    const result = await this.#controller.goToBeat(this.#storyboardId, beatId);
-    this.render();
-    if (result.sceneChanged) {
-      ui.notifications.info(game.i18n.localize("LUMENN_FRAME.InfoSceneChanged"));
-    }
-  }
-
-  #connectBeat(beatId) {
-    if (!this.#storyboardId || !game.user.isGM) return;
-    const storyboard = LumennBeatStore.getStoryboard(this.#storyboardId);
-    const activeBeat = storyboard?.beats.find((b) => b.id === storyboard.activeBeatId);
-    if (!activeBeat) return;
-
-    if (activeBeat.connections.includes(beatId)) {
-      LumennBeatStore.disconnectBeats(this.#storyboardId, activeBeat.id, beatId);
-    } else {
-      LumennBeatStore.connectBeats(this.#storyboardId, activeBeat.id, beatId);
-    }
-    this.render();
-  }
-
-  #renderBeats(html) {
-    const canvas = html.querySelector(".beats-canvas");
-    if (!canvas) return;
-
-    const storyboard = LumennBeatStore.getStoryboard(this.#storyboardId);
-    if (!storyboard) return;
-
-    canvas.querySelectorAll(".beat-node").forEach((el) => {
-      const beat = storyboard.beats.find((b) => b.id === el.dataset.id);
-      if (!beat) return;
-      el.style.left = `${beat.position.x}px`;
-      el.style.top = `${beat.position.y}px`;
-    });
-
-    this.#drawConnectors(canvas, storyboard);
-  }
-
-  #drawConnectors(canvas, storyboard) {
-    const svg = canvas.querySelector("svg.connectors");
-    if (!svg) return;
-    svg.innerHTML = "";
-
-    storyboard.beats.forEach((beat) => {
-      beat.connections.forEach((connId) => {
-        const target = storyboard.beats.find((b) => b.id === connId);
-        if (!target) return;
-
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.setAttribute("x1", beat.position.x + 60);
-        line.setAttribute("y1", beat.position.y + 30);
-        line.setAttribute("x2", target.position.x + 60);
-        line.setAttribute("y2", target.position.y + 30);
-        line.setAttribute("stroke", beat.id === storyboard.activeBeatId ? "#00d9ff" : "#666");
-        line.setAttribute("stroke-width", "2");
-        svg.appendChild(line);
-      });
-    });
-  }
-
-  #resolveAudioLabel(source, playlists) {
-    if (source.type === "track") {
-      for (const p of playlists) {
-        const sound = p.sounds.find((s) => s.uuid === source.id);
-        if (sound) return sound.name;
-      }
-    }
-    if (source.type === "playlist") {
-      const pl = playlists.find((p) => p.id === source.id);
-      return pl?.name ?? "—";
-    }
-    return "—";
-  }
-
-  #isBeatValid(beat) {
-    if (beat.sceneId && !game.scenes.get(beat.sceneId)) return false;
-    if (beat.audioSource?.id) {
-      if (beat.audioSource.type === "track") {
-        try {
-          return !!fromUuidSync(beat.audioSource.id);
-        } catch {
-          return false;
-        }
-      }
-      if (beat.audioSource.type === "playlist") {
-        return !!game.playlists.get(beat.audioSource.id);
-      }
-    }
-    return true;
-  }
+  #drawConnectors(root) { const svg = root.querySelector("svg.connectors"), s = LumennBeatStore.getStoryboard(this.#storyboardId); if (!svg || !s) return; svg.innerHTML = ""; for (const b of s.beats) for (const id of b.connections ?? []) { const t = s.beats.find(x => x.id === id); if (!t) continue; const bp = b.position ?? { x: 80, y: 80 }, tp = t.position ?? { x: 80, y: 80 }; const l = document.createElementNS("http://www.w3.org/2000/svg", "line"); l.setAttribute("x1", bp.x + 60); l.setAttribute("y1", bp.y + 30); l.setAttribute("x2", tp.x + 60); l.setAttribute("y2", tp.y + 30); l.setAttribute("stroke", b.id === s.activeBeatId ? "#00d9ff" : "#666"); l.setAttribute("stroke-width", "2"); svg.appendChild(l); } }
+  #audioLabel(src, playlists) { if (!src) return "Sem áudio"; if (src.type === "playlist") return playlists.find(p => p.id === src.id)?.name ?? "Áudio inválido"; return playlists.flatMap(p => p.sounds).find(s => s.uuid === src.id)?.name ?? "Áudio inválido"; }
+  #valid(b) { if (b.sceneId && !game.scenes.get(b.sceneId)) return false; if (!b.audioSource) return true; try { return b.audioSource.type === "playlist" ? !!game.playlists.get(b.audioSource.id) : !!fromUuidSync(b.audioSource.id); } catch { return false; } }
 }
 
 class BeatConfigDialog extends HandlebarsApplicationMixin(ApplicationV2) {
-  #storyboardId;
-  #beat;
-
-  static DEFAULT_OPTIONS = {
-    id: "lumenn-beat-config",
-    classes: ["lumenn-frame", "beat-config"],
-    title: "Configurar Beat",
-    tag: "form",
-    position: { width: 420, height: "auto" },
-    window: { resizable: false },
-    form: {
-      handler: BeatConfigDialog.#onSubmit,
-      closeOnSubmit: true,
-    },
-  };
-
-  static PARTS = {
-    form: {
-      template: "modules/lumenn-frame/templates/beat-config.hbs",
-    },
-  };
-
-  constructor(storyboardId, beat) {
-    super({});
-    this.#storyboardId = storyboardId;
-    this.#beat = beat;
-  }
-
-  async _prepareContext() {
-    const scenes = Array.from(game.scenes.values()).map((s) => ({
-      id: s.id,
-      name: s.name,
-      selected: s.id === this.#beat.sceneId,
-    }));
-
-    const playlists = Array.from(game.playlists.values()).map((p) => ({
-      id: p.id,
-      name: p.name,
-      selected: p.id === this.#beat.audioSource?.id && this.#beat.audioSource?.type === "playlist",
-      sounds: Array.from(p.sounds.values()).map((ps) => ({
-        id: ps.id,
-        name: ps.name,
-        uuid: ps.uuid,
-        selected:
-          ps.uuid === this.#beat.audioSource?.id && this.#beat.audioSource?.type === "track",
-      })),
-    }));
-
-    return {
-      beat: this.#beat,
-      scenes,
-      playlists,
-      defaultCrossfade: LumennBeatStore.getDefaultCrossfadeDuration(),
-    };
-  }
-
-  static async #onSubmit(event, form, formData) {
-    event.preventDefault();
-    const data = new FormDataExtended(form).object;
-
-    const audioSource = data.audioType === "track"
-      ? { type: "track", id: data.audioTrackId ?? null }
-      : data.audioType === "playlist"
-        ? { type: "playlist", id: data.audioPlaylistId ?? null }
-        : null;
-
-    LumennBeatStore.updateBeat(this._storyboardId, this._beat.id, {
-      sceneId: data.sceneId ?? null,
-      audioSource,
-      crossfadeDuration: data.crossfadeDuration ? Number(data.crossfadeDuration) : null,
-    });
-  }
-
-  get _storyboardId() {
-    return this.#storyboardId;
-  }
-
-  get _beat() {
-    return this.#beat;
-  }
+  #storyboardId; #beat;
+  static DEFAULT_OPTIONS = { id: "lumenn-beat-config", classes: ["lumenn-frame", "beat-config"], title: "Configurar Beat", tag: "form", position: { width: 420, height: "auto" }, form: { closeOnSubmit: true } };
+  static PARTS = { form: { template: "modules/lumenn-frame/templates/beat-config.hbs" } };
+  constructor(storyboardId, beat) { super({}); this.#storyboardId = storyboardId; this.#beat = beat; }
+  async _prepareContext() { const scenes = [...game.scenes.values()].map(s => ({ id: s.id, name: s.name, selected: s.id === this.#beat.sceneId })); const playlists = [...game.playlists.values()].map(p => ({ id: p.id, name: p.name, selected: p.id === this.#beat.audioSource?.id && this.#beat.audioSource?.type === "playlist", sounds: [...p.sounds.values()].map(ps => ({ uuid: ps.uuid, name: ps.name, selected: ps.uuid === this.#beat.audioSource?.id && this.#beat.audioSource?.type === "track" })) })); return { beat: this.#beat, scenes, playlists, defaultCrossfade: LumennBeatStore.getDefaultCrossfadeDuration() }; }
+  async _onRender(context, options) { await super._onRender(context, options); const sync = () => { const type = this.element.querySelector('[name="audioType"]')?.value; this.element.querySelector('[name="audioTrackId"]').style.display = type === "track" ? "block" : "none"; this.element.querySelector('[name="audioPlaylistId"]').style.display = type === "playlist" ? "block" : "none"; }; this.element.querySelector('[name="audioType"]')?.addEventListener("change", sync); sync(); this.element.addEventListener("submit", e => { e.preventDefault(); const d = Object.fromEntries(new FormData(e.currentTarget)); const source = d.audioType === "track" && d.audioTrackId ? { type: "track", id: d.audioTrackId } : d.audioType === "playlist" && d.audioPlaylistId ? { type: "playlist", id: d.audioPlaylistId } : null; LumennBeatStore.updateBeat(this.#storyboardId, this.#beat.id, { sceneId: d.sceneId || null, audioSource: source, crossfadeDuration: d.crossfadeDuration ? Number(d.crossfadeDuration) : null }); this.close(); }); }
 }

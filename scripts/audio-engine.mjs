@@ -80,7 +80,15 @@ export class LumennAudioEngine {
 
   #resolve(source) {
     try {
-      if (source.type === "track") return fromUuidSync(source.id) ?? null;
+      if (source.type === "track") {
+        // O schema aceita tanto UUID completo quanto o ID embutido de uma faixa.
+        if (source.id.includes(".")) return fromUuidSync(source.id) ?? null;
+        for (const playlist of game.playlists ?? []) {
+          const sound = playlist.sounds?.get(source.id);
+          if (sound) return sound;
+        }
+        return null;
+      }
       if (source.type === "playlist") return game.playlists.get(source.id) ?? null;
     } catch {
       return null;

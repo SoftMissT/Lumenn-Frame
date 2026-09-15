@@ -1,8 +1,12 @@
 <div class="lumenn-frame storyboard">
   <div class="toolbar">
     {{#if isGM}}
+      <select data-storyboard-selector aria-label="Storyboard">
+        {{#each storyboards}}<option value="{{id}}" {{#if (lumenn-eq id ../activeStoryboard.id)}}selected{{/if}}>{{name}}</option>{{/each}}
+      </select>
       <button data-action="create-storyboard">+ Storyboard</button>
       <button data-action="create-beat">+ Beat</button>
+      {{#if activeStoryboard}}<button data-action="delete-storyboard">Excluir storyboard</button>{{/if}}
       <button class="mode-toggle {{mode}}" data-action="toggle-mode">
         {{#if (lumenn-eq mode "edit")}}Edição{{else}}Ao Vivo{{/if}}
       </button>
@@ -15,7 +19,7 @@
     <svg class="connectors"></svg>
     {{#each beats}}
       <div class="beat-node {{#if isActive}}active{{/if}} {{#if isConnected}}connected{{/if}} {{#unless isValid}}invalid{{/unless}}"
-           data-id="{{id}}">
+           data-id="{{id}}" data-x="{{position.x}}" data-y="{{position.y}}" style="left:{{position.x}}px;top:{{position.y}}px">
         <div class="beat-name">{{sceneName}}</div>
         <div class="beat-detail">{{audioLabel}}</div>
         {{#if (lumenn-eq ../mode "edit")}}

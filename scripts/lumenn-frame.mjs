@@ -14,7 +14,7 @@ Hooks.once("init", () => {
   // as classes ficam expostas na API pública do módulo.
   game.modules.get(MODULE_ID).api = {
     openStoryboard() {
-      new LumennStoryboardApp().render(true);
+      new LumennStoryboardApp().render({ force: true });
     },
     LumennAudioEngine,
     LumennInvalidAudioSourceError,
@@ -23,17 +23,14 @@ Hooks.once("init", () => {
     LumennStoryboardApp,
   };
 
-  if (game.user.isGM) {
-    Hooks.on("getSceneControls", (controls) => {
-      controls.find((c) => c.name === "token")?.tools.push({
-        name: "lumenn-frame",
-        title: "Lumenn Frame",
-        icon: "fas fa-film",
-        button: true,
-        onClick: () => game.modules.get(MODULE_ID).api.openStoryboard(),
-      });
-    });
-  }
-
-  console.log(`${MODULE_ID}: initialized`);
+  Hooks.on("getSceneControlButtons", (controls) => {
+    const tokenControl = Array.isArray(controls)
+      ? controls.find((c) => c.name === "token")
+      : controls.tokens ?? controls.token;
+    if (!tokenControl) return;
+    const open = () => game.modules.get(MODULE_ID).api.openStoryboard();
+    const tool = { name: "lumenn-frame", title: "Lumenn Frame", icon: "fas fa-film", button: true, visible: !!game.user?.isGM, onChange: open, onClick: open };
+    if (Array.isArray(tokenControl.tools)) tokenControl.tools.push(tool);
+    else tokenControl.tools = { ...(tokenControl.tools ?? {}), "lumenn-frame": tool };
+  });
 });

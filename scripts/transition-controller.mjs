@@ -20,8 +20,9 @@ export class LumennTransitionController {
    * audioResult: "kept" | "crossfaded" | "faded-out" | "started" |
    *              "ignored" | "invalid-source" | "error"
    */
-  async goToBeat(storyboardId, targetBeatId) {
+  async goToBeat(storyboardId, targetBeatId, currentMode = "ao-vivo") {
     const ignored = { sceneChanged: false, audioResult: "ignored" };
+    if (currentMode !== "ao-vivo") return ignored;
     if (!game.user.isGM) return ignored;
 
     const storyboard = LumennBeatStore.getStoryboard(storyboardId);
@@ -36,7 +37,7 @@ export class LumennTransitionController {
     let sceneChanged = false;
     if (targetBeat.sceneId) {
       const scene = game.scenes.get(targetBeat.sceneId);
-      if (scene && !scene.active) {
+      if (scene) {
         await scene.activate();
         sceneChanged = true;
       }

@@ -9,8 +9,9 @@
 
   <label>Tipo de áudio</label>
   <select name="audioType">
-    <option value="track">Track</option>
-    <option value="playlist">Playlist</option>
+    <option value="none" {{#unless beat.audioSource}}selected{{/unless}}>— Nenhum —</option>
+    <option value="track" {{#if (lumenn-eq beat.audioSource.type "track")}}selected{{/if}}>Track</option>
+    <option value="playlist" {{#if (lumenn-eq beat.audioSource.type "playlist")}}selected{{/if}}>Playlist</option>
   </select>
 
   <label>Track / Playlist</label>

@@ -1,6 +1,18 @@
 # Changelog
 
-Todas as entregas abaixo estão dentro da **0.0.1** (em desenvolvimento a versão só sobe depois do gate de validação em Foundry real). Semver: 0.0.x até a primeira validação de runtime; então 0.1.0.
+As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
+
+## [0.0.2] 2026-09-14
+
+### Correção de HUD e controles
+
+- Corrigido o hook para `getSceneControlButtons`, compatível com Foundry v13/v14.
+- Corrigido o callback do botão para `onChange`, mantendo fallback `onClick`.
+- Corrigida a resolução de faixas por ID embutido de `PlaylistSound` ou UUID completo.
+- Canvas, controles de música, CRUD e modos Edição/Ao Vivo mantidos no pacote.
+- README atualizado para refletir o fluxo funcional.
+
+**Validação:** `node --check`, imports ESM, JSON do manifesto e `git diff --check` aprovados.
 
 ## [0.0.1] 2026-09-14
 

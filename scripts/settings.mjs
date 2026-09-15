@@ -18,8 +18,17 @@ export class LumennSettings {
       name: L("LUMENN_FRAME.Settings.SceneTransitionType.Name"),
       hint: L("LUMENN_FRAME.Settings.SceneTransitionType.Hint"),
       scope: "world", config: true, type: String,
-      choices: { cut: L("LUMENN_FRAME.Edge.Cut"), fade: L("LUMENN_FRAME.Edge.Fade") },
+      choices: {
+        cut: L("LUMENN_FRAME.Edge.Cut"),
+        fade: L("LUMENN_FRAME.Edge.Fade"),
+        dip: L("LUMENN_FRAME.Edge.DipToColor"),
+      },
       default: "fade",
+    });
+    game.settings.register(MODULE_ID, "defaultDipColor", {
+      name: L("LUMENN_FRAME.Settings.DipColor.Name"),
+      hint: L("LUMENN_FRAME.Settings.DipColor.Hint"),
+      scope: "world", config: true, type: String, default: "#000000",
     });
     game.settings.register(MODULE_ID, "defaultSceneFadeDuration", {
       name: L("LUMENN_FRAME.Settings.SceneFadeDuration.Name"),
@@ -56,6 +65,13 @@ export class LumennSettings {
       hint: L("LUMENN_FRAME.Settings.AudioFadeOut.Hint"),
       scope: "world", config: true, type: Number,
       range: { min: 0, max: 10000, step: 100 }, default: 1000,
+    });
+    game.settings.register(MODULE_ID, "defaultCrossfadeCurve", {
+      name: L("LUMENN_FRAME.Settings.CrossfadeCurve.Name"),
+      hint: L("LUMENN_FRAME.Settings.CrossfadeCurve.Hint"),
+      scope: "world", config: true, type: String,
+      choices: { linear: "Linear", "equal-power": "Equal Power (PARTIAL)" },
+      default: "linear",
     });
 
     /* ── Graph Editor ── */
@@ -122,6 +138,33 @@ export class LumennSettings {
       name: L("LUMENN_FRAME.Settings.PlayerAudioSync.Name"),
       scope: "world", config: true, type: Boolean, default: true,
     });
+
+    /* ── Import ── */
+    game.settings.register(MODULE_ID, "recursiveFolderImport", {
+      name: L("LUMENN_FRAME.Settings.RecursiveFolder.Name"),
+      hint: L("LUMENN_FRAME.Settings.RecursiveFolder.Hint"),
+      scope: "world", config: true, type: Boolean, default: true,
+    });
+    game.settings.register(MODULE_ID, "importPlaylistTracksAsNodes", {
+      name: L("LUMENN_FRAME.Settings.ImportTracksAsNodes.Name"),
+      hint: L("LUMENN_FRAME.Settings.ImportTracksAsNodes.Hint"),
+      scope: "world", config: true, type: Boolean, default: false,
+    });
+    game.settings.register(MODULE_ID, "folderLayoutColumns", {
+      name: L("LUMENN_FRAME.Settings.FolderColumns.Name"),
+      scope: "world", config: true, type: Number,
+      range: { min: 1, max: 10, step: 1 }, default: 3,
+    });
+    game.settings.register(MODULE_ID, "folderLayoutGap", {
+      name: L("LUMENN_FRAME.Settings.FolderGap.Name"),
+      scope: "world", config: true, type: Number,
+      range: { min: 10, max: 200, step: 5 }, default: 40,
+    });
+    game.settings.register(MODULE_ID, "autoConnectImportedScenes", {
+      name: L("LUMENN_FRAME.Settings.AutoConnectScenes.Name"),
+      hint: L("LUMENN_FRAME.Settings.AutoConnectScenes.Hint"),
+      scope: "world", config: true, type: Boolean, default: false,
+    });
   }
 
   static get(key) {
@@ -132,10 +175,22 @@ export class LumennSettings {
     return {
       sceneType: this.get("defaultSceneTransitionType"),
       sceneDuration: this.get("defaultSceneFadeDuration"),
+      dipColor: this.get("defaultDipColor"),
       audioMode: this.get("defaultAudioMode"),
       crossfade: this.get("defaultCrossfadeDuration"),
       fadeIn: this.get("defaultAudioFadeIn"),
       fadeOut: this.get("defaultAudioFadeOut"),
+      curve: this.get("defaultCrossfadeCurve"),
+    };
+  }
+
+  static getImportDefaults() {
+    return {
+      recursive: this.get("recursiveFolderImport"),
+      tracksAsNodes: this.get("importPlaylistTracksAsNodes"),
+      columns: this.get("folderLayoutColumns"),
+      gap: this.get("folderLayoutGap"),
+      autoConnect: this.get("autoConnectImportedScenes"),
     };
   }
 

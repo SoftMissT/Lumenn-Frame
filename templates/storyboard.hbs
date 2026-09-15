@@ -29,12 +29,12 @@
   <div class="lf-body">
     <div class="lf-toolbar-left">
       {{#if editable}}
-      <button class="lf-tool{{#if (lumenn-eq tool 'select')}} active{{/if}}" data-tool="select" title="{{label.select}}">&#9633;</button>
-      <button class="lf-tool{{#if (lumenn-eq tool 'hand')}} active{{/if}}" data-tool="hand" title="{{label.hand}}">&#9996;</button>
-      <button class="lf-tool{{#if (lumenn-eq tool 'connect')}} active{{/if}}" data-tool="connect" title="{{label.connect}}">&#8646;</button>
-      <button class="lf-tool{{#if (lumenn-eq tool 'scene')}} active{{/if}}" data-tool="scene" title="{{label.addScene}}">&#127916;</button>
-      <button class="lf-tool{{#if (lumenn-eq tool 'audio')}} active{{/if}}" data-tool="audio" title="{{label.addAudio}}">&#9835;</button>
-      <button class="lf-tool{{#if (lumenn-eq tool 'note')}} active{{/if}}" data-tool="note" title="{{label.addNote}}">&#182;</button>
+      <button class="lf-tool{{#if (lumenn-eq tool 'select')}} active{{/if}}" data-tool="select" title="{{label.select}}"><i class="fa-solid fa-mouse-pointer"></i></button>
+      <button class="lf-tool{{#if (lumenn-eq tool 'hand')}} active{{/if}}" data-tool="hand" title="{{label.hand}}"><i class="fa-solid fa-hand"></i></button>
+      <button class="lf-tool{{#if (lumenn-eq tool 'connect')}} active{{/if}}" data-tool="connect" title="{{label.connect}}"><i class="fa-solid fa-share-nodes"></i></button>
+      <button class="lf-tool{{#if (lumenn-eq tool 'scene')}} active{{/if}}" data-tool="scene" title="{{label.addScene}}"><i class="fa-solid fa-image"></i></button>
+      <button class="lf-tool{{#if (lumenn-eq tool 'audio')}} active{{/if}}" data-tool="audio" title="{{label.addAudio}}"><i class="fa-solid fa-music"></i></button>
+      <button class="lf-tool{{#if (lumenn-eq tool 'note')}} active{{/if}}" data-tool="note" title="{{label.addNote}}"><i class="fa-solid fa-note-sticky"></i></button>
       {{/if}}
     </div>
 
@@ -49,20 +49,20 @@
             <div class="lf-node-head" style="background:{{this.color}}"></div>
             {{#if (lumenn-eq this.type 'scene')}}
             <div class="lf-node-thumb">
-              {{#if this.sceneThumb}}<img src="{{this.sceneThumb}}" alt="{{this.sceneName}}" loading="lazy">{{else}}<span class="lf-node-thumb-ph">&#127916;</span>{{/if}}
+              {{#if this.sceneThumb}}<img src="{{this.sceneThumb}}" alt="{{this.sceneName}}" loading="lazy">{{else}}<span class="lf-node-thumb-ph"><i class="fa-solid fa-image"></i></span>{{/if}}
             </div>
             <div class="lf-node-title">{{this.sceneName}}</div>
-            <div class="lf-node-tag">{{#if this.isActive}}<span class="lf-badge-live">{{../label.setInitial}}</span>{{/if}}&#127916; Scene</div>
+            <div class="lf-node-tag">{{#if this.isActive}}<span class="lf-badge-live">{{../label.setInitial}}</span>{{/if}}<i class="fa-solid fa-image"></i> Scene</div>
             {{/if}}
             {{#if (lumenn-eq this.type 'audio')}}
-            <div class="lf-node-title">&#9835; {{this.audioLabel}}</div>
+            <div class="lf-node-title"><i class="fa-solid fa-music"></i> {{this.audioLabel}}</div>
             <div class="lf-node-tag">{{this.audioBadge}}</div>
             <div class="lf-node-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
             {{/if}}
             {{#if (lumenn-eq this.type 'note')}}
             <div class="lf-node-title">{{this.data.title}}</div>
             <div class="lf-node-body">{{this.data.body}}</div>
-            <div class="lf-node-tag">&#182; Note</div>
+            <div class="lf-node-tag"><i class="fa-solid fa-note-sticky"></i> Note</div>
             {{/if}}
           </div>
           <div class="lf-ports">
@@ -86,7 +86,7 @@
       {{/if}}
       {{#unless nodes.length}}
       <div class="lf-empty-state">
-        <div class="lf-empty-icon">&#127916;</div>
+        <div class="lf-empty-icon"><i class="fa-solid fa-image"></i></div>
         <div class="lf-empty-title">{{label.emptyState}}</div>
         <div class="lf-empty-hint">{{label.emptyHint}}<br>{{label.dropHint}}</div>
       </div>
@@ -197,19 +197,24 @@
 
       {{#if (lumenn-eq inspector.kind 'edge')}}
         {{#if (lumenn-eq inspector.edgeType 'flow')}}
-        <h3 class="lf-insp-title">{{label.flowEdge}}</h3>
+        <h3 class="lf-insp-title">{{label.flowEdge}} <span class="lf-insp-native">{{#if inspector.hasNativeTransitions}}{{label.v14Native}}{{else}}{{label.fallbackMode}}{{/if}}</span></h3>
         <p class="lf-insp-p">{{label.from}}: {{inspector.fromLabel}} &rarr; {{label.to}}: {{inspector.toLabel}}</p>
         <label class="lf-insp-label">{{label.sceneTrans}}</label>
         <select data-insp="transition.scene.type">
           <option value="cut" {{#if (lumenn-eq inspector.edge.transition.scene.type 'cut')}}selected{{/if}}>{{label.cut}}</option>
-          <option value="fade" {{#if (lumenn-eq inspector.edge.transition.scene.type 'fade')}}selected{{/if}}>{{label.fade}}</option>
+          {{#each inspector.sceneTransitions}}
+          <option value="{{this.id}}" {{#if (lumenn-eq this.id ../inspector.edge.transition.scene.type)}}selected{{/if}}>{{this.label}}</option>
+          {{/each}}
         </select>
         <label class="lf-insp-label">{{label.duration}} (ms)</label>
         <input type="number" min="0" step="100" data-insp="transition.scene.duration" value="{{inspector.edge.transition.scene.duration}}">
+        <label class="lf-insp-label">{{label.color}}</label>
+        <input type="color" data-insp="transition.scene.color" value="{{inspector.edge.transition.scene.color}}">
         <label class="lf-insp-label">{{label.audioTrans}}</label>
         <select data-insp="transition.audio.mode">
           <option value="auto" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'auto')}}selected{{/if}}>{{label.auto}}</option>
           <option value="keep" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'keep')}}selected{{/if}}>{{label.keep}}</option>
+          <option value="cut" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'cut')}}selected{{/if}}>{{label.cut}}</option>
           <option value="crossfade" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'crossfade')}}selected{{/if}}>{{label.crossfade}}</option>
           <option value="fadeout" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'fadeout')}}selected{{/if}}>{{label.fadeout}}</option>
           <option value="fadein" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'fadein')}}selected{{/if}}>{{label.fadein}}</option>
@@ -220,7 +225,16 @@
         <input type="number" min="0" step="100" data-insp="transition.audio.fadeInDuration" value="{{inspector.edge.transition.audio.fadeInDuration}}">
         <label class="lf-insp-label">{{label.fadeOut}} (ms)</label>
         <input type="number" min="0" step="100" data-insp="transition.audio.fadeOutDuration" value="{{inspector.edge.transition.audio.fadeOutDuration}}">
+        <label class="lf-insp-label">{{label.curve}}</label>
+        <select data-insp="transition.audio.curve">
+          {{#each inspector.curveOptions}}
+          <option value="{{this}}" {{#if (lumenn-eq this ../inspector.edge.transition.audio.curve)}}selected{{/if}}>{{this}}</option>
+          {{/each}}
+        </select>
         {{#if editable}}
+        {{#if inspector.hasNativeTransitions}}
+        <div class="lf-insp-actions"><button data-insp-action="preview-transition">{{label.preview}}</button></div>
+        {{/if}}
         <div class="lf-insp-actions">
           {{#if inspector.reverse}}
           <button disabled>{{label.bidirectional}}</button>

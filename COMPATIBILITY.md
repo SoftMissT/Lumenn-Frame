@@ -34,6 +34,8 @@ SUPPORTED RANGE         13.350 → 14.999
 | DialogV2.prompt/confirm | `foundry.applications.api.DialogV2` | mesmo namespace | sem adapter (leitura via `button.form.elements`) |
 | game.settings.set | Promise | Promise | store com `await` |
 | Folder drag payload (uuid) | `TextEditor.getDragEventData` | idêntico | `LumennCompat.getDragData` |
+| Folder subfolders recursivo | `Folder#getSubfolders(true)` | idêntico | `LumennCompat.collectFolderDocuments` (fallback `children`) |
+| Scene transitions nativas | `CONFIG.Canvas.sceneTransitions` + `canvas.transition.run` | não documentado publicamente | `LumennCompat.getSceneTransitions` / `runSceneTransition` (feature-detected; fallback cut/fade/dip) |
 | ResizeObserver | DOM padrão | DOM padrão | sem adapter |
 
 ## Documentação dos métodos da camada (`foundry-compat.mjs`)
@@ -50,6 +52,9 @@ Cada método traz no JSDoc: implementação **V14**, fallback **V13**, fonte.
 | `getPlaylistSoundFade` | `sound.fadeDuration` | `sound.data.fadeDuration` | idem |
 | `socketOn` / `socketEmit` / `broadcastTransition` | `game.socket` | no-op se indisponível | Context7 (sockets) |
 | `expandWorkspace` | `ApplicationV2#setPosition` | — | Context7 (AppV2) |
+| `getSceneTransitions` | `CONFIG.Canvas.sceneTransitions` (runtime) | fallback cut/fade/dip | feature-detected |
+| `runSceneTransition` | `canvas.transition.run` | fallback cut / fade/dip Lumenn | feature-detected |
+| `collectFolderDocuments` | `Folder#getSubfolders(true)` | walk `children` recursivo | v13+v14 |
 
 ## Regras
 1. Usar **sempre** `LumennCompat.*` para acesso a essas APIs.

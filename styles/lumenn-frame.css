@@ -795,6 +795,42 @@
   cursor: default;
 }
 
+/* Badge native / fallback de transição */
+.lf-insp-native {
+  float: right;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--lf-teal);
+  border: 1px solid var(--lf-teal-dim);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+/* Ícones Font Awesome nos tools/nodes */
+.lf-tool i {
+  font-size: 15px;
+  line-height: 1;
+}
+.lf-node-tag i,
+.lf-node-title i {
+  margin-right: 4px;
+  font-size: 10px;
+  opacity: .8;
+}
+.lf-node-title i {
+  font-size: 11px;
+}
+.lf-empty-icon i {
+  font-size: 32px;
+}
+.lf-node-thumb-ph i {
+  font-size: 26px;
+  color: var(--lf-muted);
+  opacity: .5;
+}
+
 /* ── Animations / scrollbar ────────────────────────────────────────── */
 @keyframes lf-fadeIn {
   from {

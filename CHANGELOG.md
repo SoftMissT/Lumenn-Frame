@@ -2,6 +2,48 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.17] - 2026-09-15
+
+> Hotfix funcional (persistência, transições V14, áudio, pastas recursivas). Build para Foundry 14.367 (primário), 13.350+ retrocompatível.
+
+### Persistence
+
+- **Clone profundo em TODAS as escritas do store** (`foundry.utils.duplicate`) e em `getAll()` — elimina aliasing do objeto retornado por `game.settings.get` e estados stale entre write/read/render
+- Migração v1→v2 continua idempotente + backup (`legacyBackup`); schema v2 intocado
+- Teste manual de persistência documentado (criar grafo → F5 → reload → reaparecer idêntico)
+
+### Scene Transitions (V14 canônico)
+
+- **Biblioteca dinâmica**: Inspector consulta `CONFIG.Canvas.sceneTransitions` em runtime (feature-detected) e constrói o dropdown a partir do registry real da build — não hardcoda Cut/Fade
+- `LumennCompat.runSceneTransition`: usa `canvas.transition.run({nextScene, activate, duration, transitionType})` quando disponível; fallback Lumenn `cut`/`fade`/`dip-to-color` (V13)
+- **Dip to Color** com color picker (default `#000000`)
+- Badge `V14 Native` / `Compatibility fallback` no Inspector
+- **Preview Transition** (demonstra sem alterar o Graph)
+- Transição continua pertencendo à edge (`A→B`/`B→A` independentes)
+
+### Audio
+
+- Modo **Cut** (para/imediato + inicia/imediato) adicionado ao engine
+- **Curve** (`linear` / `equal-power`): linear efetivo via fade de documento; equal-power é PARTIAL (persistido, executa linear)
+- **Uma fonte musical principal por Scene**: 2ª AUDIO edge é rejeitada com aviso (MVP)
+- Autoridade única de fade por fonte (não duplica Playlist+Track fades na mesma fonte)
+
+### Folder Import
+
+- **Recursivo**: `Folder#getSubfolders(true)` (fallback `children` walk) coleta subpastas em qualquer profundidade
+- `sourceFolderId` / `sourceFolderPath` preservados nos nodes importados
+- Layout em grid por Settings (colunas/gap)
+- Opções: `Import Playlist Tracks as Nodes`, `Auto-connect Imported Scenes` (OFF por padrão)
+
+### UI / Settings
+
+- **Sem emoticons**: toolbar e tags usam Font Awesome (`fa-mouse-pointer`, `fa-hand`, `fa-share-nodes`, `fa-image`, `fa-music`, `fa-note-sticky`)
+- Settings expandidas (dip color, crossfade curve, import, auto-connect) com terminologia de Graph/FLOW (sem "Beat")
+
+### Runtime Validation Pending
+
+- Crossfade de áudio real (audível) · transições nativas V14 enumeradas no runtime · sync GM→Player (2 clientes) · QA 14.367 · smoke 13.350
+
 ## [0.0.16] - 2026-09-15
 
 > Graph Editor usability hotfix (runtime validation). Build for Foundry 14.367 (primary), 13.350+ backward compatible.

@@ -139,13 +139,15 @@ export class LumennAudioEngine {
 
   /**
    * Transição de áudio dirigida por modo, com múltiplas fontes (Audio Nodes).
-   * @param {"auto"|"keep"|"crossfade"|"fadeout"|"fadein"} mode
+   * @param {"auto"|"keep"|"cut"|"crossfade"|"fadeout"|"fadein"} mode
    * @param {Array<{type:"track"|"playlist", id:string}|null>} currentSources
    * @param {Array<{type:"track"|"playlist", id:string}|null>} targetSources
    * @param {number} duration ms
-   * @returns {Promise<string>} kept|faded-out|started|crossfaded|ignored|invalid-source|error
+   * @param {"linear"|"equal-power"} curve — só "linear" é efetivo via fade de
+   *        documento do Foundry; "equal-power" é PARTIAL (persistido, executa linear).
+   * @returns {Promise<string>} kept|faded-out|started|crossfaded|cut|ignored|invalid-source|error
    */
-  async applyMode(mode, currentSources, targetSources, duration = 3000) {
+  async applyMode(mode, currentSources, targetSources, duration = 3000, curve = "linear") {
     if (this.#transitioning) return "ignored";
     this.#transitioning = true;
     try {
@@ -165,6 +167,13 @@ export class LumennAudioEngine {
           for (const d of current)
             if (!d.playing) await this.#start(d, duration);
           return "kept";
+        case "cut":
+          // Fonte anterior termina e nova inicia imediatamente (fade 0).
+          await Promise.all([
+            ...current.map((d) => this.#stop(d, 0)),
+            ...target.map((d) => this.#start(d, 0)),
+          ]);
+          return "cut";
         case "fadeout":
           await stopAll();
           return "faded-out";

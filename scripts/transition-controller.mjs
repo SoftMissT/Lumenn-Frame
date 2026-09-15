@@ -30,15 +30,18 @@ export class LumennTransitionController {
     targetSources,
     audioTrans,
     defaultFade = 3000,
+    defaultCurve = "linear",
   ) {
     const mode = audioTrans?.mode ?? "auto";
     const duration = audioTrans?.crossfadeDuration ?? defaultFade;
+    const curve = audioTrans?.curve ?? defaultCurve;
     try {
       return await this.#engine.applyMode(
         mode,
         currentSources,
         targetSources,
         duration,
+        curve,
       );
     } catch (err) {
       if (err instanceof LumennInvalidAudioSourceError) return "invalid-source";

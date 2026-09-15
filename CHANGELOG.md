@@ -2,6 +2,41 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.15] - 2026-09-15
+
+> Graph Editor 2.0 **public runtime validation release** for Foundry VTT 14.367 (primary), backward compatible with 13.350+. This is the current `Latest` channel build.
+
+### Graph Editor 2.0
+
+- Infinite canvas + camera (pan Space+drag / middle mouse, cursor-centered zoom 25–200%, `- 100% + Fit`)
+- Workspace expansion (`Expand`/`Restore`) via `ApplicationV2.setPosition`
+- Scene / Audio / Note Nodes with per-node colors and sizes (`compact`/`normal`/`large`)
+- Contextual Inspector (graph / node / edge)
+- Ports (FLOW IN/OUT, AUDIO IN/OUT) + drag port→port connections (ghost + target highlight + Escape)
+- Directional FLOW edges (`A→B`/`B→A` independent, offset curves) and AUDIO attachment edges
+- Selectable edges + transition Inspector
+- `Add return B → A`
+- Edit / Live modes with structural guards; Live navigation only through outgoing FLOW edges
+- Per-edge Scene transition (Cut/Fade + duration) and Audio transition (Auto/Keep/Crossfade/Fade Out/Fade In + crossfade duration)
+- Drag/drop: Scene→Scene Node, Playlist/PlaylistSound→Audio Node, Folder→grid
+- Graph Schema v2 + automatic legacy (schema v1) migration with backup
+- GM → Player sync infrastructure (module socket `module.lumenn-frame`, `socket: true`)
+- Foundry compatibility layer (`foundry-compat.mjs`) + `COMPATIBILITY.md` (V14-first / V13 fallback)
+
+### Compatibility
+
+- Primary target Foundry 14.367 (manifest `verified`)
+- Minimum Foundry 13.350 · Maximum Foundry 14.999
+- V14-first architecture; V13 adapter only for verified differences
+
+### Runtime Validation Pending
+
+- Real audio crossfade (audible runtime test)
+- Scene fade overlay timing
+- GM → Player two-client test
+- Foundry 14.367 runtime QA (GM + Player)
+- Foundry 13.350 compatibility smoke test
+
 ## [0.0.15-alpha.2] - 2026-09-15
 
 > Graph Editor 2.0 — runtime validation build for Foundry VTT 14.367 (primary), backward compatible with 13.350+. **Not a stable release.**

@@ -111,16 +111,18 @@ Legacy Beat schema is migrated into **Graph Schema v2** automatically (with back
 
 ## Installation
 
-For this test build, use the **manifest URL** (do **not** paste the ZIP into the manifest field):
+Use the **manifest URL** (do **not** paste the ZIP into the manifest field):
 
-```
-https://github.com/SoftMissT/Lumenn-Frame/releases/download/v0.0.15-alpha.2/module.json
-```
-
-Stable channel (points to the latest **stable** release; while `0.0.15-alpha.2` is a prerelease, `releases/latest` may keep pointing to the previous stable):
+Current public build (`v0.0.15`, `Latest`):
 
 ```
 https://github.com/SoftMissT/Lumenn-Frame/releases/latest/download/module.json
+```
+
+Specific prerelease (e.g. `v0.0.15-alpha.2`, historical):
+
+```
+https://github.com/SoftMissT/Lumenn-Frame/releases/download/v0.0.15-alpha.2/module.json
 ```
 
 1. Foundry → *Install Module* → paste the manifest URL into **Manifest URL**.
@@ -129,7 +131,7 @@ https://github.com/SoftMissT/Lumenn-Frame/releases/latest/download/module.json
 
 ## Development Status
 
-The Graph Editor 2.0 implementation is code-complete for the current build. **This is a runtime validation build — not a stable release.**
+The Graph Editor 2.0 implementation is code-complete. `v0.0.15` is the **current public runtime validation build** (`Latest` channel) — QA is still pending, so treat it as a validation release, not a fully validated stable.
 
 Known validation gaps (pending runtime QA):
 

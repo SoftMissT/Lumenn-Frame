@@ -2,6 +2,13 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.9] 2026-09-15
+
+### Correção
+
+- CSS: removido `position: relative`, `display: flex`, `height: 100%` de `.lumenn-frame.storyboard` (especificidade 0,2,0) que **sobrescreviam** `.app` do Foundry (especificidade 0,1,0) — janela perdia o posicionamento nativo em `#ui-middle` e cobria o HUD.
+- `.lf-root` (template root) virou o container real: `height:100%; width:100%; position:relative`. Overlays (`::before`/`::after`) movidos para `.lf-root` para manter o contexto de posicionamento.
+
 ## [0.0.8] 2026-09-15
 
 ### Correção

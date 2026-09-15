@@ -13,6 +13,7 @@
   "LUMENN_FRAME.Beat.Delete": "Del",
   "LUMENN_FRAME.Beat.Link": "Link",
   "LUMENN_FRAME.Beat.SetStart": "Start",
+  "LUMENN_FRAME.Transitioning": "Transitioning…",
   "LUMENN_FRAME.Beat.InvalidScene": "Invalid Scene",
   "LUMENN_FRAME.Beat.NoScene": "No Scene",
   "LUMENN_FRAME.Beat.NoAudio": "No Audio",

@@ -29,8 +29,9 @@
   <div class="beats-canvas" style="position:relative;min-height:100%;">
     <svg class="connectors"></svg>
     {{#each beats}}
-    <div class="beat-node{{#if isActive}} active{{/if}}{{#if isConnected}} connected{{/if}}{{#unless isValid}} invalid{{/unless}}"
+    <div class="beat-node{{#if isActive}} active{{/if}}{{#if isConnected}} connected{{/if}}{{#if isNavigable}} navigable{{/if}}{{#if isDimmed}} dimmed{{/if}}{{#unless isValid}} invalid{{/unless}}"
          data-id="{{this.id}}"
+         {{#if isNavigable}}data-navigable="true"{{/if}}
          style="left:{{this.position.x}}px;top:{{this.position.y}}px;">
       <div class="beat-thumb">
         {{#if this.sceneThumb}}
@@ -44,7 +45,7 @@
         {{#if this.isActive}}<span class="beat-badge start-badge">{{../label.start}}</span>{{/if}}
         {{#if this.audioLabel}}<span class="beat-badge">{{this.audioLabel}}</span>{{/if}}
       </div>
-      {{#if ../isGM}}
+      {{#if (lumenn-and ../isGM (lumenn-eq ../mode "edit"))}}
       <div class="beat-actions">
         {{#unless this.isActive}}<button class="start-action" data-action="set-start-beat" data-id="{{this.id}}" title="{{../label.start}}">&#9733;</button>{{/unless}}
         <button data-action="edit-beat" data-id="{{this.id}}" title="{{../label.edit}}">&#9998;</button>
@@ -55,6 +56,9 @@
     </div>
     {{/each}}
   </div>
+  {{#if transitioning}}
+  <div class="lf-transitioning"><span class="lf-transitioning-dot"></span>{{label.transitioning}}</div>
+  {{/if}}
   {{else}}
   <div class="lf-empty-state">
     <div class="lf-empty-icon">&#127909;</div>

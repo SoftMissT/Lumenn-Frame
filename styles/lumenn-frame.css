@@ -232,6 +232,29 @@
   border-color: var(--lf-danger);
 }
 
+/* Live mode: navigable beats get a click cursor */
+.beat-node.navigable {
+  cursor: pointer;
+}
+
+.beat-node.navigable:hover {
+  border-color: var(--lf-teal);
+  box-shadow: 0 0 14px var(--lf-teal-dim), 0 4px 16px #00000080;
+}
+
+/* Live mode: non-connected beats are dimmed and non-clickable */
+.beat-node.dimmed {
+  opacity: .38;
+  cursor: default;
+  filter: grayscale(.4);
+}
+
+.beat-node.dimmed:hover {
+  border-color: var(--lf-badge-border);
+  transform: none;
+  box-shadow: var(--lf-shadow);
+}
+
 .beat-node.active {
   border-color: var(--lf-amber);
   box-shadow: 0 0 18px var(--lf-amber-dim), 0 4px 16px #00000080;
@@ -349,6 +372,42 @@
 
 .beat-actions button.start-action:hover { color: var(--lf-amber); border-color: var(--lf-amber); }
 .beat-actions button.delete-action:hover { color: var(--lf-danger); border-color: var(--lf-danger); }
+
+/* ── Transition indicator ─────────────────────────────────────────── */
+.lf-transitioning {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 14px;
+  border: 1px solid var(--lf-teal-dim);
+  border-radius: 999px;
+  background: #101014f2;
+  color: var(--lf-teal);
+  font-family: var(--lf-font-body);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  z-index: 60;
+  pointer-events: none;
+  animation: lf-fadeIn .18s ease;
+}
+
+.lf-transitioning .lf-transitioning-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lf-teal);
+  animation: lf-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes lf-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .35; transform: scale(.7); }
+}
 
 /* ── Empty state ───────────────────────────────────────────────────── */
 .lf-empty-state {

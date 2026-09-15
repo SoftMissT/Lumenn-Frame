@@ -9,6 +9,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
   #controller = new LumennTransitionController();
   #storyboardId = null;
   #mode = "edit";
+  #transitioning = false;
   #dragDrop;
 
   static DEFAULT_OPTIONS = {
@@ -125,11 +126,15 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
 
     const beats = (activeStoryboard?.beats ?? []).map((b) => {
       const scene = b.sceneId ? game.scenes.get(b.sceneId) : null;
+      const isActive = b.id === activeStoryboard.activeBeatId;
+      const isConnected = !!activeBeat?.connections?.includes(b.id);
       return {
         ...b,
         position: b.position ?? { x: 80, y: 80 },
-        isActive: b.id === activeStoryboard.activeBeatId,
-        isConnected: !!activeBeat?.connections?.includes(b.id),
+        isActive,
+        isConnected,
+        isNavigable: this.#mode === "live" && isConnected,
+        isDimmed: this.#mode === "live" && !isActive && !isConnected,
         sceneName: scene?.name ?? (b.sceneId ? game.i18n.localize("LUMENN_FRAME.Beat.InvalidScene") : game.i18n.localize("LUMENN_FRAME.Beat.NoScene")),
         sceneThumb: scene?.thumbnail ?? scene?.background?.src ?? null,
         audioLabel: this.#audioLabel(b.audioSource, playlists),
@@ -146,6 +151,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       playlists,
       mode: this.#mode,
       isGM: !!game.user?.isGM,
+      transitioning: this.#transitioning,
       needsStartBeat: !!activeStoryboard && !activeStoryboard.activeBeatId,
       label: {
         createStoryboard: L("LUMENN_FRAME.Toolbar.CreateStoryboard"),
@@ -159,6 +165,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
         delete: L("LUMENN_FRAME.Beat.Delete"),
         link: L("LUMENN_FRAME.Beat.Link"),
         go: L("LUMENN_FRAME.Beat.Go"),
+        transitioning: L("LUMENN_FRAME.Transitioning"),
         emptyState: L("LUMENN_FRAME.EmptyState"),
         emptyHint: L("LUMENN_FRAME.EmptyHint"),
         dropHint: L("LUMENN_FRAME.DropHint"),
@@ -176,7 +183,16 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     const selector = root.querySelector("select[data-storyboard-selector]");
     selector?.addEventListener("change", (e) => { this.#storyboardId = e.target.value; this.render(); });
     this.#installInternalDrag(root);
+    this.#installLiveNavigation(root);
     this.#drawConnectors(root);
+  }
+
+  #installLiveNavigation(root) {
+    if (this.#mode !== "live") return;
+    root.querySelectorAll(".beat-node[data-navigable]").forEach((node) => node.addEventListener("click", (e) => {
+      if (e.target.closest("button")) return;
+      this.#navigate(node.dataset.id);
+    }));
   }
 
   #action(event) {
@@ -192,13 +208,19 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     if (action === "edit-beat") return this.#editBeat(id);
     if (action === "delete-beat") return this.#confirmDeleteBeat(id);
     if (action === "connect-beat") return this.#toggleConnection(id);
-    if (action === "navigate-beat" && this.#mode === "live") return this.#navigate(id);
   }
 
   async #navigate(id) {
-    const result = await this.#controller.goToBeat(this.#storyboardId, id, this.#mode === "live" ? "ao-vivo" : "edicao");
-    if (result.audioResult === "invalid-source") ui.notifications.warn(game.i18n.localize("LUMENN_FRAME.WarnInvalidAudioSource"));
-    this.render();
+    if (this.#transitioning) return;
+    this.#transitioning = true;
+    await this.render();
+    try {
+      const result = await this.#controller.goToBeat(this.#storyboardId, id, "ao-vivo");
+      if (result.audioResult === "invalid-source") ui.notifications.warn(game.i18n.localize("LUMENN_FRAME.WarnInvalidAudioSource"));
+    } finally {
+      this.#transitioning = false;
+      await this.render();
+    }
   }
 
   #toggleConnection(id) {

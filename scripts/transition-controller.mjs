@@ -1,11 +1,13 @@
-import { LumennBeatStore } from "./beat-store.mjs";
-import { LumennAudioEngine, LumennInvalidAudioSourceError } from "./audio-engine.mjs";
+import {
+  LumennAudioEngine,
+  LumennInvalidAudioSourceError,
+} from "./audio-engine.mjs";
 
 /**
- * LumennTransitionController — única peça que conhece o motor de áudio e
- * Scene.activate() (Specs §2.3). Valida permissão (RF-009) e conectividade
- * (RF-010) antes de agir. Fonte inválida não quebra a navegação (RF-011):
- * a Scene ainda é ativada e o Beat é sinalizado na UI.
+ * LumennTransitionController — peça que conhece o motor de áudio.
+ * No Graph Editor 2.0, o fluxo (Scene) é conduzido pelo app; este controller
+ * concentra apenas a decisão/execução de áudio dirigida por modo, sem conhecer
+ * Scenes nem UI. Validação de permissão/modo vive no app e no socket.
  */
 export class LumennTransitionController {
   #engine = new LumennAudioEngine();
@@ -15,53 +17,33 @@ export class LumennTransitionController {
   }
 
   /**
-   * Navega para um Beat conectado ao ativo (Specs §4.2).
-   * @returns {Promise<{sceneChanged: boolean, audioResult: string}>}
-   * audioResult: "kept" | "crossfaded" | "faded-out" | "started" |
-   *              "ignored" | "invalid-source" | "error"
+   * Transição de áudio dirigida por modo, operando sobre listas de fontes
+   * resolvidas dos Audio Nodes anexados a cada Scene.
+   * @param {Array<{type:"track"|"playlist", id:string}|null>} currentSources
+   * @param {Array<{type:"track"|"playlist", id:string}|null>} targetSources
+   * @param {{mode?:string, crossfadeDuration?:number}|null} audioTrans
+   * @param {number} defaultFade ms (usado quando a edge não define)
+   * @returns {Promise<string>} kept|faded-out|started|crossfaded|ignored|invalid-source|error
    */
-  async goToBeat(storyboardId, targetBeatId, currentMode = "ao-vivo") {
-    const ignored = { sceneChanged: false, audioResult: "ignored" };
-    if (currentMode !== "ao-vivo") return ignored;
-    if (!game.user.isGM) return ignored;
-
-    const storyboard = LumennBeatStore.getStoryboard(storyboardId);
-    if (!storyboard) return ignored;
-    const currentBeat = storyboard.beats.find((b) => b.id === storyboard.activeBeatId) ?? null;
-    if (!currentBeat) return ignored;
-    if (!currentBeat.connections.includes(targetBeatId)) return ignored;
-
-    const targetBeat = storyboard.beats.find((b) => b.id === targetBeatId);
-    if (!targetBeat) return ignored;
-
-    let sceneChanged = false;
-    if (targetBeat.sceneId) {
-      const scene = game.scenes.get(targetBeat.sceneId);
-      if (scene) {
-        await scene.activate();
-        sceneChanged = true;
-      }
-    }
-
-    const duration = LumennBeatStore.getBeatCrossfadeDuration(targetBeat);
-    let audioResult;
+  async goToAudio(
+    currentSources,
+    targetSources,
+    audioTrans,
+    defaultFade = 3000,
+  ) {
+    const mode = audioTrans?.mode ?? "auto";
+    const duration = audioTrans?.crossfadeDuration ?? defaultFade;
     try {
-      audioResult = await this.#engine.transition(
-        currentBeat.audioSource,
-        targetBeat.audioSource,
+      return await this.#engine.applyMode(
+        mode,
+        currentSources,
+        targetSources,
         duration,
       );
     } catch (err) {
-      if (err instanceof LumennInvalidAudioSourceError) {
-        audioResult = "invalid-source";
-        ui.notifications.warn(game.i18n.localize("LUMENN_FRAME.WarnInvalidAudioSource"));
-      } else {
-        console.error("lumenn-frame: falha na transição de áudio", err);
-        audioResult = "error";
-      }
+      if (err instanceof LumennInvalidAudioSourceError) return "invalid-source";
+      console.error("lumenn-frame: falha na transição de áudio", err);
+      return "error";
     }
-
-    await LumennBeatStore.setActiveBeat(storyboardId, targetBeatId);
-    return { sceneChanged, audioResult };
   }
 }

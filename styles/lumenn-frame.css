@@ -1,29 +1,29 @@
-/* Lumenn Frame – Cinematic Edit Bay Theme v0.0.3 ────────────────────────── */
+/* Lumenn Frame – Graph Editor 2.0 (Cinematic Edit Bay theme) ──────────────── */
 
 /* ── Variables ─────────────────────────────────────────────────────── */
 .lumenn-frame {
-  --lf-ink:          #0c0c0f;
-  --lf-surface:      #16161a;
-  --lf-panel:        #1d1d23;
-  --lf-panel-alt:    #242430;
-  --lf-text:         #e0ddd4;
-  --lf-muted:        #73707c;
-  --lf-amber:        #f0a321;
-  --lf-amber-dim:    #f0a32166;
-  --lf-teal:         #2dd4bf;
-  --lf-teal-dim:     #2dd4bf55;
-  --lf-danger:       #e45656;
-  --lf-badge:        #2b2c33;
+  --lf-ink: #0c0c0f;
+  --lf-surface: #16161a;
+  --lf-panel: #1d1d23;
+  --lf-panel-alt: #242430;
+  --lf-text: #e0ddd4;
+  --lf-muted: #73707c;
+  --lf-amber: #f0a321;
+  --lf-amber-dim: #f0a32166;
+  --lf-teal: #2dd4bf;
+  --lf-teal-dim: #2dd4bf55;
+  --lf-danger: #e45656;
+  --lf-badge: #2b2c33;
   --lf-badge-border: #3b3c44;
-  --lf-shadow:       0 2px 10px #00000060;
+  --lf-shadow: 0 2px 10px #00000060;
   --lf-font-display: "Modesto Condensed", "Signika", serif;
-  --lf-font-body:    "Montserrat", "Signika", sans-serif;
-  --lf-radius:       4px;
-  --lf-transition:   0.18s ease;
+  --lf-font-body: "Montserrat", "Signika", sans-serif;
+  --lf-radius: 4px;
+  --lf-transition: 0.15s ease;
 }
 
-/* ── Base container ────────────────────────────────────────────────── */
-.lumenn-frame.storyboard {
+/* ── Base ──────────────────────────────────────────────────────────── */
+.lumenn-frame.graph-editor {
   background: var(--lf-ink);
   color: var(--lf-text);
   font-family: var(--lf-font-body);
@@ -32,7 +32,6 @@
   isolation: isolate;
 }
 
-/* Framework window chrome — dark theme */
 .lumenn-frame .window-header {
   background: var(--lf-panel);
   border-bottom: 1px solid #ffffff0a;
@@ -44,19 +43,14 @@
   letter-spacing: .04em;
 }
 
-.lumenn-frame.storyboard .window-content {
+.lumenn-frame.graph-editor .window-content {
   background: var(--lf-ink);
   padding: 0;
   overflow: hidden;
   position: relative;
 }
 
-.lumenn-frame.beat-config .window-content {
-  background: var(--lf-ink);
-  padding: 10px;
-}
-
-.lumenn-frame.storyboard .lf-root {
+.lumenn-frame.graph-editor .lf-root {
   position: absolute;
   inset: 0;
   display: flex;
@@ -64,36 +58,29 @@
   min-height: 0;
 }
 
-/* Film grain overlay */
+/* Film grain + vignette (sutis, não bloqueiam interação) */
 .lf-root::before {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 4;
+  z-index: 50;
   opacity: .045;
-  background-image: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(255,255,255,.03) 2px,
-    rgba(255,255,255,.03) 4px
-  );
+  background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 255, 255, .03) 2px, rgba(255, 255, 255, .03) 4px);
   background-size: 100% 4px;
 }
 
-/* Vignette — suave, não corta as bordas */
 .lf-root::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 3;
+  z-index: 49;
   background: radial-gradient(ellipse at center, transparent 62%, rgba(12, 12, 15, .5) 100%);
 }
 
-/* ── Toolbar ───────────────────────────────────────────────────────── */
-.lf-toolbar {
+/* ── Topbar ────────────────────────────────────────────────────────── */
+.lf-topbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -101,39 +88,20 @@
   padding: 6px 10px;
   background: var(--lf-panel);
   border-bottom: 1px solid #ffffff0a;
-  z-index: 6;
+  z-index: 60;
 }
 
-.lf-toolbar .lf-group {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.lf-toolbar .lf-group-mode {
-  margin-left: auto;
-}
-
-.lf-toolbar button {
-  font-family: var(--lf-font-body);
-  font-size: 11.5px;
-  font-weight: 500;
-  padding: 3px 10px;
-  border: 1px solid var(--lf-badge-border);
-  border-radius: var(--lf-radius);
-  background: var(--lf-badge);
-  color: var(--lf-text);
-  cursor: pointer;
-  transition: background var(--lf-transition), border-color var(--lf-transition), color var(--lf-transition);
+.lf-brand {
+  font-family: var(--lf-font-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--lf-amber);
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
-.lf-toolbar button:hover {
-  background: var(--lf-panel-alt);
-  border-color: var(--lf-muted);
-}
-
-.lf-toolbar select {
+.lf-topbar select {
   flex: 0 1 180px;
   min-width: 0;
   background: var(--lf-badge);
@@ -144,89 +112,174 @@
   padding: 3px 6px;
   border-radius: var(--lf-radius);
   cursor: pointer;
-  pointer-events: auto;
 }
 
-.lf-toolbar select:focus {
-  outline: none;
-  border-color: var(--lf-amber);
+.lf-top-btn {
+  font-family: var(--lf-font-body);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border: 1px solid var(--lf-badge-border);
+  border-radius: var(--lf-radius);
+  background: var(--lf-badge);
+  color: var(--lf-text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--lf-transition), border-color var(--lf-transition);
 }
 
-.lf-toolbar .lf-divider {
-  width: 1px;
-  height: 18px;
-  background: var(--lf-badge-border);
-  margin: 0 4px;
+.lf-top-btn:hover {
+  background: var(--lf-panel-alt);
+  border-color: var(--lf-muted);
 }
 
-/* Segmented mode toggle */
-.lf-toolbar .lf-mode-toggle {
+.lf-topbar-spacer {
+  flex: 1 1 auto;
+}
+
+.lf-mode-toggle {
   display: flex;
   border: 1px solid var(--lf-badge-border);
   border-radius: var(--lf-radius);
   overflow: hidden;
 }
 
-.lf-toolbar .lf-mode-toggle button {
+.lf-mode-toggle button {
   border: none;
   border-radius: 0;
+  font-family: var(--lf-font-body);
   font-size: 11px;
   padding: 3px 12px;
   color: var(--lf-muted);
   background: transparent;
+  cursor: pointer;
 }
 
-.lf-toolbar .lf-mode-toggle button.active {
+.lf-mode-toggle button.active {
   background: var(--lf-amber);
   color: var(--lf-ink);
 }
 
-.lf-toolbar .lf-mode-toggle button:not(:first-child) {
+.lf-mode-toggle button:not(:first-child) {
   border-left: 1px solid var(--lf-badge-border);
 }
 
-.lf-toolbar .lf-start-btn {
-  color: var(--lf-amber);
-  border-color: var(--lf-amber-dim);
+.lf-camera-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px;
+  background: var(--lf-badge);
+  border: 1px solid var(--lf-badge-border);
+  border-radius: var(--lf-radius);
 }
 
-.lf-toolbar .lf-start-btn:hover {
-  background: var(--lf-amber);
-  color: var(--lf-ink);
+.lf-camera-controls button {
+  font-family: var(--lf-font-body);
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 22px;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--lf-text);
+  cursor: pointer;
 }
 
-/* ── Canvas ────────────────────────────────────────────────────────── */
-.lf-canvas {
+.lf-camera-controls button:hover {
+  background: var(--lf-panel-alt);
+}
+
+.lf-camera-controls .lf-camera-percent {
+  min-width: 40px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--lf-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Body layout ───────────────────────────────────────────────────── */
+.lf-body {
   flex: 1 1 auto;
   min-height: 0;
+  display: flex;
+  flex-direction: row;
   position: relative;
-  overflow: hidden;      /* VIEWPORT: enquadra o grafo; navegação = câmera */
+}
+
+.lf-toolbar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 4px;
+  width: 40px;
+  flex: 0 0 40px;
+  background: var(--lf-panel);
+  border-right: 1px solid #ffffff0a;
+  z-index: 60;
+}
+
+.lf-tool {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  border: 1px solid var(--lf-badge-border);
+  border-radius: var(--lf-radius);
+  background: var(--lf-badge);
+  color: var(--lf-muted);
+  cursor: pointer;
+  transition: background var(--lf-transition), color var(--lf-transition), border-color var(--lf-transition);
+}
+
+.lf-tool:hover {
+  color: var(--lf-text);
+  border-color: var(--lf-muted);
+}
+
+.lf-tool.active {
+  background: var(--lf-amber);
+  color: var(--lf-ink);
+  border-color: var(--lf-amber);
+}
+
+/* ── Viewport / Camera / World ─────────────────────────────────────── */
+.lf-viewport {
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
   background: var(--lf-ink);
   z-index: 1;
 }
 
-/* Câmera: o plano transformado que contém nodes + edges em WORLD coords. */
-.lf-canvas .lf-camera {
+.lf-camera {
   position: absolute;
   top: 0;
   left: 0;
   min-width: 100%;
   min-height: 100%;
-  transform-origin: 0 0;   /* obrigatório: worldToScreen = x*zoom + pan */
+  transform-origin: 0 0;
   will-change: transform;
-  cursor: crosshair;
 }
 
-.lf-canvas.space-hold { cursor: grab; }
-.lf-canvas.panning { cursor: grabbing; }
+.lf-viewport.space-hold {
+  cursor: grab;
+}
 
-.lf-canvas.drag-over {
+.lf-viewport.panning {
+  cursor: grabbing;
+}
+
+.lf-viewport.drag-over {
   outline: 2px dashed var(--lf-amber);
   outline-offset: -4px;
-  background: var(--lf-amber-dim);
 }
 
-.lf-canvas svg.connectors {
+.lf-edges {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -235,122 +288,71 @@
   z-index: 2;
 }
 
-/* ── Camera toolbar (provisória — QA Fase A) ──────────────────────── */
-.lf-camera-bar {
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-  z-index: 8;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 3px 5px;
-  background: #101014e6;
-  border: 1px solid var(--lf-badge-border);
-  border-radius: var(--lf-radius);
-  box-shadow: var(--lf-shadow);
-}
-
-.lf-camera-bar button {
-  font-family: var(--lf-font-body);
-  font-size: 11px;
-  font-weight: 600;
-  min-width: 22px;
-  padding: 2px 6px;
-  border: 1px solid var(--lf-badge-border);
-  border-radius: 3px;
-  background: var(--lf-badge);
-  color: var(--lf-text);
+.lf-edges .lf-edge-hit {
+  pointer-events: stroke;
   cursor: pointer;
-  transition: background var(--lf-transition), border-color var(--lf-transition);
 }
 
-.lf-camera-bar button:hover {
-  background: var(--lf-panel-alt);
-  border-color: var(--lf-muted);
+.lf-edges .lf-ghost {
+  pointer-events: none;
 }
 
-.lf-camera-bar .lf-camera-percent {
-  min-width: 42px;
-  text-align: center;
-  font-family: var(--lf-font-body);
-  font-size: 11px;
-  color: var(--lf-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── Beat node ─────────────────────────────────────────────────────── */
-.beat-node {
+/* ── Nodes ─────────────────────────────────────────────────────────── */
+.lf-node {
   position: absolute;
-  width: 120px;
+  display: flex;
+  flex-direction: column;
   background: var(--lf-panel);
   border: 2px solid var(--lf-badge-border);
   border-radius: 6px;
-  cursor: grab;
-  z-index: 3;
   box-shadow: var(--lf-shadow);
-  transition: border-color var(--lf-transition), box-shadow var(--lf-transition), transform var(--lf-transition);
   overflow: hidden;
-  animation: lf-fadeIn .22s ease;
+  z-index: 3;
+  cursor: grab;
+  transition: border-color var(--lf-transition), box-shadow var(--lf-transition);
 }
 
-.beat-node:hover {
+.lf-node:hover {
   border-color: var(--lf-muted);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px #00000080;
 }
 
-.beat-node.invalid {
-  border-color: var(--lf-danger);
+.lf-node.selected {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px #ffffff40, 0 4px 16px #00000080;
 }
 
-/* Live mode: navigable beats get a click cursor */
-.beat-node.navigable {
-  cursor: pointer;
-}
-
-.beat-node.navigable:hover {
+.lf-node.target-hi {
   border-color: var(--lf-teal);
-  box-shadow: 0 0 14px var(--lf-teal-dim), 0 4px 16px #00000080;
+  box-shadow: 0 0 0 2px var(--lf-teal-dim);
 }
 
-/* Live mode: non-connected beats are dimmed and non-clickable */
-.beat-node.dimmed {
-  opacity: .38;
-  cursor: default;
-  filter: grayscale(.4);
-}
-
-.beat-node.dimmed:hover {
-  border-color: var(--lf-badge-border);
-  transform: none;
-  box-shadow: var(--lf-shadow);
-}
-
-.beat-node.active {
+.lf-node.active {
   border-color: var(--lf-amber);
   box-shadow: 0 0 18px var(--lf-amber-dim), 0 4px 16px #00000080;
 }
 
-.beat-node.connected {
+.lf-node.navigable {
+  cursor: pointer;
   border-color: var(--lf-teal);
 }
 
-.beat-node.active.connected {
-  border-color: var(--lf-amber);
+.lf-node.dimmed {
+  opacity: .38;
+  filter: grayscale(.4);
+  cursor: default;
 }
 
-/* Modo de linkagem pendente (aguardando o nó destino) */
-.beat-node.linking {
-  border-color: var(--lf-teal);
-  box-shadow: 0 0 18px var(--lf-teal-dim), 0 4px 16px #00000080;
-  cursor: crosshair;
+.lf-node.dimmed:hover {
+  border-color: var(--lf-badge-border);
 }
 
-/* Thumbnail */
-.beat-node .beat-thumb {
-  width: 100%;
-  aspect-ratio: 16 / 9;
+.lf-node-head {
+  flex: 0 0 6px;
+}
+
+.lf-node-thumb {
+  flex: 1 1 auto;
+  min-height: 0;
   background: var(--lf-ink);
   display: flex;
   align-items: center;
@@ -359,7 +361,7 @@
   border-bottom: 1px solid #ffffff0a;
 }
 
-.beat-node .beat-thumb img {
+.lf-node-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -367,154 +369,130 @@
   pointer-events: none;
 }
 
-.beat-node .beat-thumb .beat-placeholder {
-  font-size: 22px;
+.lf-node-thumb .lf-node-thumb-ph {
+  font-size: 26px;
   color: var(--lf-muted);
-  opacity: .45;
+  opacity: .5;
 }
 
-.beat-node .beat-label {
-  padding: 5px 7px 4px;
+.lf-node-title {
+  padding: 6px 8px 2px;
   font-family: var(--lf-font-display);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--lf-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.3;
+  line-height: 1.25;
 }
 
-.beat-node .beat-meta {
-  padding: 0 7px 6px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px 5px;
+.lf-node-tag {
+  padding: 0 8px 6px;
   font-size: 10px;
   color: var(--lf-muted);
-  line-height: 1.2;
+  letter-spacing: .02em;
 }
 
-.beat-node .beat-badge {
-  display: inline-flex;
+.lf-node-body {
+  flex: 1 1 auto;
+  padding: 2px 8px 6px;
+  font-size: 11px;
+  color: var(--lf-text);
+  opacity: .85;
+  white-space: pre-wrap;
+  overflow: hidden;
+}
+
+.lf-node-wave {
+  flex: 1 1 auto;
+  display: flex;
   align-items: center;
   gap: 3px;
+  padding: 4px 8px 8px;
+}
+
+.lf-node-wave i {
+  flex: 1;
+  height: 26px;
+  background: linear-gradient(var(--lf-teal), var(--lf-teal-dim));
+  border-radius: 2px;
+  opacity: .7;
+  transform: scaleY(.5);
+}
+
+.lf-node-wave i:nth-child(even) {
+  transform: scaleY(.85);
+}
+
+.lf-node-wave i:nth-child(3n) {
+  transform: scaleY(.3);
+}
+
+.lf-badge-live {
+  display: inline-block;
+  margin-right: 4px;
   padding: 1px 5px;
-  border: 1px solid var(--lf-badge-border);
+  border: 1px solid var(--lf-amber-dim);
   border-radius: 3px;
-  background: var(--lf-badge);
-  color: var(--lf-muted);
-  font-size: 9.5px;
-  white-space: nowrap;
-}
-
-.beat-node .beat-badge .audio-kind-icon {
-  font-size: 9px;
-  opacity: .8;
-}
-
-.beat-node .beat-badge.invalid-badge {
-  border-color: var(--lf-danger);
-  color: var(--lf-danger);
-}
-
-.beat-node.active .beat-badge.start-badge {
-  border-color: var(--lf-amber-dim);
   color: var(--lf-amber);
+  font-size: 9px;
 }
 
-/* Actions — always visible in edit mode (template gates them on isGM+edit) */
-.beat-actions {
-  display: flex;
+/* ── Ports ─────────────────────────────────────────────────────────── */
+.lf-ports {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  gap: 2px;
-  z-index: 5;
-}
-
-.beat-actions button {
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  background: var(--lf-ink);
-  border: 1px solid var(--lf-badge-border);
-  border-radius: 3px;
-  color: var(--lf-muted);
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-  transition: color var(--lf-transition), border-color var(--lf-transition);
-}
-
-.beat-actions button:hover {
-  color: var(--lf-text);
-  border-color: var(--lf-muted);
-}
-
-.beat-actions button.start-action:hover { color: var(--lf-amber); border-color: var(--lf-amber); }
-.beat-actions button.delete-action:hover { color: var(--lf-danger); border-color: var(--lf-danger); }
-
-/* ── Transition indicator ─────────────────────────────────────────── */
-.lf-transitioning {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 14px;
-  border: 1px solid var(--lf-teal-dim);
-  border-radius: 999px;
-  background: #101014f2;
-  color: var(--lf-teal);
-  font-family: var(--lf-font-body);
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: .03em;
-  z-index: 7;
+  inset: 0;
   pointer-events: none;
-  animation: lf-fadeIn .18s ease;
 }
 
-.lf-transitioning .lf-transitioning-dot {
-  width: 8px;
-  height: 8px;
+.lf-port {
+  position: absolute;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: var(--lf-teal);
-  animation: lf-pulse 0.9s ease-in-out infinite;
+  background: var(--lf-badge);
+  border: 2px solid var(--lf-badge-border);
+  box-sizing: border-box;
+  pointer-events: auto;
+  cursor: crosshair;
+  opacity: 0;
+  transition: opacity var(--lf-transition), border-color var(--lf-transition), transform var(--lf-transition);
 }
 
-/* Linking pending hint */
-.lf-linking-hint {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 5px 14px;
-  border: 1px solid var(--lf-teal-dim);
-  border-radius: 999px;
-  background: #101014f2;
-  color: var(--lf-teal);
-  font-family: var(--lf-font-body);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: .03em;
-  z-index: 7;
-  pointer-events: none;
-  animation: lf-fadeIn .18s ease;
+.lf-node:hover .lf-port,
+.lf-node.selected .lf-port,
+.lf-viewport.connect-mode .lf-port {
+  opacity: 1;
 }
 
-@keyframes lf-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: .35; transform: scale(.7); }
+.lf-port:hover {
+  border-color: var(--lf-teal);
+  transform: scale(1.3);
 }
 
-/* ── Empty state ───────────────────────────────────────────────────── */
+.lf-port-in {
+  left: -7px;
+  top: 30%;
+}
+
+.lf-port-out {
+  right: -7px;
+  top: 30%;
+}
+
+.lf-node-audio .lf-port-out {
+  top: 62%;
+}
+
+.lf-port-audio {
+  left: -7px;
+  top: 62%;
+  width: 10px;
+  height: 10px;
+}
+
+/* ── Empty state / transition overlay ──────────────────────────────── */
 .lf-empty-state {
   position: absolute;
   top: 0;
@@ -535,7 +513,6 @@
 .lf-empty-state .lf-empty-icon {
   font-size: 32px;
   opacity: .3;
-  margin-bottom: 2px;
 }
 
 .lf-empty-state .lf-empty-title {
@@ -548,98 +525,87 @@
 
 .lf-empty-state .lf-empty-hint {
   font-size: 12px;
-  max-width: 260px;
+  max-width: 320px;
   line-height: 1.4;
 }
 
-/* ── BeatConfigDialog ──────────────────────────────────────────────── */
-.beat-config {
+.lf-transitioning {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 14px;
+  border: 1px solid var(--lf-teal-dim);
+  border-radius: 999px;
+  background: #101014f2;
+  color: var(--lf-teal);
   font-family: var(--lf-font-body);
-  font-size: 13px;
+  font-size: 11.5px;
+  font-weight: 600;
+  z-index: 7;
+  pointer-events: none;
+  animation: lf-fadeIn .18s ease;
 }
 
-.beat-config .bc-section {
+.lf-transitioning .lf-transitioning-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lf-teal);
+  animation: lf-pulse .9s ease-in-out infinite;
+}
+
+/* ── Inspector ─────────────────────────────────────────────────────── */
+.lf-inspector {
+  flex: 0 0 264px;
+  min-width: 0;
+  padding: 10px;
+  overflow-y: auto;
   background: var(--lf-panel);
-  border: 1px solid var(--lf-badge-border);
-  border-radius: var(--lf-radius);
-  padding: 10px 12px;
-  margin-bottom: 10px;
+  border-left: 1px solid #ffffff0a;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.beat-config .bc-section-title {
+.lf-insp-title {
   font-family: var(--lf-font-display);
   font-size: 13px;
   font-weight: 600;
   color: var(--lf-amber);
   text-transform: uppercase;
   letter-spacing: .04em;
-  margin-bottom: 8px;
+  margin: 2px 0 4px;
   padding-bottom: 5px;
   border-bottom: 1px solid #ffffff0a;
 }
 
-.beat-config .bc-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-/* Audio source tabs (PDR Decisão #4) */
-.beat-config .bc-tabs {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 10px;
-  border: 1px solid var(--lf-badge-border);
-  border-radius: var(--lf-radius);
-  overflow: hidden;
-}
-
-.beat-config .bc-tab {
-  flex: 1 1 0;
-  padding: 5px 0;
-  font-family: var(--lf-font-body);
-  font-size: 11.5px;
-  font-weight: 600;
-  text-align: center;
-  color: var(--lf-muted);
-  background: var(--lf-badge);
-  border: none;
-  cursor: pointer;
-  transition: background var(--lf-transition), color var(--lf-transition);
-}
-
-.beat-config .bc-tab:not(:first-child) {
-  border-left: 1px solid var(--lf-badge-border);
-}
-
-.beat-config .bc-tab:hover {
-  color: var(--lf-text);
-}
-
-.beat-config .bc-tab.active {
-  background: var(--lf-amber);
-  color: var(--lf-ink);
-}
-
-.beat-config .bc-tab-panel {
-  display: none;
-}
-
-.beat-config .bc-row:last-child {
-  margin-bottom: 0;
-}
-
-.beat-config label {
-  font-size: 11.5px;
+.lf-insp-label {
+  font-size: 10.5px;
   font-weight: 600;
   color: var(--lf-muted);
   text-transform: uppercase;
   letter-spacing: .03em;
+  margin-top: 2px;
 }
 
-.beat-config select,
-.beat-config input {
+.lf-insp-label.lf-insp-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: none;
+  color: var(--lf-text);
+  font-size: 11.5px;
+}
+
+.lf-inspector select,
+.lf-inspector input[type="text"],
+.lf-inspector input[type="number"],
+.lf-inspector textarea {
   width: 100%;
   padding: 5px 8px;
   border: 1px solid var(--lf-badge-border);
@@ -648,96 +614,124 @@
   color: var(--lf-text);
   font-family: var(--lf-font-body);
   font-size: 12px;
+  box-sizing: border-box;
 }
 
-.beat-config select:focus,
-.beat-config input:focus {
+.lf-inspector input[type="range"] {
+  width: 100%;
+}
+
+.lf-inspector select:focus,
+.lf-inspector input:focus,
+.lf-inspector textarea:focus {
   outline: none;
   border-color: var(--lf-amber);
 }
 
-/* Scene preview */
-.bc-scene-preview {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.bc-scene-preview .bc-thumb {
-  width: 80px;
-  height: 45px;
-  border-radius: 3px;
-  background: var(--lf-ink);
-  overflow: hidden;
-  flex-shrink: 0;
-  border: 1px solid var(--lf-badge-border);
-}
-
-.bc-scene-preview .bc-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.bc-scene-preview .bc-thumb .bc-no-thumb {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--lf-muted);
-  font-size: 11px;
-  opacity: .5;
-}
-
-.bc-scene-preview .bc-scene-name {
+.lf-insp-p {
+  margin: 0;
   font-size: 12px;
   color: var(--lf-text);
+  opacity: .85;
+  line-height: 1.4;
 }
 
-.bc-scene-preview .bc-scene-name.unset {
-  color: var(--lf-muted);
-  font-style: italic;
-}
-
-.beat-config .bc-hint {
-  font-size: 10.5px;
-  color: var(--lf-muted);
-  line-height: 1.3;
-}
-
-.beat-config .bc-footer {
+.lf-swatches {
   display: flex;
-  justify-content: flex-end;
-  margin-top: 6px;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
-.beat-config .bc-footer button {
+.lf-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform var(--lf-transition), border-color var(--lf-transition);
+}
+
+.lf-swatch:hover {
+  transform: scale(1.15);
+  border-color: #ffffff80;
+}
+
+.lf-insp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.lf-insp-actions button {
+  flex: 1 1 auto;
   font-family: var(--lf-font-body);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
-  padding: 5px 18px;
+  padding: 5px 10px;
   border: 1px solid var(--lf-amber-dim);
   border-radius: var(--lf-radius);
   background: var(--lf-amber);
   color: var(--lf-ink);
   cursor: pointer;
-  transition: background var(--lf-transition);
+  white-space: nowrap;
 }
 
-.beat-config .bc-footer button:hover {
+.lf-insp-actions button:hover {
   background: #d9931e;
 }
 
-/* ── Animations ────────────────────────────────────────────────────── */
-@keyframes lf-fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+.lf-insp-actions button.danger {
+  background: var(--lf-danger);
+  border-color: var(--lf-danger);
+  color: #fff;
 }
 
-/* ── Scrollbar ─────────────────────────────────────────────────────── */
-.lf-canvas::-webkit-scrollbar { width: 6px; height: 6px; }
-.lf-canvas::-webkit-scrollbar-track { background: transparent; }
-.lf-canvas::-webkit-scrollbar-thumb { background: var(--lf-badge-border); border-radius: 3px; }
-.lf-canvas::-webkit-scrollbar-thumb:hover { background: var(--lf-muted); }
+.lf-insp-actions button.danger:hover {
+  background: #c33;
+}
+
+.lf-insp-actions button:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+/* ── Animations / scrollbar ────────────────────────────────────────── */
+@keyframes lf-fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lf-pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: .35;
+    transform: scale(.7);
+  }
+}
+
+.lf-inspector::-webkit-scrollbar {
+  width: 6px;
+}
+
+.lf-inspector::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lf-inspector::-webkit-scrollbar-thumb {
+  background: var(--lf-badge-border);
+  border-radius: 3px;
+}

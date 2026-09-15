@@ -22,7 +22,9 @@
  */
 export class LumennInvalidAudioSourceError extends Error {
   constructor(source) {
-    super(`Fonte de áudio inválida ou excluída: ${source?.type ?? "?"}:${source?.id ?? "?"}`);
+    super(
+      `Fonte de áudio inválida ou excluída: ${source?.type ?? "?"}:${source?.id ?? "?"}`,
+    );
     this.name = "LumennInvalidAudioSourceError";
     this.source = source;
   }
@@ -51,8 +53,13 @@ export class LumennAudioEngine {
       const current = currentSource ? this.#resolve(currentSource) : null;
       const target = targetSource ? this.#resolveStrict(targetSource) : null;
 
-      if (currentSource && targetSource && this.#sameSource(currentSource, targetSource)) {
-        if (current && !current.playing) await this.#start(current, crossfadeDuration);
+      if (
+        currentSource &&
+        targetSource &&
+        this.#sameSource(currentSource, targetSource)
+      ) {
+        if (current && !current.playing)
+          await this.#start(current, crossfadeDuration);
         return "kept";
       }
       if (current && !target) {
@@ -89,7 +96,8 @@ export class LumennAudioEngine {
         }
         return null;
       }
-      if (source.type === "playlist") return game.playlists.get(source.id) ?? null;
+      if (source.type === "playlist")
+        return game.playlists.get(source.id) ?? null;
     } catch {
       return null;
     }
@@ -127,5 +135,85 @@ export class LumennAudioEngine {
       );
     }
     await doc.stopAll();
+  }
+
+  /**
+   * Transição de áudio dirigida por modo, com múltiplas fontes (Audio Nodes).
+   * @param {"auto"|"keep"|"crossfade"|"fadeout"|"fadein"} mode
+   * @param {Array<{type:"track"|"playlist", id:string}|null>} currentSources
+   * @param {Array<{type:"track"|"playlist", id:string}|null>} targetSources
+   * @param {number} duration ms
+   * @returns {Promise<string>} kept|faded-out|started|crossfaded|ignored|invalid-source|error
+   */
+  async applyMode(mode, currentSources, targetSources, duration = 3000) {
+    if (this.#transitioning) return "ignored";
+    this.#transitioning = true;
+    try {
+      const current = (currentSources ?? [])
+        .map((s) => (s ? this.#resolve(s) : null))
+        .filter(Boolean);
+      const target = (targetSources ?? [])
+        .map((s) => (s ? this.#resolve(s) : null))
+        .filter(Boolean);
+      const stopAll = () =>
+        Promise.all(current.map((d) => this.#stop(d, duration)));
+      const startAll = () =>
+        Promise.all(target.map((d) => this.#start(d, duration)));
+
+      switch (mode) {
+        case "keep":
+          for (const d of current)
+            if (!d.playing) await this.#start(d, duration);
+          return "kept";
+        case "fadeout":
+          await stopAll();
+          return "faded-out";
+        case "fadein":
+          await startAll();
+          return "started";
+        case "crossfade":
+          await Promise.all([
+            ...current.map((d) => this.#stop(d, duration)),
+            ...target.map((d) => this.#start(d, duration)),
+          ]);
+          return "crossfaded";
+        case "auto":
+        default: {
+          const same =
+            current.length === target.length &&
+            current.length > 0 &&
+            current.every((c) =>
+              target.some(
+                (t) => t.id === c.id && t.documentName === c.documentName,
+              ),
+            );
+          if (same) {
+            for (const d of target)
+              if (!d.playing) await this.#start(d, duration);
+            return "kept";
+          }
+          if (!target.length && current.length) {
+            await stopAll();
+            return "faded-out";
+          }
+          if (!current.length && target.length) {
+            await startAll();
+            return "started";
+          }
+          if (!current.length && !target.length) return "kept";
+          await Promise.all([
+            ...current.map((d) => this.#stop(d, duration)),
+            ...target.map((d) => this.#start(d, duration)),
+          ]);
+          return "crossfaded";
+        }
+      }
+    } catch (err) {
+      if (err instanceof LumennInvalidAudioSourceError) return "invalid-source";
+      console.error("lumenn-frame: falha no applyMode", err);
+      return "error";
+    } finally {
+      this.#transitioning = false;
+    }
   }
 }

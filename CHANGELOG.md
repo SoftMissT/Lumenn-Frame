@@ -2,6 +2,36 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## 0.0.15-alpha.2
+
+> **Graph Editor 2.0** (drift reset). Build de validação de runtime — implementação completa no código; **QA v13/v14 (GM+Player) ainda pendente**.
+
+### Implementado (Fase única pós-drift-reset)
+
+- Workspace `[Expandir]/[Restaurar]` via `ApplicationV2.setPosition`
+- Canvas infinito (coordenadas ±, sem clamps)
+- Câmera: pan (Space+drag, botão do meio), zoom centrado no cursor, `- 100% + Fit`
+- Toolbar esquerda: Select / Hand / Connect / Scene / Audio / Note
+- Scene / Audio / Note Nodes com cores, tamanhos (compact/normal/large) e aparência distinta
+- Inspector lateral contextual (graph/node/edge)
+- Ports (FLOW IN/OUT, AUDIO IN/OUT) + criação de edges por drag port→port com ghost + target highlight + Escape
+- FLOW edges (direcionais; A→B/B→A independentes; recíprocas com curva offset) e AUDIO edges (tracejadas, associação não-navegável)
+- Edge selection (hit target grosso) + transição por edge (scene cut/fade; audio auto/keep/crossfade/fadeout/fadein)
+- `[Adicionar retorno B → A]` + estado Bidirectional
+- Drag/drop: Scene→Scene Node, Playlist/PlaylistSound→Audio Node, Folder→grid
+- Live Mode (pan/zoom/select; move/edit/connect/delete bloqueados; navegação só por outgoing FLOW)
+- Transições executadas: Scene fade overlay + `Scene.activate()`; crossfade real por Audio Nodes via `LumennAudioEngine.applyMode`
+- GM/Player sync via module socket (`module.lumenn-frame`; `socket: true`); players espelham o fade
+- Schema v2 (`graphs`: nodes[] + edges[]) + migração não-destrutiva do schema v1 (backup + idempotente)
+- `foundry-compat.mjs` (camada central de compat) + `COMPATIBILITY.md`
+- `module.json`: `socket: true`, min 13.350 / max 14.999, verified 13.350 (baseline, sem claim de teste)
+
+### Bloqueado / pendente (ver relatório)
+
+- Runtime QA v13.350/13.351 e v14 (GM + Player) — sem ambiente de teste disponível
+- Crossfade audível com áudio real — requer teste de runtime
+- verified v14 — não testado
+
 ## 0.0.15-alpha.1
 
 > **ALPHA / runtime validation build** — Graph Editor 2.0, **Phase A: Camera only**. Nenhuma feature de Fase B (schema v2, ports, Inspector, novos node types) incluída.
@@ -45,6 +75,7 @@ As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver
 ## 0.0.14-beta.1
 
 ### Fixed / Testing
+
 > Build de validação de runtime — os bugs abaixo estão corrigidos no código, mas esta versão ainda depende do QA manual no Foundry (responsividade, drop, grafo, scroll, persistência, modos).
 
 - responsive toolbar (flex-wrap, grupos semânticos — não corta mais controles)

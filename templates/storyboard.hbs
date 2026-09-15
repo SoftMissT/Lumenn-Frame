@@ -1,92 +1,216 @@
 <div class="lf-root">
-  <div class="lf-toolbar">
-    <div class="lf-group lf-group-select">
-      {{#if storyboards.length}}
-      <select class="lf-storyboard-selector" data-storyboard-selector>
-        {{#each storyboards}}
-        <option value="{{this.id}}" {{#if (lumenn-eq this.id ../activeStoryboard.id)}}selected{{/if}}>{{this.name}}</option>
-        {{/each}}
-      </select>
-      {{/if}}
-    </div>
-    {{#if isGM}}
-    <div class="lf-group lf-group-crud">
-      {{#if (lumenn-eq mode 'edit')}}
-      <button data-action="create-storyboard">{{label.createStoryboard}}</button>
-      <button data-action="rename-storyboard">{{label.renameStoryboard}}</button>
-      <button data-action="delete-storyboard">{{label.deleteStoryboard}}</button>
-      {{/if}}
-    </div>
-    <div class="lf-group lf-group-beat">
-      {{#if (lumenn-eq mode 'edit')}}
-      <button data-action="create-beat">{{label.createBeat}}</button>
-      {{#if needsStartBeat}}<button class="lf-start-btn" disabled>{{label.needsStartBeat}}</button>{{/if}}
-      {{/if}}
-    </div>
-    <div class="lf-group lf-group-mode">
-      <div class="lf-mode-toggle">
-        <button class="{{#if (lumenn-eq mode 'edit')}}active{{/if}}" data-action="toggle-mode">{{label.editMode}}</button>
-        <button class="{{#if (lumenn-eq mode 'live')}}active{{/if}}" data-action="toggle-mode">{{label.liveMode}}</button>
-      </div>
-    </div>
+  <div class="lf-topbar">
+    <span class="lf-brand">Lumenn Frame</span>
+    {{#if graphs.length}}
+    <select class="lf-graph-selector" data-graph-selector>
+      {{#each graphs}}
+      <option value="{{this.id}}" {{#if (lumenn-eq this.id ../activeGraph.id)}}selected{{/if}}>{{this.name}}</option>
+      {{/each}}
+    </select>
     {{/if}}
+    {{#if isGM}}
+    <button class="lf-top-btn" data-action="create-graph" title="{{label.createGraph}}">+</button>
+    {{/if}}
+    <div class="lf-mode-toggle">
+      <button class="{{#if (lumenn-eq mode 'edit')}}active{{/if}}" data-action="toggle-mode">{{label.editMode}}</button>
+      <button class="{{#if (lumenn-eq mode 'live')}}active{{/if}}" data-action="toggle-mode">{{label.liveMode}}</button>
+    </div>
+    <span class="lf-topbar-spacer"></span>
+    <div class="lf-camera-controls">
+      <button data-camera="zoom-out" title="Zoom out">-</button>
+      <span class="lf-camera-percent" data-camera-percent>100%</span>
+      <button data-camera="reset" title="100%">100%</button>
+      <button data-camera="zoom-in" title="Zoom in">+</button>
+      <button data-camera="fit" title="Fit All">Fit</button>
+    </div>
+    <button class="lf-top-btn" data-action="workspace-toggle">{{label.expand}}</button>
   </div>
 
-  <div class="lf-canvas">
-    <div class="lf-camera">
-      <svg class="connectors"></svg>
-      {{#each beats}}
-      <div class="beat-node{{#if isActive}} active{{/if}}{{#if isConnected}} connected{{/if}}{{#if isNavigable}} navigable{{/if}}{{#if isDimmed}} dimmed{{/if}}{{#unless isValid}} invalid{{/unless}}{{#if (lumenn-eq this.id ../linkingBeatId)}} linking{{/if}}"
-           data-id="{{this.id}}"
-           {{#if isNavigable}}data-navigable="true"{{/if}}
-           style="left:{{this.position.x}}px;top:{{this.position.y}}px;">
-        <div class="beat-thumb">
-          {{#if this.sceneThumb}}
-            <img src="{{this.sceneThumb}}" alt="{{this.sceneName}}" loading="lazy">
-          {{else}}
-            <span class="beat-placeholder">&#127909;</span>
+  <div class="lf-body">
+    <div class="lf-toolbar-left">
+      {{#if editable}}
+      <button class="lf-tool{{#if (lumenn-eq tool 'select')}} active{{/if}}" data-tool="select" title="{{label.select}}">&#9633;</button>
+      <button class="lf-tool{{#if (lumenn-eq tool 'hand')}} active{{/if}}" data-tool="hand" title="{{label.hand}}">&#9996;</button>
+      <button class="lf-tool{{#if (lumenn-eq tool 'connect')}} active{{/if}}" data-tool="connect" title="{{label.connect}}">&#8646;</button>
+      <button class="lf-tool{{#if (lumenn-eq tool 'scene')}} active{{/if}}" data-tool="scene" title="{{label.addScene}}">&#127916;</button>
+      <button class="lf-tool{{#if (lumenn-eq tool 'audio')}} active{{/if}}" data-tool="audio" title="{{label.addAudio}}">&#9835;</button>
+      <button class="lf-tool{{#if (lumenn-eq tool 'note')}} active{{/if}}" data-tool="note" title="{{label.addNote}}">&#182;</button>
+      {{/if}}
+    </div>
+
+    <div class="lf-viewport">
+      <div class="lf-camera">
+        <svg class="lf-edges"></svg>
+        {{#each nodes}}
+        <div class="lf-node lf-node-{{this.type}}{{#if this.isActive}} active{{/if}}{{#if this.isNavigable}} navigable{{/if}}{{#if this.isDimmed}} dimmed{{/if}}{{#if this.selected}} selected{{/if}}{{#if this.targetHi}} target-hi{{/if}}"
+             data-id="{{this.id}}"
+             style="left:{{this.position.x}}px;top:{{this.position.y}}px;width:{{this.width}}px;height:{{this.height}}px;--node-color:{{this.color}};">
+          <div class="lf-node-head" style="background:{{this.color}}"></div>
+          {{#if (lumenn-eq this.type 'scene')}}
+          <div class="lf-node-thumb">
+            {{#if this.sceneThumb}}<img src="{{this.sceneThumb}}" alt="{{this.sceneName}}" loading="lazy">{{else}}<span class="lf-node-thumb-ph">&#127916;</span>{{/if}}
+          </div>
+          <div class="lf-node-title">{{this.sceneName}}</div>
+          <div class="lf-node-tag">{{#if this.isActive}}<span class="lf-badge-live">{{../label.setInitial}}</span>{{/if}}&#127916; Scene</div>
           {{/if}}
+          {{#if (lumenn-eq this.type 'audio')}}
+          <div class="lf-node-title">&#9835; {{this.audioLabel}}</div>
+          <div class="lf-node-tag">{{this.audioBadge}}</div>
+          <div class="lf-node-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          {{/if}}
+          {{#if (lumenn-eq this.type 'note')}}
+          <div class="lf-node-title">{{this.data.title}}</div>
+          <div class="lf-node-body">{{this.data.body}}</div>
+          <div class="lf-node-tag">&#182; Note</div>
+          {{/if}}
+          <div class="lf-ports">
+            {{#if (lumenn-eq this.type 'scene')}}
+            <span class="lf-port lf-port-in" data-port="flow-in" data-node="{{this.id}}" title="FLOW IN"></span>
+            <span class="lf-port lf-port-out" data-port="flow-out" data-node="{{this.id}}" title="FLOW OUT"></span>
+            <span class="lf-port lf-port-audio" data-port="audio-in" data-node="{{this.id}}" title="AUDIO IN"></span>
+            {{/if}}
+            {{#if (lumenn-eq this.type 'audio')}}
+            <span class="lf-port lf-port-out lf-port-audio" data-port="audio-out" data-node="{{this.id}}" title="AUDIO OUT"></span>
+            {{/if}}
+          </div>
         </div>
-        <div class="beat-label">{{this.sceneName}}</div>
-        <div class="beat-meta">
-          {{#if this.isActive}}<span class="beat-badge start-badge">{{../label.start}}</span>{{/if}}
-          {{#if this.audioLabel}}<span class="beat-badge"><i class="audio-kind-icon {{#if (lumenn-eq this.audioKind 'playlist')}}fa-solid fa-list-ul{{else}}fa-solid fa-music{{/if}}"></i>{{this.audioLabel}}</span>{{/if}}
-          {{#unless this.isValid}}<span class="beat-badge invalid-badge">{{../label.invalid}}</span>{{/unless}}
+        {{/each}}
+      </div>
+      {{#if transitioning}}
+      <div class="lf-transitioning"><span class="lf-transitioning-dot"></span>{{label.transition}}</div>
+      {{/if}}
+      {{#unless nodes.length}}
+      <div class="lf-empty-state">
+        <div class="lf-empty-icon">&#127916;</div>
+        <div class="lf-empty-title">{{label.emptyState}}</div>
+        <div class="lf-empty-hint">{{label.emptyHint}}<br>{{label.dropHint}}</div>
+      </div>
+      {{/unless}}
+    </div>
+
+    <div class="lf-inspector">
+      {{#if (lumenn-eq inspector.kind 'node')}}
+        {{#if (lumenn-eq inspector.nodeType 'scene')}}
+        <h3 class="lf-insp-title">{{label.scene}}</h3>
+        <label class="lf-insp-label">{{label.sceneDoc}}</label>
+        <select data-insp="data.sceneId">
+          <option value="">{{label.none}}</option>
+          {{#each inspector.scenes}}
+          <option value="{{this.id}}" {{#if (lumenn-eq this.id ../inspector.node.data.sceneId)}}selected{{/if}}>{{this.name}}</option>
+          {{/each}}
+        </select>
+        {{/if}}
+        {{#if (lumenn-eq inspector.nodeType 'audio')}}
+        <h3 class="lf-insp-title">{{label.audio}}</h3>
+        <label class="lf-insp-label">{{label.source}}</label>
+        <select data-insp="data.audioType">
+          <option value="">{{label.none}}</option>
+          <option value="playlist" {{#if (lumenn-eq inspector.node.data.audioType 'playlist')}}selected{{/if}}>Playlist</option>
+          <option value="track" {{#if (lumenn-eq inspector.node.data.audioType 'track')}}selected{{/if}}>Track</option>
+        </select>
+        {{#if (lumenn-eq inspector.node.data.audioType 'playlist')}}
+        <select data-insp="data.audioId">
+          <option value="">{{label.none}}</option>
+          {{#each inspector.playlistsForAudio}}
+          <option value="{{this.id}}" {{#if (lumenn-eq this.id ../inspector.node.data.audioId)}}selected{{/if}}>{{this.name}}</option>
+          {{/each}}
+        </select>
+        {{/if}}
+        {{#if (lumenn-eq inspector.node.data.audioType 'track')}}
+        <select data-insp="data.audioId">
+          <option value="">{{label.none}}</option>
+          {{#each inspector.playlistsForAudio}}
+          {{#each this.sounds}}
+          <option value="{{this.uuid}}" {{#if (lumenn-eq this.uuid ../../inspector.node.data.audioId)}}selected{{/if}}>{{../name}} / {{this.name}}</option>
+          {{/each}}
+          {{/each}}
+        </select>
+        {{/if}}
+        <label class="lf-insp-label">{{label.volume}}</label>
+        <input type="range" min="0" max="1" step="0.05" data-insp="data.volume" value="{{inspector.node.data.volume}}">
+        <label class="lf-insp-label lf-insp-check"><input type="checkbox" data-insp="data.loop" {{#if inspector.node.data.loop}}checked{{/if}}> {{label.loop}}</label>
+        {{/if}}
+        {{#if (lumenn-eq inspector.nodeType 'note')}}
+        <h3 class="lf-insp-title">{{label.note}}</h3>
+        <label class="lf-insp-label">{{label.title}}</label>
+        <input type="text" data-insp-input="data.title" value="{{inspector.node.data.title}}">
+        <label class="lf-insp-label">{{label.body}}</label>
+        <textarea data-insp-input="data.body" rows="4">{{inspector.node.data.body}}</textarea>
+        {{/if}}
+        <label class="lf-insp-label">{{label.color}}</label>
+        <div class="lf-swatches">
+          {{#each inspector.colors}}
+          <span class="lf-swatch" data-insp-swatch data-color="{{this}}" style="background:{{this}}"></span>
+          {{/each}}
         </div>
-        {{#if (lumenn-and ../isGM (lumenn-eq ../mode "edit"))}}
-        <div class="beat-actions">
-          {{#unless this.isActive}}<button class="start-action" data-action="set-start-beat" data-id="{{this.id}}" title="{{../label.start}}">&#9733;</button>{{/unless}}
-          <button data-action="edit-beat" data-id="{{this.id}}" title="{{../label.edit}}">&#9998;</button>
-          <button data-action="connect-beat" data-id="{{this.id}}" title="{{../label.link}}">&#9741;</button>
-          <button data-action="delete-beat" data-id="{{this.id}}" title="{{../label.delete}}">&#10005;</button>
+        <label class="lf-insp-label">{{label.size}}</label>
+        <select data-insp="size">
+          {{#each inspector.sizes}}
+          <option value="{{this}}" {{#if (lumenn-eq this ../inspector.node.size)}}selected{{/if}}>{{this}}</option>
+          {{/each}}
+        </select>
+        <label class="lf-insp-label">{{label.notes}}</label>
+        <textarea data-insp-input="notes" rows="3">{{inspector.node.notes}}</textarea>
+        {{#if editable}}
+        <div class="lf-insp-actions">
+          <button data-insp-action="set-initial">{{label.setInitial}}</button>
+          <button class="danger" data-insp-action="delete-node">{{label.delete}}</button>
         </div>
         {{/if}}
+      {{/if}}
+
+      {{#if (lumenn-eq inspector.kind 'edge')}}
+        {{#if (lumenn-eq inspector.edgeType 'flow')}}
+        <h3 class="lf-insp-title">{{label.flowEdge}}</h3>
+        <p class="lf-insp-p">{{label.from}}: {{inspector.fromLabel}} &rarr; {{label.to}}: {{inspector.toLabel}}</p>
+        <label class="lf-insp-label">{{label.sceneTrans}}</label>
+        <select data-insp="transition.scene.type">
+          <option value="cut" {{#if (lumenn-eq inspector.edge.transition.scene.type 'cut')}}selected{{/if}}>{{label.cut}}</option>
+          <option value="fade" {{#if (lumenn-eq inspector.edge.transition.scene.type 'fade')}}selected{{/if}}>{{label.fade}}</option>
+        </select>
+        <label class="lf-insp-label">{{label.duration}} (ms)</label>
+        <input type="number" min="0" step="100" data-insp="transition.scene.duration" value="{{inspector.edge.transition.scene.duration}}">
+        <label class="lf-insp-label">{{label.audioTrans}}</label>
+        <select data-insp="transition.audio.mode">
+          <option value="auto" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'auto')}}selected{{/if}}>{{label.auto}}</option>
+          <option value="keep" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'keep')}}selected{{/if}}>{{label.keep}}</option>
+          <option value="crossfade" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'crossfade')}}selected{{/if}}>{{label.crossfade}}</option>
+          <option value="fadeout" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'fadeout')}}selected{{/if}}>{{label.fadeout}}</option>
+          <option value="fadein" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'fadein')}}selected{{/if}}>{{label.fadein}}</option>
+        </select>
+        <label class="lf-insp-label">{{label.crossfadeDur}} (ms)</label>
+        <input type="number" min="0" step="100" data-insp="transition.audio.crossfadeDuration" value="{{inspector.edge.transition.audio.crossfadeDuration}}">
+        {{#if editable}}
+        <div class="lf-insp-actions">
+          {{#if inspector.reverse}}
+          <button disabled>{{label.bidirectional}}</button>
+          {{else}}
+          <button data-insp-action="add-return">{{label.addReturn}}</button>
+          {{/if}}
+          <button class="danger" data-insp-action="delete-edge">{{label.delete}}</button>
+        </div>
+        {{/if}}
+        {{else}}
+        <h3 class="lf-insp-title">{{label.audioEdge}}</h3>
+        <p class="lf-insp-p">{{label.from}}: {{inspector.fromLabel}} &rarr; {{label.to}}: {{inspector.toLabel}}</p>
+        {{#if editable}}
+        <div class="lf-insp-actions"><button class="danger" data-insp-action="delete-edge">{{label.delete}}</button></div>
+        {{/if}}
+        {{/if}}
+      {{/if}}
+
+      {{#if (lumenn-eq inspector.kind 'graph')}}
+      <h3 class="lf-insp-title">{{label.graph}}</h3>
+      <p class="lf-insp-p">{{activeGraph.name}}</p>
+      <p class="lf-insp-p">{{nodes.length}} nodes &middot; {{edgeCount}} edges</p>
+      <p class="lf-insp-p">Schema v2 &middot; graph editor</p>
+      {{#if editable}}
+      <div class="lf-insp-actions">
+        <button data-insp-action="rename-graph">{{label.renameGraph}}</button>
+        <button class="danger" data-insp-action="delete-graph">{{label.deleteGraph}}</button>
       </div>
-      {{/each}}
+      {{/if}}
+      {{/if}}
     </div>
-
-    <div class="lf-camera-bar">
-      <button type="button" data-camera="zoom-out" title="Zoom out">-</button>
-      <span class="lf-camera-percent" data-camera-percent>100%</span>
-      <button type="button" data-camera="reset" title="Reset 100%">100%</button>
-      <button type="button" data-camera="zoom-in" title="Zoom in">+</button>
-      <button type="button" data-camera="fit" title="Fit All">Fit</button>
-    </div>
-
-    {{#if linkingBeatId}}
-    <div class="lf-linking-hint">{{label.linkingHint}}</div>
-    {{/if}}
-
-    {{#if transitioning}}
-    <div class="lf-transitioning"><span class="lf-transitioning-dot"></span>{{label.transitioning}}</div>
-    {{/if}}
-
-    {{#unless beats.length}}
-    <div class="lf-empty-state">
-      <div class="lf-empty-icon">&#127909;</div>
-      <div class="lf-empty-title">{{label.emptyState}}</div>
-      <div class="lf-empty-hint">{{label.emptyHint}}<br>{{label.dropHint}}</div>
-    </div>
-    {{/unless}}
   </div>
 </div>

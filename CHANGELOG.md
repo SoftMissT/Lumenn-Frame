@@ -2,7 +2,9 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
-## [0.0.3] 2026-09-15
+## [0.0.5] 2026-09-15
+
+> Consolidação final: 0.0.3/0.0.4 foram tags de trabalho intermediárias.
 
 ### UI/UX — Cinematic Edit Bay
 

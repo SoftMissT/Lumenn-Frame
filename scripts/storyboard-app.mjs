@@ -20,7 +20,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     position: { width: 900, height: 650 },
     window: { resizable: true },
     dragDrop: [
-      { dragSelector: ".beat-node", dropSelector: ".beats-canvas" },
+      { dropSelector: ".beats-canvas" },
     ],
   };
 
@@ -38,11 +38,9 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
   #createDragDropHandlers() {
     return this.options.dragDrop.map((d) => {
       d.permissions = {
-        dragstart: this.#canDragStart.bind(this),
         drop: this.#canDrop.bind(this),
       };
       d.callbacks = {
-        dragstart: this.#onDragStart.bind(this),
         dragover: this.#onDragOver.bind(this),
         dragleave: this.#onDragLeave.bind(this),
         drop: this.#onDrop.bind(this),
@@ -51,13 +49,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     });
   }
 
-  #canDragStart() { return false; } // We only accept external drops
   #canDrop() { return !!game.user?.isGM && this.#mode === "edit"; }
-
-  #onDragStart(event) {
-    // Internal beat repositioning is handled by #installDrag (pointer events)
-    event.preventDefault();
-  }
 
   #onDragOver(event) {
     event.preventDefault();
@@ -73,10 +65,12 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     this.element.querySelector(".beats-canvas")?.classList.remove("drag-over");
     if (!game.user?.isGM || this.#mode !== "edit") return;
 
-    const raw = event.dataTransfer?.getData("text/plain") ?? "";
-    if (!raw) return;
+    // Sidebar drags carry JSON: {type: "Scene"|"Playlist"|"PlaylistSound", uuid, ...}
+    const data = TextEditor.getDragEventData(event);
+    const uuid = data?.uuid ?? event.dataTransfer?.getData("text/plain") ?? "";
+    if (!uuid) return;
     let doc;
-    try { doc = await fromUuid(raw); } catch { return; }
+    try { doc = await fromUuid(uuid); } catch { return; }
     if (!doc) return;
 
     const canvas = this.element.querySelector(".beats-canvas");

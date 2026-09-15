@@ -2,6 +2,14 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.10] 2026-09-15
+
+### Correções
+
+- **Drag-drop de Cena/Playlist funcional**: o payload do drag da sidebar é JSON (`TextEditor.getDragEventData` → `{type, uuid}`), não UUID puro. `#onDrop` agora resolve `data.uuid` com fallback para `text/plain` — antes `fromUuid(raw)` recebia JSON, retornava null e o drop era ignorado em silêncio.
+- **Notifications sobrepostas pela janela escura**: z-indexes internos (49/50/51/60) escapavam do stacking context da janela e pintavam por cima dos overlays do sistema. `.lumenn-frame.storyboard` agora tem `isolation: isolate` (stacking context próprio) e z-indexes internos reduzidos para escala local (1–7).
+- `dragSelector: ".beat-node"` removido do `dragDrop` — reposicionamento interno já é pointer events; dragstart nativo era peso morto.
+
 ## [0.0.9] 2026-09-15
 
 ### Correção

@@ -29,6 +29,7 @@
   font-family: var(--lf-font-body);
   font-size: 13px;
   overflow: hidden;
+  isolation: isolate;
 }
 
 .lumenn-frame.storyboard .lf-root {
@@ -46,7 +47,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 50;
+  z-index: 4;
   opacity: .045;
   background-image: repeating-linear-gradient(
     0deg,
@@ -64,7 +65,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 49;
+  z-index: 3;
   background: radial-gradient(ellipse at center, transparent 55%, #0c0c0fcc 100%);
 }
 
@@ -78,7 +79,7 @@
   min-height: 36px;
   background: var(--lf-panel);
   border-bottom: 1px solid #ffffff0a;
-  z-index: 51;
+  z-index: 6;
 }
 
 .lf-titlebar h1 {
@@ -116,7 +117,7 @@
   padding: 4px 10px 4px 0;
   background: var(--lf-panel);
   border-bottom: 1px solid #ffffff0a;
-  z-index: 51;
+  z-index: 6;
 }
 
 .lf-toolbar button {
@@ -357,7 +358,7 @@
   top: 4px;
   right: 4px;
   gap: 2px;
-  z-index: 10;
+  z-index: 5;
 }
 
 .beat-node:hover .beat-actions {
@@ -407,7 +408,7 @@
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: .03em;
-  z-index: 60;
+  z-index: 7;
   pointer-events: none;
   animation: lf-fadeIn .18s ease;
 }

@@ -2,6 +2,14 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.11] 2026-09-15
+
+### Correções
+
+- **Tema escuro de volta (janela branca)**: o wrapper `.window-content` do framework tem background claro + padding padrão que pintavam por cima do tema. Agora estilizado direto (`.lumenn-frame.storyboard .window-content` → ink, sem padding) + `.window-header` dark com título âmbar — mesmo padrão do CSB V2.
+- **Ações de beat sempre visíveis em modo edição**: link (conectar), editar (crossfade/transição), start e deletar estavam em `display:none` até hover — invisíveis = "não existem". Agora `display:flex` fixo.
+- **Dropdown de storyboard sempre funcional**: com zero storyboards o select nem renderizava. GM abre o app sem storyboards → um é criado automaticamente no primeiro open.
+
 ## [0.0.10] 2026-09-15
 
 ### Correções

@@ -106,7 +106,11 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
   /* ── Context ─────────────────────────────────────────────────────── */
 
   async _prepareContext() {
-    const storyboards = LumennBeatStore.getAll();
+    let storyboards = LumennBeatStore.getAll();
+    if (storyboards.length === 0 && game.user?.isGM) {
+      LumennBeatStore.createStoryboard();
+      storyboards = LumennBeatStore.getAll();
+    }
     const activeStoryboard = storyboards.find((s) => s.id === this.#storyboardId) ?? storyboards[0] ?? null;
     if (activeStoryboard) this.#storyboardId = activeStoryboard.id;
 

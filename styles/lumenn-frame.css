@@ -32,6 +32,29 @@
   isolation: isolate;
 }
 
+/* Framework window chrome — dark theme */
+.lumenn-frame .window-header {
+  background: var(--lf-panel);
+  border-bottom: 1px solid #ffffff0a;
+}
+
+.lumenn-frame .window-header .window-title {
+  font-family: var(--lf-font-display);
+  color: var(--lf-amber);
+  letter-spacing: .04em;
+}
+
+.lumenn-frame.storyboard .window-content {
+  background: var(--lf-ink);
+  padding: 0;
+  overflow: hidden;
+}
+
+.lumenn-frame.beat-config .window-content {
+  background: var(--lf-ink);
+  padding: 10px;
+}
+
 .lumenn-frame.storyboard .lf-root {
   display: flex;
   flex-direction: column;
@@ -189,6 +212,7 @@
   min-height: 0;
   position: relative;
   overflow: hidden;
+  background: var(--lf-ink);
   z-index: 1;
 }
 
@@ -351,18 +375,14 @@
   color: var(--lf-amber);
 }
 
-/* Actions */
+/* Actions — always visible in edit mode (template gates them on isGM+edit) */
 .beat-actions {
-  display: none;
+  display: flex;
   position: absolute;
   top: 4px;
   right: 4px;
   gap: 2px;
   z-index: 5;
-}
-
-.beat-node:hover .beat-actions {
-  display: flex;
 }
 
 .beat-actions button {

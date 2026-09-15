@@ -2,7 +2,9 @@ const MODULE_ID = "lumenn-frame";
 
 /**
  * LumennBeatStore — CRUD de storyboards/Beats sobre game.settings (escopo world).
- * Toda operação de escrita verifica game.user.isGM.
+ * Toda operação de escrita verifica game.user.isGM e aguarda a Promise de
+ * game.settings.set antes de retornar, para que o estado lido em seguida
+ * (getAll) já reflita a gravação — sem race condition entre write e read.
  */
 export class LumennBeatStore {
   static #STORYBOARDS_KEY = "storyboards";
@@ -36,7 +38,7 @@ export class LumennBeatStore {
     return this.getAll().find((s) => s.id === storyboardId) ?? null;
   }
 
-  static createStoryboard(name = "Novo Storyboard") {
+  static async createStoryboard(name = "Novo Storyboard") {
     if (!game.user.isGM) return null;
     const storyboards = this.getAll();
     const storyboard = {
@@ -46,28 +48,28 @@ export class LumennBeatStore {
       activeBeatId: null,
     };
     storyboards.push(storyboard);
-    game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
+    await game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
     return storyboard;
   }
 
-  static renameStoryboard(storyboardId, name) {
+  static async renameStoryboard(storyboardId, name) {
     if (!game.user.isGM) return false;
     const storyboards = this.getAll();
     const storyboard = storyboards.find((s) => s.id === storyboardId);
     if (!storyboard) return false;
     storyboard.name = name;
-    game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
+    await game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
     return true;
   }
 
-  static deleteStoryboard(storyboardId) {
+  static async deleteStoryboard(storyboardId) {
     if (!game.user.isGM) return false;
     const storyboards = this.getAll().filter((s) => s.id !== storyboardId);
-    game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
+    await game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
     return true;
   }
 
-  static createBeat(storyboardId, beatData = {}) {
+  static async createBeat(storyboardId, beatData = {}) {
     if (!game.user.isGM) return null;
     const storyboards = this.getAll();
     const storyboard = storyboards.find((s) => s.id === storyboardId);
@@ -82,11 +84,11 @@ export class LumennBeatStore {
       position: beatData.position ?? { x: 100, y: 100 },
     };
     storyboard.beats.push(beat);
-    game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
+    await game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
     return beat;
   }
 
-  static updateBeat(storyboardId, beatId, patch) {
+  static async updateBeat(storyboardId, beatId, patch) {
     if (!game.user.isGM) return null;
     const storyboards = this.getAll();
     const storyboard = storyboards.find((s) => s.id === storyboardId);
@@ -96,11 +98,11 @@ export class LumennBeatStore {
     if (!beat) return null;
 
     Object.assign(beat, patch);
-    game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
+    await game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
     return beat;
   }
 
-  static deleteBeat(storyboardId, beatId) {
+  static async deleteBeat(storyboardId, beatId) {
     if (!game.user.isGM) return false;
     const storyboards = this.getAll();
     const storyboard = storyboards.find((s) => s.id === storyboardId);
@@ -111,12 +113,13 @@ export class LumennBeatStore {
       b.connections = b.connections.filter((c) => c !== beatId);
     });
     if (storyboard.activeBeatId === beatId) storyboard.activeBeatId = null;
-    game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
+    await game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
     return true;
   }
 
-  static connectBeats(storyboardId, fromBeatId, toBeatId) {
+  static async connectBeats(storyboardId, fromBeatId, toBeatId) {
     if (!game.user.isGM) return false;
+    if (fromBeatId === toBeatId) return false;
     const storyboards = this.getAll();
     const storyboard = storyboards.find((s) => s.id === storyboardId);
     if (!storyboard) return false;
@@ -127,12 +130,12 @@ export class LumennBeatStore {
 
     if (!fromBeat.connections.includes(toBeatId)) {
       fromBeat.connections.push(toBeatId);
+      await game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
     }
-    game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
     return true;
   }
 
-  static disconnectBeats(storyboardId, fromBeatId, toBeatId) {
+  static async disconnectBeats(storyboardId, fromBeatId, toBeatId) {
     if (!game.user.isGM) return false;
     const storyboards = this.getAll();
     const storyboard = storyboards.find((s) => s.id === storyboardId);
@@ -142,7 +145,7 @@ export class LumennBeatStore {
     if (!fromBeat) return false;
 
     fromBeat.connections = fromBeat.connections.filter((c) => c !== toBeatId);
-    game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
+    await game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
     return true;
   }
 
@@ -152,13 +155,13 @@ export class LumennBeatStore {
     return storyboard.beats.find((b) => b.id === storyboard.activeBeatId) ?? null;
   }
 
-  static setActiveBeat(storyboardId, beatId) {
+  static async setActiveBeat(storyboardId, beatId) {
     if (!game.user.isGM) return;
     const storyboards = this.getAll();
     const storyboard = storyboards.find((s) => s.id === storyboardId);
     if (!storyboard) return;
     storyboard.activeBeatId = beatId;
-    game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
+    await game.settings.set(MODULE_ID, LumennBeatStore.#STORYBOARDS_KEY, storyboards);
   }
 
   static getDefaultCrossfadeDuration() {

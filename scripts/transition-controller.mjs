@@ -61,7 +61,7 @@ export class LumennTransitionController {
       }
     }
 
-    LumennBeatStore.setActiveBeat(storyboardId, targetBeatId);
+    await LumennBeatStore.setActiveBeat(storyboardId, targetBeatId);
     return { sceneChanged, audioResult };
   }
 }

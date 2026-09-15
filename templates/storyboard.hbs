@@ -1,30 +1,39 @@
 <div class="lf-root">
   <div class="lf-toolbar">
-    {{#if storyboards.length}}
-    <select class="lf-storyboard-selector" data-storyboard-selector>
-      {{#each storyboards}}
-      <option value="{{this.id}}" {{#if (lumenn-eq this.id ../activeStoryboard.id)}}selected{{/if}}>{{this.name}}</option>
-      {{/each}}
-    </select>
-    <span class="lf-divider"></span>
-    {{/if}}
+    <div class="lf-group lf-group-select">
+      {{#if storyboards.length}}
+      <select class="lf-storyboard-selector" data-storyboard-selector>
+        {{#each storyboards}}
+        <option value="{{this.id}}" {{#if (lumenn-eq this.id ../activeStoryboard.id)}}selected{{/if}}>{{this.name}}</option>
+        {{/each}}
+      </select>
+      {{/if}}
+    </div>
     {{#if isGM}}
-    <button data-action="create-storyboard">{{label.createStoryboard}}</button>
-    <button data-action="rename-storyboard">{{label.renameStoryboard}}</button>
-    <button data-action="create-beat">{{label.createBeat}}</button>
-    <button data-action="delete-storyboard">{{label.deleteStoryboard}}</button>
-    <span class="lf-divider"></span>
-    {{#if needsStartBeat}}<button class="lf-start-btn" disabled>{{label.needsStartBeat}}</button>{{/if}}
-    <div class="lf-mode-toggle">
-      <button class="{{#if (lumenn-eq mode 'edit')}}active{{/if}}" data-action="toggle-mode">{{label.editMode}}</button>
-      <button class="{{#if (lumenn-eq mode 'live')}}active{{/if}}" data-action="toggle-mode">{{label.liveMode}}</button>
+    <div class="lf-group lf-group-crud">
+      {{#if (lumenn-eq mode 'edit')}}
+      <button data-action="create-storyboard">{{label.createStoryboard}}</button>
+      <button data-action="rename-storyboard">{{label.renameStoryboard}}</button>
+      <button data-action="delete-storyboard">{{label.deleteStoryboard}}</button>
+      {{/if}}
+    </div>
+    <div class="lf-group lf-group-beat">
+      {{#if (lumenn-eq mode 'edit')}}
+      <button data-action="create-beat">{{label.createBeat}}</button>
+      {{#if needsStartBeat}}<button class="lf-start-btn" disabled>{{label.needsStartBeat}}</button>{{/if}}
+      {{/if}}
+    </div>
+    <div class="lf-group lf-group-mode">
+      <div class="lf-mode-toggle">
+        <button class="{{#if (lumenn-eq mode 'edit')}}active{{/if}}" data-action="toggle-mode">{{label.editMode}}</button>
+        <button class="{{#if (lumenn-eq mode 'live')}}active{{/if}}" data-action="toggle-mode">{{label.liveMode}}</button>
+      </div>
     </div>
     {{/if}}
   </div>
 
   <div class="lf-canvas">
-    {{#if beats.length}}
-    <div class="beats-canvas" style="position:relative;min-height:100%;">
+    <div class="beats-canvas">
       <svg class="connectors"></svg>
       {{#each beats}}
       <div class="beat-node{{#if isActive}} active{{/if}}{{#if isConnected}} connected{{/if}}{{#if isNavigable}} navigable{{/if}}{{#if isDimmed}} dimmed{{/if}}{{#unless isValid}} invalid{{/unless}}{{#if (lumenn-eq this.id ../linkingBeatId)}} linking{{/if}}"
@@ -55,15 +64,21 @@
       </div>
       {{/each}}
     </div>
+
+    {{#if linkingBeatId}}
+    <div class="lf-linking-hint">{{label.linkingHint}}</div>
+    {{/if}}
+
     {{#if transitioning}}
     <div class="lf-transitioning"><span class="lf-transitioning-dot"></span>{{label.transitioning}}</div>
     {{/if}}
-    {{else}}
+
+    {{#unless beats.length}}
     <div class="lf-empty-state">
       <div class="lf-empty-icon">&#127909;</div>
       <div class="lf-empty-title">{{label.emptyState}}</div>
       <div class="lf-empty-hint">{{label.emptyHint}}<br>{{label.dropHint}}</div>
     </div>
-    {{/if}}
+    {{/unless}}
   </div>
 </div>

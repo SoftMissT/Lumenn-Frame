@@ -2,7 +2,12 @@ import { LumennBeatStore } from "./beat-store.mjs";
 import { LumennTransitionController } from "./transition-controller.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
-const { DragDrop } = foundry.applications.ux;
+const { DragDrop, TextEditor } = foundry.applications.ux;
+
+// Dimensões do Beat e folga do mundo (canvas) — sistema único de coordenadas.
+const BEAT_W = 120;
+const BEAT_H = 190;
+const WORLD_PAD = 80;
 
 /** GM storyboard editor/live controller. Domain state remains in BeatStore. */
 export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV2) {
@@ -11,6 +16,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
   #mode = "edit";
   #transitioning = false;
   #pendingLinkId = null;
+  #resizeObserver = null;
   #dragDrop;
 
   static DEFAULT_OPTIONS = {
@@ -32,6 +38,13 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
   constructor(options = {}) {
     super(options);
     this.#dragDrop = this.#createDragDropHandlers();
+    // Escape cancela o modo de linkagem pendente.
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && this.#pendingLinkId) {
+        this.#pendingLinkId = null;
+        this.render();
+      }
+    });
   }
 
   /* ── Drag/Drop wiring (ApplicationV2 manual pattern) ─────────────── */
@@ -73,11 +86,11 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     try { doc = await fromUuid(uuid); } catch { return; }
     if (!doc) return;
 
-    const canvas = this.element.querySelector(".lf-canvas");
-    const rect = canvas?.getBoundingClientRect();
+    const viewport = this.element.querySelector(".lf-canvas");
+    const point = this.#clientToCanvas(event, viewport);
     const position = {
-      x: Math.max(10, Math.round((event.clientX - (rect?.left ?? 0)) - 60)),
-      y: Math.max(10, Math.round((event.clientY - (rect?.top ?? 0)) - 30)),
+      x: Math.max(0, Math.round(point.x - BEAT_W / 2)),
+      y: Math.max(0, Math.round(point.y - 30)),
     };
 
     // ── Drop on a specific beat: override scene/audio ──
@@ -88,7 +101,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       else if (doc.documentName === "Playlist") patch.audioSource = { type: "playlist", id: doc.id };
       else if (doc.documentName === "PlaylistSound") patch.audioSource = { type: "track", id: doc.uuid };
       else return;
-      LumennBeatStore.updateBeat(this.#storyboardId, targetNode.dataset.id, patch);
+      await LumennBeatStore.updateBeat(this.#storyboardId, targetNode.dataset.id, patch);
       return this.render();
     }
 
@@ -102,18 +115,18 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       else if (d.documentName === "Playlist") beatData.audioSource = { type: "playlist", id: d.id };
       else if (d.documentName === "PlaylistSound") beatData.audioSource = { type: "track", id: d.uuid };
       else continue;
-      const beat = LumennBeatStore.createBeat(this.#storyboardId, beatData);
+      const beat = await LumennBeatStore.createBeat(this.#storyboardId, beatData);
       if (beat) created.push(beat);
-      offsetX += 140;
+      offsetX += BEAT_W + 20;
     }
     // Automatização: sequência de drops vira uma cadeia linkada
     for (let i = 0; i < created.length - 1; i++) {
-      LumennBeatStore.connectBeats(this.#storyboardId, created[i].id, created[i + 1].id);
+      await LumennBeatStore.connectBeats(this.#storyboardId, created[i].id, created[i + 1].id);
     }
     // Primeiro beat criado vira o start se ainda não houver
     const s = LumennBeatStore.getStoryboard(this.#storyboardId);
     if (created.length && !s?.activeBeatId) {
-      LumennBeatStore.setActiveBeat(this.#storyboardId, created[0].id);
+      await LumennBeatStore.setActiveBeat(this.#storyboardId, created[0].id);
     }
     this.render();
   }
@@ -125,12 +138,43 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     return [doc];
   }
 
+  /** Converte coordenadas de evento (client) para o sistema do WORLD do canvas. */
+  #clientToCanvas(event, viewport) {
+    const rect = viewport?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    return {
+      x: event.clientX - rect.left + (viewport?.scrollLeft ?? 0),
+      y: event.clientY - rect.top + (viewport?.scrollTop ?? 0),
+    };
+  }
+
+  /** Expande o WORLD até conter todos os Beats (mínimo = viewport). */
+  #resizeWorld(root) {
+    const viewport = root.querySelector(".lf-canvas");
+    const world = root.querySelector(".beats-canvas");
+    if (!viewport || !world) return;
+    const s = LumennBeatStore.getStoryboard(this.#storyboardId);
+    let maxX = 0;
+    let maxY = 0;
+    for (const b of s?.beats ?? []) {
+      const p = b.position ?? { x: 0, y: 0 };
+      maxX = Math.max(maxX, p.x + BEAT_W + WORLD_PAD);
+      maxY = Math.max(maxY, p.y + BEAT_H + WORLD_PAD);
+    }
+    world.style.width = `${Math.max(viewport.clientWidth, maxX)}px`;
+    world.style.height = `${Math.max(viewport.clientHeight, maxY)}px`;
+  }
+
+  #beatCenter(beat) {
+    const p = beat.position ?? { x: 80, y: 80 };
+    return { x: p.x + BEAT_W / 2, y: p.y + 30 };
+  }
+
   /* ── Context ─────────────────────────────────────────────────────── */
 
   async _prepareContext() {
     let storyboards = LumennBeatStore.getAll();
     if (storyboards.length === 0 && game.user?.isGM) {
-      LumennBeatStore.createStoryboard();
+      await LumennBeatStore.createStoryboard();
       storyboards = LumennBeatStore.getAll();
     }
     const activeStoryboard = storyboards.find((s) => s.id === this.#storyboardId) ?? storyboards[0] ?? null;
@@ -193,6 +237,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
         emptyState: L("LUMENN_FRAME.EmptyState"),
         emptyHint: L("LUMENN_FRAME.EmptyHint"),
         dropHint: L("LUMENN_FRAME.DropHint"),
+        linkingHint: L("LUMENN_FRAME.LinkingHint"),
       },
     };
   }
@@ -208,7 +253,20 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     selector?.addEventListener("change", (e) => { this.#storyboardId = e.target.value; this.render(); });
     this.#installInternalDrag(root);
     this.#installLiveNavigation(root);
+    this.#resizeWorld(root);
     this.#drawConnectors(root);
+    this.#observeResize(root);
+  }
+
+  #observeResize(root) {
+    const viewport = root.querySelector(".lf-canvas");
+    if (!viewport) return;
+    this.#resizeObserver?.disconnect();
+    this.#resizeObserver = new ResizeObserver(() => {
+      this.#resizeWorld(root);
+      this.#drawConnectors(root);
+    });
+    this.#resizeObserver.observe(viewport);
   }
 
   #installLiveNavigation(root) {
@@ -219,17 +277,32 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     }));
   }
 
-  #action(event) {
+  async #action(event) {
     event.preventDefault();
     const action = event.currentTarget.dataset.action;
     const id = event.currentTarget.dataset.id;
     if (!game.user?.isGM) return;
-    if (action === "toggle-mode") { this.#mode = this.#mode === "edit" ? "live" : "edit"; return this.render(); }
+    if (action === "toggle-mode") { this.#mode = this.#mode === "edit" ? "live" : "edit"; this.#pendingLinkId = null; return this.render(); }
+    // Modo Ao Vivo não permite nenhuma alteração estrutural.
+    if (this.#mode !== "edit") return;
     if (action === "create-storyboard") return this.#createStoryboard();
     if (action === "rename-storyboard") return this.#renameStoryboard();
     if (action === "delete-storyboard") return this.#confirmDeleteStoryboard();
-    if (action === "create-beat") { const r = this.element.querySelector(".beats-canvas")?.getBoundingClientRect(); LumennBeatStore.createBeat(this.#storyboardId, { position: { x: Math.max(10, (event.clientX - (r?.left ?? 0)) - 60), y: Math.max(10, (event.clientY - (r?.top ?? 0)) - 30) } }); return this.render(); }
-    if (action === "set-start-beat") { LumennBeatStore.setActiveBeat(this.#storyboardId, id); return this.render(); }
+    if (action === "create-beat") {
+      const viewport = this.element.querySelector(".lf-canvas");
+      let position;
+      if (event.target.closest?.(".lf-canvas")) {
+        const p = this.#clientToCanvas(event, viewport);
+        position = { x: Math.max(0, p.x - BEAT_W / 2), y: Math.max(0, p.y - 30) };
+      } else {
+        const s = LumennBeatStore.getStoryboard(this.#storyboardId);
+        const maxX = Math.max(0, ...(s?.beats ?? []).map((b) => (b.position?.x ?? 0) + BEAT_W + 20));
+        position = { x: maxX, y: 40 };
+      }
+      await LumennBeatStore.createBeat(this.#storyboardId, { position });
+      return this.render();
+    }
+    if (action === "set-start-beat") { await LumennBeatStore.setActiveBeat(this.#storyboardId, id); return this.render(); }
     if (action === "edit-beat") return this.#editBeat(id);
     if (action === "delete-beat") return this.#confirmDeleteBeat(id);
     if (action === "connect-beat") return this.#toggleConnection(id);
@@ -248,7 +321,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     }
   }
 
-  #toggleConnection(id) {
+  async #toggleConnection(id) {
     const s = LumennBeatStore.getStoryboard(this.#storyboardId);
     if (!s || !s.beats.some((b) => b.id === id)) return;
     // Sem pendente → inicia o modo de linkagem a partir deste nó
@@ -264,8 +337,8 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     const from = this.#pendingLinkId;
     this.#pendingLinkId = null;
     const fromBeat = s.beats.find((b) => b.id === from);
-    if (fromBeat.connections.includes(id)) LumennBeatStore.disconnectBeats(this.#storyboardId, from, id);
-    else LumennBeatStore.connectBeats(this.#storyboardId, from, id);
+    if (fromBeat.connections.includes(id)) await LumennBeatStore.disconnectBeats(this.#storyboardId, from, id);
+    else await LumennBeatStore.connectBeats(this.#storyboardId, from, id);
     this.render();
   }
 
@@ -276,14 +349,24 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
 
   /* ── Delete confirmations ────────────────────────────────────────── */
 
-  async #createStoryboard() {
-    const name = await foundry.applications.api.DialogV2.prompt({
-      title: game.i18n.localize("LUMENN_FRAME.Toolbar.CreateStoryboard"),
-      content: `<input type="text" name="name" value="Novo Storyboard" autofocus>`,
-      ok: { label: game.i18n.localize("LUMENN_FRAME.Config.Save") },
+  async #promptName(title, initial) {
+    const raw = await foundry.applications.api.DialogV2.prompt({
+      window: { title },
+      content: `<input type="text" name="name" value="${String(initial).replace(/"/g, "&quot;")}" autofocus>`,
+      ok: {
+        label: game.i18n.localize("LUMENN_FRAME.Config.Save"),
+        callback: (event, button) => button.form.elements.name.value,
+      },
     });
+    // Normalização defensiva — nunca aceitar objeto/shape inesperado como nome.
+    const name = typeof raw === "string" ? raw : (raw?.name ?? raw?.value ?? "");
+    return name.toString().trim();
+  }
+
+  async #createStoryboard() {
+    const name = await this.#promptName(game.i18n.localize("LUMENN_FRAME.Toolbar.CreateStoryboard"), "Novo Storyboard");
     if (!name) return;
-    const s = LumennBeatStore.createStoryboard(name);
+    const s = await LumennBeatStore.createStoryboard(name);
     this.#storyboardId = s?.id ?? this.#storyboardId;
     this.render();
   }
@@ -291,13 +374,9 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
   async #renameStoryboard() {
     const s = LumennBeatStore.getStoryboard(this.#storyboardId);
     if (!s) return;
-    const name = await foundry.applications.api.DialogV2.prompt({
-      title: game.i18n.localize("LUMENN_FRAME.Toolbar.RenameStoryboard"),
-      content: `<input type="text" name="name" value="${s.name}" autofocus>`,
-      ok: { label: game.i18n.localize("LUMENN_FRAME.Config.Save") },
-    });
+    const name = await this.#promptName(game.i18n.localize("LUMENN_FRAME.Toolbar.RenameStoryboard"), s.name);
     if (!name) return;
-    LumennBeatStore.renameStoryboard(this.#storyboardId, name);
+    await LumennBeatStore.renameStoryboard(this.#storyboardId, name);
     this.render();
   }
 
@@ -308,7 +387,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       yes: { label: game.i18n.localize("LUMENN_FRAME.Beat.Delete") },
       no: { label: game.i18n.localize("LUMENN_FRAME.Config.Cancel") },
     });
-    if (confirmed) { LumennBeatStore.deleteStoryboard(this.#storyboardId); this.#storyboardId = null; this.render(); }
+    if (confirmed) { await LumennBeatStore.deleteStoryboard(this.#storyboardId); this.#storyboardId = null; this.render(); }
   }
 
   async #confirmDeleteBeat(id) {
@@ -318,7 +397,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       yes: { label: game.i18n.localize("LUMENN_FRAME.Beat.Delete") },
       no: { label: game.i18n.localize("LUMENN_FRAME.Config.Cancel") },
     });
-    if (confirmed) { LumennBeatStore.deleteBeat(this.#storyboardId, id); this.render(); }
+    if (confirmed) { await LumennBeatStore.deleteBeat(this.#storyboardId, id); this.render(); }
   }
 
   /* ── Internal beat repositioning (pointer events) ────────────────── */
@@ -337,14 +416,21 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       node.setPointerCapture(e.pointerId);
       const beat = LumennBeatStore.getStoryboard(this.#storyboardId)?.beats.find((b) => b.id === node.dataset.id);
       const start = { x: e.clientX, y: e.clientY, ...(beat?.position ?? { x: 0, y: 0 }) };
-      const move = (ev) => { node.style.left = `${start.x + ev.clientX - e.clientX}px`; node.style.top = `${start.y + ev.clientY - e.clientY}px`; };
-      const up = (ev) => {
+      let rafId = null;
+      const move = (ev) => {
+        node.style.left = `${start.x + ev.clientX - e.clientX}px`;
+        node.style.top = `${start.y + ev.clientY - e.clientY}px`;
+        // Atualiza conectores em tempo real, throttled via requestAnimationFrame.
+        if (rafId == null) rafId = requestAnimationFrame(() => { rafId = null; this.#drawConnectors(root); });
+      };
+      const up = async (ev) => {
         node.releasePointerCapture(ev.pointerId);
         node.removeEventListener("pointermove", move);
         node.removeEventListener("pointerup", up);
         const x = Math.max(0, start.x + ev.clientX - e.clientX);
         const y = Math.max(0, start.y + ev.clientY - e.clientY);
-        LumennBeatStore.updateBeat(this.#storyboardId, node.dataset.id, { position: { x, y } });
+        await LumennBeatStore.updateBeat(this.#storyboardId, node.dataset.id, { position: { x, y } });
+        this.#resizeWorld(root);
         this.#drawConnectors(root);
       };
       node.addEventListener("pointermove", move);
@@ -363,9 +449,9 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       for (const id of b.connections ?? []) {
         const t = s.beats.find((x) => x.id === id);
         if (!t) continue;
-        const bp = b.position ?? { x: 80, y: 80 };
-        const tp = t.position ?? { x: 80, y: 80 };
-        const x1 = bp.x + 60, y1 = bp.y + 30, x2 = tp.x + 60, y2 = tp.y + 30;
+        const bp = this.#beatCenter(b);
+        const tp = this.#beatCenter(t);
+        const x1 = bp.x, y1 = bp.y, x2 = tp.x, y2 = tp.y;
         const dx = x2 - x1, dy = y2 - y1;
         const cx = x1 + dx * 0.5, cy = y1 + dy * 0.5 - Math.abs(dx) * 0.15;
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -482,8 +568,7 @@ class BeatConfigDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         sceneId: d.sceneId || null,
         audioSource: source,
         crossfadeDuration: d.crossfadeDuration ? Number(d.crossfadeDuration) : null,
-      });
-      this.close();
+      }).then(() => this.close());
     });
   }
 }

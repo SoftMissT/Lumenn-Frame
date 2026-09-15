@@ -38,5 +38,6 @@
   "LUMENN_FRAME.ConfirmDeleteBeat": "Excluir este Beat?",
   "LUMENN_FRAME.EmptyState": "Nenhum Beat ainda",
   "LUMENN_FRAME.EmptyHint": "Arraste uma Scene, Playlist ou Pasta para o canvas para criar Beats, ou clique em \"+ Beat\" acima.",
-  "LUMENN_FRAME.DropHint": "Solte uma Scene, Playlist ou Pasta da barra lateral aqui."
+  "LUMENN_FRAME.DropHint": "Solte uma Scene, Playlist ou Pasta da barra lateral aqui.",
+  "LUMENN_FRAME.LinkingHint": "Selecione o Beat de destino — Esc cancela."
 }

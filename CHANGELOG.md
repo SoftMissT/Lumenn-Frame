@@ -2,6 +2,20 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## 0.0.14-beta.1
+
+### Fixed / Testing
+> Build de validação de runtime — os bugs abaixo estão corrigidos no código, mas esta versão ainda depende do QA manual no Foundry (responsividade, drop, grafo, scroll, persistência, modos).
+
+- responsive toolbar (flex-wrap, grupos semânticos — não corta mais controles)
+- scrollable storyboard world (viewport + world; nós fora do primeiro viewport ficam acessíveis)
+- unified canvas coordinates (drop/drag/connectors no mesmo espaço do WORLD)
+- generic Beat-to-Beat linking (qualquer nó pode ser origem; `activeBeatId` não interfere)
+- async BeatStore persistence (await em todas as escritas; sem race write/read)
+- linking feedback / Escape cancellation
+- Foundry v13 drag/drop namespace cleanup (`foundry.applications.ux.TextEditor`)
+- Edit/Live structural guards
+
 ## [0.0.13] 2026-09-15
 
 ### Correções

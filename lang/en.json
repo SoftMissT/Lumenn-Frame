@@ -38,5 +38,6 @@
   "LUMENN_FRAME.ConfirmDeleteBeat": "Delete this Beat?",
   "LUMENN_FRAME.EmptyState": "No Beats yet",
   "LUMENN_FRAME.EmptyHint": "Drag a Scene, Playlist, or Folder onto the canvas to create Beats, or click \"+ Beat\" above.",
-  "LUMENN_FRAME.DropHint": "Drop a Scene, Playlist, or Folder from the sidebar here."
+  "LUMENN_FRAME.DropHint": "Drop a Scene, Playlist, or Folder from the sidebar here.",
+  "LUMENN_FRAME.LinkingHint": "Select the destination Beat — Esc cancels."
 }

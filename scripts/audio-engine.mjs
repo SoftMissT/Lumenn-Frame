@@ -1,24 +1,24 @@
 /**
- * LumennAudioEngine — Motor de continuidade de áudio (v0.1.1).
+ * LumennAudioEngine — Motor de continuidade de áudio (v0.1.2).
  *
  * Transições são dirigidas por documentos (PlaylistSound/Playlist .update),
  * não por Sound#fade local: manipulação direta de Sound não é transmitida aos
- * outros clientes — jogadores não ouviriam o crossfade. O estado `playing` +
- * `fadeDuration` dos documentos é sincronizado pelo próprio Foundry em todos
- * os clientes, e cada cliente executa o fade nativamente.
+ * outros clientes — jogadores não ouviriam o crossfade.
  *
- * APIs v13 verificadas na doc oficial (2026-09-14):
- * - Scene#activate(); Playlist#playAll/stopAll; Playlist#updateEmbeddedDocuments
- * - PlaylistSound#sound é lazy ("created lazily when playback is required")
- * - PlaylistSound#update({fadeDuration, playing}) dispara fade sincronizado
+ * SCHEMA DE FADE (correto, V13 e V14):
+ * - `PlaylistSoundData.fade?: number` — campo persistido.
+ * - `PlaylistSound#fadeDuration` — accessor computado (NUNCA gravar).
+ * - `PlaylistData.fade?: number` — fade da Playlist; combina com o fade do Track
+ *   (double-fade). Por isso o Lumenn aplica fade em UM nível por transição:
+ *   Track → `PlaylistSound.fade`; Playlist → `Playlist.fade` (playAll/stopAll).
  *
- * Não conhece Scenes, UI ou game.settings — recebe tudo por parâmetro
- * (Blueprint §3.3). Fonte atual inválida é tratada como silêncio (RF-011,
- * a navegação não pode quebrar); fonte destino inválida lança
- * LumennInvalidAudioSourceError (Specs §4.1).
+ * Preservação: o valor anterior de `fade` é salvo antes da transição e
+ * restaurado ao final — a configuração de Playlist/Track do usuário não é
+ * alterada permanentemente.
  *
- * Nota: o patch de fadeDuration persiste no documento do som — efeito
- * colateral necessário para fade global com duração por Beat (RF-006/RF-012).
+ * Não conhece Scenes, UI ou game.settings — recebe tudo por parâmetro.
+ * Fonte atual inválida = silêncio (navegação não quebra); fonte destino
+ * inválida lança LumennInvalidAudioSourceError.
  */
 export class LumennInvalidAudioSourceError extends Error {
   constructor(source) {
@@ -32,19 +32,15 @@ export class LumennInvalidAudioSourceError extends Error {
 
 export class LumennAudioEngine {
   #transitioning = false;
+  #savedFades = new Map();
 
   get isTransitioning() {
     return this.#transitioning;
   }
 
   /**
-   * Decide e executa a transição de áudio entre dois Beats (Specs §4.1).
-   * @param {{ type: "track"|"playlist", id: string }|null} currentSource
-   * @param {{ type: "track"|"playlist", id: string }|null} targetSource
-   * @param {number} crossfadeDuration ms
-   * @returns {Promise<"kept"|"crossfaded"|"faded-out"|"started"|"ignored">}
-   * "ignored" = RF-008 (transição em andamento neste storyboard).
-   * @throws {LumennInvalidAudioSourceError} se targetSource não resolve.
+   * Decide e executa a transição de áudio entre duas fontes (Specs §4.1).
+   * Mantido para compatibilidade; o fluxo atual do Graph Editor usa applyMode.
    */
   async transition(currentSource, targetSource, crossfadeDuration = 3000) {
     if (this.#transitioning) return "ignored";
@@ -78,6 +74,7 @@ export class LumennAudioEngine {
       return "crossfaded";
     } finally {
       this.#transitioning = false;
+      await this.#restoreFades();
     }
   }
 
@@ -110,30 +107,51 @@ export class LumennAudioEngine {
     return doc;
   }
 
+  /* ── Save/restore do fade do usuário ─────────────────────────────── */
+
+  #saveFade(doc) {
+    if (!doc?.uuid || this.#savedFades.has(doc.uuid)) return;
+    // Lê o campo persistido (`fade`); `fadeDuration` é accessor equivalente.
+    this.#savedFades.set(doc.uuid, doc.fade ?? doc.fadeDuration ?? 0);
+  }
+
+  async #restoreFades() {
+    const fades = [...this.#savedFades.entries()];
+    this.#savedFades.clear();
+    await Promise.all(
+      fades.map(async ([uuid, prev]) => {
+        const doc = fromUuidSync(uuid);
+        if (doc?.update) await doc.update({ fade: prev });
+      }),
+    );
+  }
+
+  /* ── Start/stop dirigidos por documento, autoridade única de fade ── */
+
+  /**
+   * Inicia uma fonte. Track → grava `PlaylistSound.fade`; Playlist → grava
+   * `Playlist.fade` (uma única autoridade, evitando double-fade com playAll).
+   */
   async #start(doc, duration) {
     if (doc.documentName === "PlaylistSound") {
-      await doc.update({ fadeDuration: duration, playing: true });
+      this.#saveFade(doc);
+      await doc.update({ fade: duration, playing: true });
       return;
     }
-    await doc.updateEmbeddedDocuments(
-      "PlaylistSound",
-      doc.sounds.map((s) => ({ _id: s.id, fadeDuration: duration })),
-    );
+    this.#saveFade(doc);
+    await doc.update({ fade: duration });
     await doc.playAll();
   }
 
+  /** Para uma fonte. Mesma política de autoridade única do fade. */
   async #stop(doc, duration) {
     if (doc.documentName === "PlaylistSound") {
-      await doc.update({ fadeDuration: duration, playing: false });
+      this.#saveFade(doc);
+      await doc.update({ fade: duration, playing: false });
       return;
     }
-    const playing = doc.sounds.filter((s) => s.playing);
-    if (playing.length) {
-      await doc.updateEmbeddedDocuments(
-        "PlaylistSound",
-        playing.map((s) => ({ _id: s.id, fadeDuration: duration })),
-      );
-    }
+    this.#saveFade(doc);
+    await doc.update({ fade: duration });
     await doc.stopAll();
   }
 
@@ -223,6 +241,7 @@ export class LumennAudioEngine {
       return "error";
     } finally {
       this.#transitioning = false;
+      await this.#restoreFades();
     }
   }
 }

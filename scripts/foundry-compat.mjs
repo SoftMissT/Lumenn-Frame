@@ -85,8 +85,9 @@ export const LumennCompat = {
 
   /**
    * Atualiza um PlaylistSound (fade/playing).
-   * V14: `PlaylistSound#update({fadeDuration, playing})`. V13: idêntico (schema de documento).
-   * Fonte: Research-Lumenn-Frame + audio-engine.mjs (verificado).
+   * V14: `PlaylistSound#update({fade, playing})` — campo persistido é `fade`;
+   *      `fadeDuration` é accessor computado (NUNCA gravar). V13: idêntico.
+   * Fonte: schema PlaylistSoundData (`fade?: number`) + accessor `fadeDuration`.
    */
   async updatePlaylistSound(sound, data) {
     if (!sound?.update) return null;
@@ -94,17 +95,17 @@ export const LumennCompat = {
   },
 
   /**
-   * Lê fadeDuration de um PlaylistSound sem assumir shape.
-   * V14: `sound.fadeDuration`. V13: idêntico; fallback `sound.data.fadeDuration`.
+   * Lê o fade de um PlaylistSound sem assumir shape.
+   * Campo persistido: `fade`. Accessor computado: `fadeDuration` (válido para LEITURA).
    */
   getPlaylistSoundFade(sound) {
     if (!sound) return null;
-    return sound.fadeDuration ?? sound.data?.fadeDuration ?? null;
+    return sound.fade ?? sound.fadeDuration ?? sound.data?.fade ?? null;
   },
 
-  /** Grava fadeDuration de forma tolerante ao shape (v13/v14). */
+  /** Grava o fade persistido (campo `fade`) — nunca `fadeDuration`. */
   setPlaylistSoundFade(sound, value) {
-    if (sound?.update) return sound.update({ fadeDuration: value });
+    if (sound?.update) return sound.update({ fade: value });
     return null;
   },
 

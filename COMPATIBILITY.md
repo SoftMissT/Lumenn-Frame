@@ -28,8 +28,8 @@ SUPPORTED RANGE         13.350 → 14.999
 | Scene.activate() | `Scene#activate()` | idêntico | `LumennCompat.activateScene` |
 | Scene.preload() | `Scene#preload()` | idêntico | `LumennCompat.preloadScene` (fallback no-op) |
 | Playlist playAll/stopAll/updateEmbeddedDocuments | documento Playlist | idêntico | sem adapter (verificado no SDD) |
-| PlaylistSound update({fadeDuration, playing}) | documento PlaylistSound | idêntico | `LumennCompat.updatePlaylistSound` / `setPlaylistSoundFade` |
-| PlaylistSound fadeDuration (leitura) | `sound.fadeDuration` | idêntico; fallback `sound.data.fadeDuration` | `LumennCompat.getPlaylistSoundFade` |
+| PlaylistSound fade | campo persistido `fade`; accessor `fadeDuration` (leitura) | idêntico | `LumennCompat.updatePlaylistSound` / `setPlaylistSoundFade` (grava `{fade}`) |
+| Playlist fade | campo `fade`; autoridade única (Playlist OU Sound, nunca ambos) | idêntico | engine `#start/#stop` com save/restore |
 | Module socket | `game.socket`, `"socket": true` | idêntico | `LumennCompat.socketOn/Emit`, `broadcastTransition` |
 | DialogV2.prompt/confirm | `foundry.applications.api.DialogV2` | mesmo namespace | sem adapter (leitura via `button.form.elements`) |
 | game.settings.set | Promise | Promise | store com `await` |
@@ -48,8 +48,8 @@ Cada método traz no JSDoc: implementação **V14**, fallback **V13**, fonte.
 | `resolveUuid` / `resolveUuidSync` | `fromUuid` / `fromUuidSync` | — | Context7 (Documents) |
 | `activateScene` | `Scene#activate()` | — | Research-Lumenn-Frame |
 | `preloadScene` | `Scene#preload()` | no-op | idem |
-| `updatePlaylistSound` / `setPlaylistSoundFade` | `PlaylistSound#update` | — | Research-Lumenn-Frame + audio-engine |
-| `getPlaylistSoundFade` | `sound.fadeDuration` | `sound.data.fadeDuration` | idem |
+| `updatePlaylistSound` / `setPlaylistSoundFade` | `PlaylistSound#update({fade})` | `{fade}` (campo persistido) | schema PlaylistSoundData `fade?: number` |
+| `getPlaylistSoundFade` | `sound.fade` (campo) / `sound.fadeDuration` (accessor) | idêntico | leitura tolerante ao shape |
 | `socketOn` / `socketEmit` / `broadcastTransition` | `game.socket` | no-op se indisponível | Context7 (sockets) |
 | `expandWorkspace` | `ApplicationV2#setPosition` | — | Context7 (AppV2) |
 | `getSceneTransitions` | `CONFIG.Canvas.sceneTransitions` (runtime) | fallback cut/fade/dip | feature-detected |

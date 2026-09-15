@@ -2,6 +2,24 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.18] - 2026-09-15
+
+> **Hotfix bloqueador de fade.** Correção do schema de fade do PlaylistSound/Playlist (V13 e V14). Nenhuma feature nova.
+
+### Fixed
+
+- **`PlaylistSound` / `Playlist` fade**: o campo persistido é **`fade`**; `fadeDuration` é accessor computado (**NUNCA gravar**). Todas as escritas do engine e de `LumennCompat.setPlaylistSoundFade` agora usam `{ fade: duration }`.
+- **Autoridade única de fade por transição**: Track → `PlaylistSound.fade`; Playlist → `Playlist.fade` (`playAll`/`stopAll`). Não aplica fade de Playlist + fade de Track simultaneamente (evita double-fade composto).
+- **Preserva configuração do usuário**: valor anterior de `fade` é salvo antes da transição e **restaurado** ao final (`#savedFades`/`#restoreFades` em `applyMode`/`transition`).
+- Matriz `COMPATIBILITY.md` atualizada (campo `fade`, leitura via accessor).
+- Zero writes de `fadeDuration` como campo de documento (restantes são `crossfadeDuration`, conceito de edge).
+
+### Runtime Validation Pending
+
+- Crossfade audível (Track→Track, Track→Playlist, Playlist→Track, Playlist→Playlist)
+- Enumerar `CONFIG.Canvas.sceneTransitions` no 14.367
+- Persistência real (F5 / restart) · GM→Player (2 clientes) · smoke 13.350
+
 ## [0.0.17] - 2026-09-15
 
 > Hotfix funcional (persistência, transições V14, áudio, pastas recursivas). Build para Foundry 14.367 (primário), 13.350+ retrocompatível.

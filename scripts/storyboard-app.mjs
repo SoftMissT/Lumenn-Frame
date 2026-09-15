@@ -10,6 +10,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
   #storyboardId = null;
   #mode = "edit";
   #transitioning = false;
+  #pendingLinkId = null;
   #dragDrop;
 
   static DEFAULT_OPTIONS = {
@@ -17,10 +18,10 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     classes: ["lumenn-frame", "storyboard", "app", "window-app"],
     title: "Lumenn Frame",
     tag: "div",
-    position: { width: 900, height: 650 },
+    position: { width: 1000, height: 720 },
     window: { resizable: true },
     dragDrop: [
-      { dropSelector: ".beats-canvas" },
+      { dropSelector: ".lf-canvas" },
     ],
   };
 
@@ -53,16 +54,16 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
 
   #onDragOver(event) {
     event.preventDefault();
-    this.element.querySelector(".beats-canvas")?.classList.add("drag-over");
+    this.element.querySelector(".lf-canvas")?.classList.add("drag-over");
   }
 
   #onDragLeave(event) {
-    this.element.querySelector(".beats-canvas")?.classList.remove("drag-over");
+    this.element.querySelector(".lf-canvas")?.classList.remove("drag-over");
   }
 
   async #onDrop(event) {
     event.preventDefault();
-    this.element.querySelector(".beats-canvas")?.classList.remove("drag-over");
+    this.element.querySelector(".lf-canvas")?.classList.remove("drag-over");
     if (!game.user?.isGM || this.#mode !== "edit") return;
 
     const data = TextEditor.getDragEventData(event);
@@ -72,7 +73,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     try { doc = await fromUuid(uuid); } catch { return; }
     if (!doc) return;
 
-    const canvas = this.element.querySelector(".beats-canvas");
+    const canvas = this.element.querySelector(".lf-canvas");
     const rect = canvas?.getBoundingClientRect();
     const position = {
       x: Math.max(10, Math.round((event.clientX - (rect?.left ?? 0)) - 60)),
@@ -91,8 +92,9 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       return this.render();
     }
 
-    // ── Drop on empty canvas ──
+    // ── Drop on empty canvas: create beats, auto-link sequence, auto-set start ──
     const docs = this.#resolveDropDocs(doc);
+    const created = [];
     let offsetX = 0;
     for (const d of docs) {
       const beatData = { position: { x: position.x + offsetX, y: position.y } };
@@ -100,8 +102,18 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       else if (d.documentName === "Playlist") beatData.audioSource = { type: "playlist", id: d.id };
       else if (d.documentName === "PlaylistSound") beatData.audioSource = { type: "track", id: d.uuid };
       else continue;
-      LumennBeatStore.createBeat(this.#storyboardId, beatData);
+      const beat = LumennBeatStore.createBeat(this.#storyboardId, beatData);
+      if (beat) created.push(beat);
       offsetX += 140;
+    }
+    // Automatização: sequência de drops vira uma cadeia linkada
+    for (let i = 0; i < created.length - 1; i++) {
+      LumennBeatStore.connectBeats(this.#storyboardId, created[i].id, created[i + 1].id);
+    }
+    // Primeiro beat criado vira o start se ainda não houver
+    const s = LumennBeatStore.getStoryboard(this.#storyboardId);
+    if (created.length && !s?.activeBeatId) {
+      LumennBeatStore.setActiveBeat(this.#storyboardId, created[0].id);
     }
     this.render();
   }
@@ -161,6 +173,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       mode: this.#mode,
       isGM: !!game.user?.isGM,
       transitioning: this.#transitioning,
+      linkingBeatId: this.#pendingLinkId,
       needsStartBeat: !!activeStoryboard && !activeStoryboard.activeBeatId,
       label: {
         createStoryboard: L("LUMENN_FRAME.Toolbar.CreateStoryboard"),
@@ -237,10 +250,22 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
 
   #toggleConnection(id) {
     const s = LumennBeatStore.getStoryboard(this.#storyboardId);
-    const a = s?.beats.find((b) => b.id === s.activeBeatId);
-    if (!a || a.id === id) return;
-    if (a.connections.includes(id)) LumennBeatStore.disconnectBeats(this.#storyboardId, a.id, id);
-    else LumennBeatStore.connectBeats(this.#storyboardId, a.id, id);
+    if (!s || !s.beats.some((b) => b.id === id)) return;
+    // Sem pendente → inicia o modo de linkagem a partir deste nó
+    if (!this.#pendingLinkId) {
+      this.#pendingLinkId = id;
+      return this.render();
+    }
+    // Clicou no mesmo nó de novo → cancela
+    if (this.#pendingLinkId === id) {
+      this.#pendingLinkId = null;
+      return this.render();
+    }
+    const from = this.#pendingLinkId;
+    this.#pendingLinkId = null;
+    const fromBeat = s.beats.find((b) => b.id === from);
+    if (fromBeat.connections.includes(id)) LumennBeatStore.disconnectBeats(this.#storyboardId, from, id);
+    else LumennBeatStore.connectBeats(this.#storyboardId, from, id);
     this.render();
   }
 
@@ -303,6 +328,11 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     const canvas = root.querySelector(".beats-canvas");
     canvas?.querySelectorAll(".beat-node").forEach((node) => node.addEventListener("pointerdown", (e) => {
       if (e.target.closest("button")) return;
+      // Em modo de linkagem pendente, clicar em outro nó completa a conexão
+      if (this.#pendingLinkId) {
+        this.#toggleConnection(node.dataset.id);
+        return;
+      }
       e.preventDefault();
       node.setPointerCapture(e.pointerId);
       const beat = LumennBeatStore.getStoryboard(this.#storyboardId)?.beats.find((b) => b.id === node.dataset.id);

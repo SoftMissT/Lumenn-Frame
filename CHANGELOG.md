@@ -2,6 +2,15 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.13] 2026-09-15
+
+### Correções
+
+- **Link de qualquer nó → qualquer nó**: o fluxo antigo conectava apenas a partir do Beat inicial (`activeBeat`), impossibilitando linkar nós arbitrários. Novo modo de linkagem pendente: clicar ⟗ num Beat A destaca A em teal e entra em modo "linking"; clicar ⟗ (ou no corpo) de um Beat B cria a conexão A→B; clicar no mesmo nó cancela.
+- **Drag em storyboard vazio**: `dropSelector` era `".beats-canvas"`, mas com zero Beats o template renderiza o empty state sem esse elemento — o drop era ignorado em silêncio. Agora `dropSelector: ".lf-canvas"` (sempre presente) e handlers de dragover/drop usam `.lf-canvas`.
+- **Automatização de drops**: soltar uma pasta (vários docs) cria os Beats em sequência com offset de 140px, **auto-linka em cadeia** (0→1, 1→2, …) e **auto-define o primeiro como start** quando o storyboard ainda não tem Beat ativo.
+- **HUD cortada/pequena**: janela padrão aumentada para 1000×720; `.lf-root` passou a preencher via `position: absolute; inset: 0` (não depende mais de `height:100%` do `.window-content`, que podia colapsar); vignette suavizada (era `#0c0c0fcc` a 80% — escurecia as bordas e parecia cortada).
+
 ## [0.0.12] 2026-09-15
 
 ### Correções

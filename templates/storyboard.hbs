@@ -27,7 +27,7 @@
     <div class="beats-canvas" style="position:relative;min-height:100%;">
       <svg class="connectors"></svg>
       {{#each beats}}
-      <div class="beat-node{{#if isActive}} active{{/if}}{{#if isConnected}} connected{{/if}}{{#if isNavigable}} navigable{{/if}}{{#if isDimmed}} dimmed{{/if}}{{#unless isValid}} invalid{{/unless}}"
+      <div class="beat-node{{#if isActive}} active{{/if}}{{#if isConnected}} connected{{/if}}{{#if isNavigable}} navigable{{/if}}{{#if isDimmed}} dimmed{{/if}}{{#unless isValid}} invalid{{/unless}}{{#if (lumenn-eq this.id ../linkingBeatId)}} linking{{/if}}"
            data-id="{{this.id}}"
            {{#if isNavigable}}data-navigable="true"{{/if}}
            style="left:{{this.position.x}}px;top:{{this.position.y}}px;">

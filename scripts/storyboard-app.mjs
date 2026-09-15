@@ -8,6 +8,9 @@ const { DragDrop, TextEditor } = foundry.applications.ux;
 const BEAT_W = 120;
 const BEAT_H = 190;
 const WORLD_PAD = 80;
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 2.0;
+const ZOOM_STEP = 1.25;
 
 /** GM storyboard editor/live controller. Domain state remains in BeatStore. */
 export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV2) {
@@ -17,6 +20,9 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
   #transitioning = false;
   #pendingLinkId = null;
   #resizeObserver = null;
+  #camera = { panX: 0, panY: 0, zoom: 1 };
+  #panState = null;
+  #spaceDown = false;
   #dragDrop;
 
   static DEFAULT_OPTIONS = {
@@ -44,6 +50,22 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
         this.#pendingLinkId = null;
         this.render();
       }
+    });
+    // Space = modificador temporário de pan (não muda a ferramenta).
+    document.addEventListener("keydown", (e) => {
+      if (e.code !== "Space") return;
+      const t = e.target;
+      if (t && (t.matches?.("input, textarea, select") || t.isContentEditable)) return;
+      if (!this.#spaceDown) {
+        this.#spaceDown = true;
+        this.element?.classList.add("space-hold");
+      }
+      e.preventDefault();
+    });
+    document.addEventListener("keyup", (e) => {
+      if (e.code !== "Space") return;
+      this.#spaceDown = false;
+      this.element?.classList.remove("space-hold");
     });
   }
 
@@ -138,19 +160,29 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     return [doc];
   }
 
-  /** Converte coordenadas de evento (client) para o sistema do WORLD do canvas. */
+  /** client (viewport-local) -> WORLD via câmera. */
   #clientToCanvas(event, viewport) {
+    return this.#screenToWorld(this.#clientToScreen(event, viewport));
+  }
+
+  /** client -> viewport-local (screen). */
+  #clientToScreen(event, viewport) {
     const rect = viewport?.getBoundingClientRect() ?? { left: 0, top: 0 };
-    return {
-      x: event.clientX - rect.left + (viewport?.scrollLeft ?? 0),
-      y: event.clientY - rect.top + (viewport?.scrollTop ?? 0),
-    };
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  #screenToWorld(s) {
+    return { x: (s.x - this.#camera.panX) / this.#camera.zoom, y: (s.y - this.#camera.panY) / this.#camera.zoom };
+  }
+
+  #worldToScreen(w) {
+    return { x: w.x * this.#camera.zoom + this.#camera.panX, y: w.y * this.#camera.zoom + this.#camera.panY };
   }
 
   /** Expande o WORLD até conter todos os Beats (mínimo = viewport). */
   #resizeWorld(root) {
     const viewport = root.querySelector(".lf-canvas");
-    const world = root.querySelector(".beats-canvas");
+    const world = root.querySelector(".lf-camera");
     if (!viewport || !world) return;
     const s = LumennBeatStore.getStoryboard(this.#storyboardId);
     let maxX = 0;
@@ -256,6 +288,9 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
     this.#resizeWorld(root);
     this.#drawConnectors(root);
     this.#observeResize(root);
+    this.#applyCamera(root);
+    this.#bindCameraControls(root);
+    this.#bindCameraNavigation(root);
   }
 
   #observeResize(root) {
@@ -267,6 +302,113 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       this.#drawConnectors(root);
     });
     this.#resizeObserver.observe(viewport);
+  }
+
+  /* ── Camera (pan/zoom/Fit) ───────────────────────────────────────── */
+
+  #applyCamera(root = this.element) {
+    const camEl = root.querySelector(".lf-camera");
+    if (camEl) {
+      camEl.style.transform = `translate(${this.#camera.panX}px, ${this.#camera.panY}px) scale(${this.#camera.zoom})`;
+    }
+    const pct = root.querySelector("[data-camera-percent]");
+    if (pct) pct.textContent = `${Math.round(this.#camera.zoom * 100)}%`;
+  }
+
+  /** Zoom no ponto da tela (screen coords) mantendo o ponto do mundo sob o cursor estável. */
+  #zoomAt(screenPoint, zoom) {
+    const cam = this.#camera;
+    const w = this.#screenToWorld(screenPoint);
+    zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+    cam.panX = screenPoint.x - w.x * zoom;
+    cam.panY = screenPoint.y - w.y * zoom;
+    cam.zoom = zoom;
+    this.#applyCamera();
+  }
+
+  /** Fit All: enquadra todos os nós no viewport. Zero nós -> reset da câmera. */
+  #fitAll(root) {
+    const viewport = root.querySelector(".lf-canvas");
+    if (!viewport) return;
+    const s = LumennBeatStore.getStoryboard(this.#storyboardId);
+    const beats = s?.beats ?? [];
+    if (beats.length === 0) {
+      this.#camera.panX = 0;
+      this.#camera.panY = 0;
+      this.#camera.zoom = 1;
+      return this.#applyCamera(root);
+    }
+    const PAD = 60;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const b of beats) {
+      const p = b.position ?? { x: 0, y: 0 };
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x + BEAT_W);
+      maxY = Math.max(maxY, p.y + BEAT_H);
+    }
+    const contentW = Math.max(1, (maxX - minX));
+    const contentH = Math.max(1, (maxY - minY));
+    const availW = Math.max(1, viewport.clientWidth - PAD * 2);
+    const availH = Math.max(1, viewport.clientHeight - PAD * 2);
+    let zoom = Math.min(availW / contentW, availH / contentH);
+    zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    this.#camera.zoom = zoom;
+    this.#camera.panX = viewport.clientWidth / 2 - cx * zoom;
+    this.#camera.panY = viewport.clientHeight / 2 - cy * zoom;
+    this.#applyCamera(root);
+  }
+
+  #bindCameraControls(root) {
+    const viewport = root.querySelector(".lf-canvas");
+    root.querySelectorAll("[data-camera]").forEach((btn) => btn.addEventListener("click", (e) => {
+      const act = e.currentTarget.dataset.camera;
+      if (!viewport) return;
+      const center = { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 };
+      if (act === "zoom-in") this.#zoomAt(center, this.#camera.zoom * ZOOM_STEP);
+      else if (act === "zoom-out") this.#zoomAt(center, this.#camera.zoom / ZOOM_STEP);
+      else if (act === "reset") this.#zoomAt(center, 1);
+      else if (act === "fit") this.#fitAll(root);
+    }));
+  }
+
+  #bindCameraNavigation(root) {
+    const viewport = root.querySelector(".lf-canvas");
+    if (!viewport) return;
+    // Zoom pela roda, centrado no cursor. preventDefault só dentro do viewport.
+    viewport.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const factor = Math.pow(1.1, -e.deltaY * 0.01);
+      this.#zoomAt(this.#clientToScreen(e, viewport), this.#camera.zoom * factor);
+    }, { passive: false });
+
+    // Pan: Space + left-drag, ou botão do meio.
+    viewport.addEventListener("pointerdown", (e) => {
+      const isPan = (this.#spaceDown && e.button === 0) || e.button === 1;
+      if (!isPan) return;
+      e.preventDefault();
+      viewport.setPointerCapture(e.pointerId);
+      this.#panState = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      viewport.classList.add("panning");
+    });
+    viewport.addEventListener("pointermove", (e) => {
+      if (!this.#panState || this.#panState.id !== e.pointerId) return;
+      this.#camera.panX += e.clientX - this.#panState.x;
+      this.#camera.panY += e.clientY - this.#panState.y;
+      this.#panState.x = e.clientX;
+      this.#panState.y = e.clientY;
+      this.#applyCamera(root);
+    });
+    const endPan = (e) => {
+      if (this.#panState?.id === e.pointerId) {
+        this.#panState = null;
+        viewport.classList.remove("panning");
+      }
+    };
+    viewport.addEventListener("pointerup", endPan);
+    viewport.addEventListener("pointercancel", endPan);
   }
 
   #installLiveNavigation(root) {
@@ -404,9 +546,12 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
 
   #installInternalDrag(root) {
     if (this.#mode !== "edit") return;
-    const canvas = root.querySelector(".beats-canvas");
-    canvas?.querySelectorAll(".beat-node").forEach((node) => node.addEventListener("pointerdown", (e) => {
+    const viewport = root.querySelector(".lf-canvas");
+    const world = root.querySelector(".lf-camera");
+    world?.querySelectorAll(".beat-node").forEach((node) => node.addEventListener("pointerdown", (e) => {
       if (e.target.closest("button")) return;
+      // Space ou botão do meio = pan da câmera, não arraste de nó.
+      if (this.#spaceDown || e.button !== 0) return;
       // Em modo de linkagem pendente, clicar em outro nó completa a conexão
       if (this.#pendingLinkId) {
         this.#toggleConnection(node.dataset.id);
@@ -415,20 +560,26 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
       e.preventDefault();
       node.setPointerCapture(e.pointerId);
       const beat = LumennBeatStore.getStoryboard(this.#storyboardId)?.beats.find((b) => b.id === node.dataset.id);
-      const start = { x: e.clientX, y: e.clientY, ...(beat?.position ?? { x: 0, y: 0 }) };
+      const base = beat?.position ?? { x: 0, y: 0 };
+      // Grab offset em WORLD coords: mantém o nó sob o cursor em qualquer zoom.
+      const w0 = this.#screenToWorld(this.#clientToScreen(e, viewport));
+      const grab = { x: w0.x - base.x, y: w0.y - base.y };
       let rafId = null;
       const move = (ev) => {
-        node.style.left = `${start.x + ev.clientX - e.clientX}px`;
-        node.style.top = `${start.y + ev.clientY - e.clientY}px`;
-        // Atualiza conectores em tempo real, throttled via requestAnimationFrame.
+        const w = this.#screenToWorld(this.#clientToScreen(ev, viewport));
+        const x = Math.max(0, Math.round(w.x - grab.x));
+        const y = Math.max(0, Math.round(w.y - grab.y));
+        node.style.left = `${x}px`;
+        node.style.top = `${y}px`;
         if (rafId == null) rafId = requestAnimationFrame(() => { rafId = null; this.#drawConnectors(root); });
       };
       const up = async (ev) => {
         node.releasePointerCapture(ev.pointerId);
         node.removeEventListener("pointermove", move);
         node.removeEventListener("pointerup", up);
-        const x = Math.max(0, start.x + ev.clientX - e.clientX);
-        const y = Math.max(0, start.y + ev.clientY - e.clientY);
+        const w = this.#screenToWorld(this.#clientToScreen(ev, viewport));
+        const x = Math.max(0, Math.round(w.x - grab.x));
+        const y = Math.max(0, Math.round(w.y - grab.y));
         await LumennBeatStore.updateBeat(this.#storyboardId, node.dataset.id, { position: { x, y } });
         this.#resizeWorld(root);
         this.#drawConnectors(root);

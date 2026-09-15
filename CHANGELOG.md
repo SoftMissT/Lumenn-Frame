@@ -2,6 +2,26 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## 0.0.15-alpha.1
+
+> **ALPHA / runtime validation build** — Graph Editor 2.0, **Phase A: Camera only**. Nenhuma feature de Fase B (schema v2, ports, Inspector, novos node types) incluída.
+
+### Graph Editor 2.0 — Phase A: Camera
+
+- viewport/camera/world architecture
+- pan with Space + drag
+- pan with middle mouse
+- cursor-centered zoom
+- zoom controls
+- reset 100%
+- Fit All
+- world/screen coordinate conversion
+- node drag aware of zoom
+- edges transformed with camera
+- camera state local to client
+
+**QA de runtime (AT-CAM-01..15):** abrir grafo existente; space/meio-botão pan sem alterar positions; zoom centrado no cursor; botões -/+/100%/Fit; node drag aderente em 25–200%; edges presas aos nós sob pan/zoom; 20+ nós fluido; nenhum `game.settings.set` durante pan/zoom; console sem exceptions.
+
 ## 0.0.14-beta.2
 
 ### Runtime validation build (QA)

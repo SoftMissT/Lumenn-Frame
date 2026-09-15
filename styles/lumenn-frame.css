@@ -200,17 +200,25 @@
   flex: 1 1 auto;
   min-height: 0;
   position: relative;
-  overflow: auto;        /* VIEWPORT: rola quando o WORLD cresce */
+  overflow: hidden;      /* VIEWPORT: enquadra o grafo; navegação = câmera */
   background: var(--lf-ink);
   z-index: 1;
 }
 
-.lf-canvas .beats-canvas {
-  position: relative;    /* WORLD: tamanho definido em JS, mínimo = viewport */
+/* Câmera: o plano transformado que contém nodes + edges em WORLD coords. */
+.lf-canvas .lf-camera {
+  position: absolute;
+  top: 0;
+  left: 0;
   min-width: 100%;
   min-height: 100%;
+  transform-origin: 0 0;   /* obrigatório: worldToScreen = x*zoom + pan */
+  will-change: transform;
   cursor: crosshair;
 }
+
+.lf-canvas.space-hold { cursor: grab; }
+.lf-canvas.panning { cursor: grabbing; }
 
 .lf-canvas.drag-over {
   outline: 2px dashed var(--lf-amber);
@@ -225,6 +233,50 @@
   height: 100%;
   pointer-events: none;
   z-index: 2;
+}
+
+/* ── Camera toolbar (provisória — QA Fase A) ──────────────────────── */
+.lf-camera-bar {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 5px;
+  background: #101014e6;
+  border: 1px solid var(--lf-badge-border);
+  border-radius: var(--lf-radius);
+  box-shadow: var(--lf-shadow);
+}
+
+.lf-camera-bar button {
+  font-family: var(--lf-font-body);
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 22px;
+  padding: 2px 6px;
+  border: 1px solid var(--lf-badge-border);
+  border-radius: 3px;
+  background: var(--lf-badge);
+  color: var(--lf-text);
+  cursor: pointer;
+  transition: background var(--lf-transition), border-color var(--lf-transition);
+}
+
+.lf-camera-bar button:hover {
+  background: var(--lf-panel-alt);
+  border-color: var(--lf-muted);
+}
+
+.lf-camera-bar .lf-camera-percent {
+  min-width: 42px;
+  text-align: center;
+  font-family: var(--lf-font-body);
+  font-size: 11px;
+  color: var(--lf-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Beat node ─────────────────────────────────────────────────────── */

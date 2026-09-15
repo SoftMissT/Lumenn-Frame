@@ -33,7 +33,7 @@
   </div>
 
   <div class="lf-canvas">
-    <div class="beats-canvas">
+    <div class="lf-camera">
       <svg class="connectors"></svg>
       {{#each beats}}
       <div class="beat-node{{#if isActive}} active{{/if}}{{#if isConnected}} connected{{/if}}{{#if isNavigable}} navigable{{/if}}{{#if isDimmed}} dimmed{{/if}}{{#unless isValid}} invalid{{/unless}}{{#if (lumenn-eq this.id ../linkingBeatId)}} linking{{/if}}"
@@ -63,6 +63,14 @@
         {{/if}}
       </div>
       {{/each}}
+    </div>
+
+    <div class="lf-camera-bar">
+      <button type="button" data-camera="zoom-out" title="Zoom out">-</button>
+      <span class="lf-camera-percent" data-camera-percent>100%</span>
+      <button type="button" data-camera="reset" title="Reset 100%">100%</button>
+      <button type="button" data-camera="zoom-in" title="Zoom in">+</button>
+      <button type="button" data-camera="fit" title="Fit All">Fit</button>
     </div>
 
     {{#if linkingBeatId}}

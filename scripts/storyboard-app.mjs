@@ -14,7 +14,7 @@ export class LumennStoryboardApp extends HandlebarsApplicationMixin(ApplicationV
 
   static DEFAULT_OPTIONS = {
     id: "lumenn-storyboard",
-    classes: ["lumenn-frame", "storyboard"],
+    classes: ["lumenn-frame", "storyboard", "app", "window-app"],
     title: "Lumenn Frame",
     tag: "div",
     position: { width: 900, height: 650 },
@@ -348,7 +348,7 @@ class BeatConfigDialog extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static DEFAULT_OPTIONS = {
     id: "lumenn-beat-config",
-    classes: ["lumenn-frame", "beat-config"],
+    classes: ["lumenn-frame", "beat-config", "app", "window-app"],
     title: "LUMENN_FRAME.Config.Title",
     tag: "form",
     position: { width: 440, height: "auto" },

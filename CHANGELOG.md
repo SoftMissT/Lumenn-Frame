@@ -2,6 +2,12 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.8] 2026-09-15
+
+### Correção
+
+- JS: `classes` agora inclui `"app"` e `"window-app"` (storyboard e beat-config). Sem isso, o Foundry não posiciona a janela dentro de `#ui-middle` nem gerencia o `z-index` nativo — janela cobria os scene controls e conflitava com overlays do sistema.
+
 ## [0.0.7] 2026-09-15
 
 ### Correção

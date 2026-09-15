@@ -2,6 +2,13 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.6] 2026-09-15
+
+### Correção
+
+- Templates `storyboard.hbs` e `beat-config.hbs` renderizavam múltiplos elementos raiz — ApplicationV2 exige um único elemento por `PARTS`. Embrulhados em `<div class="lf-root">` e `<div class="bc-body">`.
+- Layout flex movido para `.lf-root`; `BeatConfigDialog` sem `form.closeOnSubmit` redundante.
+
 ## [0.0.5] 2026-09-15
 
 > Consolidação final: 0.0.3/0.0.4 foram tags de trabalho intermediárias.

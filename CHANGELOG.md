@@ -2,6 +2,26 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## 0.0.14-beta.2
+
+### Runtime validation build (QA)
+
+> Runtime idêntico ao `0.0.14-beta.1` (nenhum script/style/template alterado). Esta tag é uma entrada limpa de teste via GitHub: instale pelo manifesto da tag — `https://github.com/SoftMissT/Lumenn-Frame/releases/download/v0.0.14-beta.2/module.json` — e rode o QA.
+
+### Documentação (Specs locais — SDD gitignored, fora do pacote)
+
+- **FLOW EDGES formalizado** nas Specs (§3.4): o storyboard é um **grafo direcionado** — `A -> B` não implica `B -> A`; recíproca exige as duas arestas; branching/ciclos/múltiplas entradas-saídas válidos; `activeBeatId` nunca restringe edges em Edição; `connections[]` = outgoing FLOW edges; self-edge proibida; Ao Vivo segue só outgoing.
+- **CT-FLOW-01..05** adicionados às Specs (§5) como checklist do QA de grafo.
+
+### QA de runtime — escopo
+
+1. Responsividade (1920/1600/1366 + resize) — toolbar sem cortes, toggle acessível.
+2. Drop: Scene/Playlist/Folder em canvas vazio e existente.
+3. Grafo: A→B, B→A, branching A→B/C/D, ciclo A→B→C→A (CT-FLOW-01..05).
+4. Move + scroll + resize — conectores corretos.
+5. Persistência após reload (positions, sceneId, audioSource, connections, activeBeatId).
+6. Modos Edição/Ao Vivo — guards estruturais.
+
 ## 0.0.14-beta.1
 
 ### Fixed / Testing

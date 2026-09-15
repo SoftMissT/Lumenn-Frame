@@ -1,157 +1,535 @@
+/* Lumenn Frame – Cinematic Edit Bay Theme v0.0.3 ────────────────────────── */
+
+/* ── Variables ─────────────────────────────────────────────────────── */
+:root {
+  --lf-ink:          #0c0c0f;
+  --lf-surface:      #16161a;
+  --lf-panel:        #1d1d23;
+  --lf-panel-alt:    #242430;
+  --lf-text:         #e0ddd4;
+  --lf-muted:        #73707c;
+  --lf-amber:        #f0a321;
+  --lf-amber-dim:    #f0a32166;
+  --lf-teal:         #2dd4bf;
+  --lf-teal-dim:     #2dd4bf55;
+  --lf-danger:       #e45656;
+  --lf-badge:        #2b2c33;
+  --lf-badge-border: #3b3c44;
+  --lf-shadow:       0 2px 10px #00000060;
+  --lf-font-display: "Modesto Condensed", "Signika", serif;
+  --lf-font-body:    "Montserrat", "Signika", sans-serif;
+  --lf-radius:       4px;
+  --lf-transition:   0.18s ease;
+}
+
+/* ── Base container ────────────────────────────────────────────────── */
 .lumenn-frame.storyboard {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #1a1a2e;
-  color: #e0e0e0;
+  background: var(--lf-ink);
+  color: var(--lf-text);
+  font-family: var(--lf-font-body);
+  font-size: 13px;
+  overflow: hidden;
+  position: relative;
 }
 
-.lumenn-frame .toolbar {
+/* Film grain overlay */
+.lumenn-frame.storyboard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  opacity: .045;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255,255,255,.03) 2px,
+    rgba(255,255,255,.03) 4px
+  );
+  background-size: 100% 4px;
+}
+
+/* Vignette */
+.lumenn-frame.storyboard::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 49;
+  background: radial-gradient(ellipse at center, transparent 55%, #0c0c0fcc 100%);
+}
+
+/* ── Titlebar ──────────────────────────────────────────────────────── */
+.lf-titlebar {
   display: flex;
-  gap: 8px;
-  padding: 8px 12px;
-  background: #16213e;
-  border-bottom: 1px solid #0f3460;
   align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  height: 36px;
+  min-height: 36px;
+  background: var(--lf-panel);
+  border-bottom: 1px solid #ffffff0a;
+  z-index: 51;
 }
 
-.lumenn-frame .toolbar button {
-  padding: 4px 10px;
-  border: 1px solid #0f3460;
-  border-radius: 4px;
-  background: #1a1a2e;
-  color: #e0e0e0;
-  cursor: pointer;
+.lf-titlebar h1 {
+  font-family: var(--lf-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--lf-amber);
+  text-transform: uppercase;
+  margin: 0;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.lf-titlebar select {
+  flex: 0 1 180px;
+  min-width: 0;
+  background: var(--lf-badge);
+  border: 1px solid var(--lf-badge-border);
+  color: var(--lf-text);
+  font-family: var(--lf-font-body);
   font-size: 12px;
+  padding: 2px 6px;
+  border-radius: var(--lf-radius);
+  cursor: pointer;
 }
 
-.lumenn-frame .toolbar button:hover {
-  background: #0f3460;
+.lf-titlebar .lf-spacer { flex: 1 1 auto; }
+
+/* ── Toolbar ───────────────────────────────────────────────────────── */
+.lf-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 0;
+  background: var(--lf-panel);
+  border-bottom: 1px solid #ffffff0a;
+  z-index: 51;
 }
 
-.lumenn-frame .toolbar button.active {
-  background: #00d9ff;
-  color: #000;
-  border-color: #00d9ff;
+.lf-toolbar button {
+  font-family: var(--lf-font-body);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border: 1px solid var(--lf-badge-border);
+  border-radius: var(--lf-radius);
+  background: var(--lf-badge);
+  color: var(--lf-text);
+  cursor: pointer;
+  transition: background var(--lf-transition), border-color var(--lf-transition), color var(--lf-transition);
+  white-space: nowrap;
 }
 
-.lumenn-frame .mode-toggle {
+.lf-toolbar button:hover {
+  background: var(--lf-panel-alt);
+  border-color: var(--lf-muted);
+}
+
+.lf-toolbar .lf-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--lf-badge-border);
+  margin: 0 4px;
+}
+
+/* Segmented mode toggle */
+.lf-toolbar .lf-mode-toggle {
+  display: flex;
+  border: 1px solid var(--lf-badge-border);
+  border-radius: var(--lf-radius);
+  overflow: hidden;
   margin-left: auto;
 }
 
-.lumenn-frame .mode-toggle.edit {
-  background: #4a4a6a;
-}
-
-.lumenn-frame .mode-toggle.live {
-  background: #00d9ff;
-  color: #000;
-}
-
-.lumenn-frame .beats-canvas {
-  flex: 1;
-  position: relative;
-  overflow: auto;
-  min-height: 400px;
-}
-
-.lumenn-frame .beat-node {
-  position: absolute;
-  width: 120px;
-  min-height: 60px;
-  background: #16213e;
-  border: 2px solid #0f3460;
-  border-radius: 6px;
-  padding: 8px;
-  cursor: pointer;
-  user-select: none;
-  transition: border-color 0.15s;
-}
-
-.lumenn-frame .beat-node:hover {
-  border-color: #00d9ff;
-}
-
-.lumenn-frame .beat-node.active {
-  border-color: #00d9ff;
-  box-shadow: 0 0 12px rgba(0, 217, 255, 0.4);
-}
-
-.lumenn-frame .beat-node.connected {
-  opacity: 1;
-  cursor: pointer;
-}
-
-.lumenn-frame .beat-node:not(.connected) {
-  opacity: 0.45;
-}
-
-.lumenn-frame .beat-node.invalid {
-  border-color: #e74c3c;
-}
-
-.lumenn-frame .beat-node .beat-name {
+.lf-toolbar .lf-mode-toggle button {
+  border: none;
+  border-radius: 0;
   font-size: 11px;
-  font-weight: 600;
-  margin-bottom: 4px;
-  white-space: nowrap;
+  padding: 3px 12px;
+  color: var(--lf-muted);
+  background: transparent;
+}
+
+.lf-toolbar .lf-mode-toggle button.active {
+  background: var(--lf-amber);
+  color: var(--lf-ink);
+}
+
+.lf-toolbar .lf-mode-toggle button:not(:first-child) {
+  border-left: 1px solid var(--lf-badge-border);
+}
+
+.lf-toolbar .lf-start-btn {
+  color: var(--lf-amber);
+  border-color: var(--lf-amber-dim);
+}
+
+.lf-toolbar .lf-start-btn:hover {
+  background: var(--lf-amber);
+  color: var(--lf-ink);
+}
+
+/* ── Canvas ────────────────────────────────────────────────────────── */
+.lf-canvas {
+  flex: 1 1 auto;
+  position: relative;
   overflow: hidden;
-  text-overflow: ellipsis;
+  z-index: 1;
 }
 
-.lumenn-frame .beat-node .beat-detail {
-  font-size: 10px;
-  color: #999;
-}
-
-.lumenn-frame .beat-actions {
-  display: flex;
-  gap: 4px;
-  margin-top: 6px;
-}
-
-.lumenn-frame .beat-actions button {
-  font-size: 10px;
-  padding: 2px 6px;
-  border: 1px solid #333;
-  border-radius: 3px;
-  background: #1a1a2e;
-  color: #ccc;
-  cursor: pointer;
-}
-
-.lumenn-frame .beat-actions button:hover {
-  background: #333;
-}
-
-.lumenn-frame svg.connectors {
+.lf-canvas .beats-canvas {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
+  overflow: auto;
+  cursor: crosshair;
+}
+
+.lf-canvas .beats-canvas.drag-over {
+  outline: 2px dashed var(--lf-amber);
+  outline-offset: -4px;
+  background: var(--lf-amber-dim);
+}
+
+.lf-canvas svg.connectors {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
+  z-index: 2;
 }
 
-.lumenn-frame .beat-config {
-  background: #1a1a2e;
-  color: #e0e0e0;
+/* ── Beat node ─────────────────────────────────────────────────────── */
+.beat-node {
+  position: absolute;
+  width: 120px;
+  background: var(--lf-panel);
+  border: 2px solid var(--lf-badge-border);
+  border-radius: 6px;
+  cursor: grab;
+  z-index: 3;
+  box-shadow: var(--lf-shadow);
+  transition: border-color var(--lf-transition), box-shadow var(--lf-transition), transform var(--lf-transition);
+  overflow: hidden;
+  animation: lf-fadeIn .22s ease;
 }
 
-.lumenn-frame .beat-config label {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 12px;
-  color: #aaa;
+.beat-node:hover {
+  border-color: var(--lf-muted);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px #00000080;
 }
 
-.lumenn-frame .beat-config select,
-.lumenn-frame .beat-config input {
+.beat-node.invalid {
+  border-color: var(--lf-danger);
+}
+
+.beat-node.active {
+  border-color: var(--lf-amber);
+  box-shadow: 0 0 18px var(--lf-amber-dim), 0 4px 16px #00000080;
+}
+
+.beat-node.connected {
+  border-color: var(--lf-teal);
+}
+
+.beat-node.active.connected {
+  border-color: var(--lf-amber);
+}
+
+/* Thumbnail */
+.beat-node .beat-thumb {
   width: 100%;
-  padding: 6px 8px;
-  border: 1px solid #0f3460;
-  border-radius: 4px;
-  background: #16213e;
-  color: #e0e0e0;
+  aspect-ratio: 16 / 9;
+  background: var(--lf-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-bottom: 1px solid #ffffff0a;
+}
+
+.beat-node .beat-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+.beat-node .beat-thumb .beat-placeholder {
+  font-size: 22px;
+  color: var(--lf-muted);
+  opacity: .45;
+}
+
+.beat-node .beat-label {
+  padding: 5px 7px 4px;
+  font-family: var(--lf-font-display);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lf-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.beat-node .beat-meta {
+  padding: 0 7px 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 5px;
+  font-size: 10px;
+  color: var(--lf-muted);
+  line-height: 1.2;
+}
+
+.beat-node .beat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border: 1px solid var(--lf-badge-border);
+  border-radius: 3px;
+  background: var(--lf-badge);
+  color: var(--lf-muted);
+  font-size: 9.5px;
+  white-space: nowrap;
+}
+
+.beat-node.active .beat-badge.start-badge {
+  border-color: var(--lf-amber-dim);
+  color: var(--lf-amber);
+}
+
+/* Actions */
+.beat-actions {
+  display: none;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  gap: 2px;
+  z-index: 10;
+}
+
+.beat-node:hover .beat-actions {
+  display: flex;
+}
+
+.beat-actions button {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  background: var(--lf-ink);
+  border: 1px solid var(--lf-badge-border);
+  border-radius: 3px;
+  color: var(--lf-muted);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color var(--lf-transition), border-color var(--lf-transition);
+}
+
+.beat-actions button:hover {
+  color: var(--lf-text);
+  border-color: var(--lf-muted);
+}
+
+.beat-actions button.start-action:hover { color: var(--lf-amber); border-color: var(--lf-amber); }
+.beat-actions button.delete-action:hover { color: var(--lf-danger); border-color: var(--lf-danger); }
+
+/* ── Empty state ───────────────────────────────────────────────────── */
+.lf-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: var(--lf-muted);
+  gap: 8px;
+  pointer-events: none;
+  z-index: 5;
+  position: relative;
+}
+
+.lf-empty-state .lf-empty-icon {
+  font-size: 32px;
+  opacity: .3;
+  margin-bottom: 2px;
+}
+
+.lf-empty-state .lf-empty-title {
+  font-family: var(--lf-font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--lf-text);
+  opacity: .7;
+}
+
+.lf-empty-state .lf-empty-hint {
+  font-size: 12px;
+  max-width: 260px;
+  line-height: 1.4;
+}
+
+/* ── BeatConfigDialog ──────────────────────────────────────────────── */
+.beat-config {
+  font-family: var(--lf-font-body);
+  font-size: 13px;
+}
+
+.beat-config .bc-section {
+  background: var(--lf-panel);
+  border: 1px solid var(--lf-badge-border);
+  border-radius: var(--lf-radius);
+  padding: 10px 12px;
   margin-bottom: 10px;
 }
+
+.beat-config .bc-section-title {
+  font-family: var(--lf-font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lf-amber);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #ffffff0a;
+}
+
+.beat-config .bc-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.beat-config .bc-row:last-child {
+  margin-bottom: 0;
+}
+
+.beat-config label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--lf-muted);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.beat-config select,
+.beat-config input {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--lf-badge-border);
+  border-radius: var(--lf-radius);
+  background: var(--lf-badge);
+  color: var(--lf-text);
+  font-family: var(--lf-font-body);
+  font-size: 12px;
+}
+
+.beat-config select:focus,
+.beat-config input:focus {
+  outline: none;
+  border-color: var(--lf-amber);
+}
+
+/* Scene preview */
+.bc-scene-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.bc-scene-preview .bc-thumb {
+  width: 80px;
+  height: 45px;
+  border-radius: 3px;
+  background: var(--lf-ink);
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid var(--lf-badge-border);
+}
+
+.bc-scene-preview .bc-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.bc-scene-preview .bc-thumb .bc-no-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--lf-muted);
+  font-size: 11px;
+  opacity: .5;
+}
+
+.bc-scene-preview .bc-scene-name {
+  font-size: 12px;
+  color: var(--lf-text);
+}
+
+.bc-scene-preview .bc-scene-name.unset {
+  color: var(--lf-muted);
+  font-style: italic;
+}
+
+.beat-config .bc-hint {
+  font-size: 10.5px;
+  color: var(--lf-muted);
+  line-height: 1.3;
+}
+
+.beat-config .bc-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.beat-config .bc-footer button {
+  font-family: var(--lf-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 18px;
+  border: 1px solid var(--lf-amber-dim);
+  border-radius: var(--lf-radius);
+  background: var(--lf-amber);
+  color: var(--lf-ink);
+  cursor: pointer;
+  transition: background var(--lf-transition);
+}
+
+.beat-config .bc-footer button:hover {
+  background: #d9931e;
+}
+
+/* ── Animations ────────────────────────────────────────────────────── */
+@keyframes lf-fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────── */
+.lf-canvas .beats-canvas::-webkit-scrollbar { width: 6px; height: 6px; }
+.lf-canvas .beats-canvas::-webkit-scrollbar-track { background: transparent; }
+.lf-canvas .beats-canvas::-webkit-scrollbar-thumb { background: var(--lf-badge-border); border-radius: 3px; }
+.lf-canvas .beats-canvas::-webkit-scrollbar-thumb:hover { background: var(--lf-muted); }

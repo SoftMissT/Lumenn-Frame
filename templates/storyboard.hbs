@@ -1,42 +1,65 @@
-<div class="lumenn-frame storyboard">
-  <div class="toolbar">
-    {{#if isGM}}
-      <select data-storyboard-selector aria-label="Storyboard">
-        {{#each storyboards}}<option value="{{id}}" {{#if (lumenn-eq id ../activeStoryboard.id)}}selected{{/if}}>{{name}}</option>{{/each}}
-      </select>
-      <button data-action="create-storyboard">+ Storyboard</button>
-      <button data-action="create-beat">+ Beat</button>
-      {{#if activeStoryboard}}<button data-action="delete-storyboard">Excluir storyboard</button>{{/if}}
-      <button class="mode-toggle {{mode}}" data-action="toggle-mode">
-        {{#if (lumenn-eq mode "edit")}}Edição{{else}}Ao Vivo{{/if}}
-      </button>
-      {{#if needsStartBeat}}
-        <span class="hint">Defina o Beat inicial ("Início") antes de navegar.</span>
-      {{/if}}
-    {{/if}}
+<div class="lf-titlebar">
+  <h1>Lumenn Frame</h1>
+  {{#if storyboards.length}}
+  <select class="lf-storyboard-selector" data-storyboard-selector>
+    {{#each storyboards}}
+    <option value="{{this.id}}" {{#if (lumenn-eq this.id ../activeStoryboard.id)}}selected{{/if}}>{{this.name}}</option>
+    {{/each}}
+  </select>
+  {{/if}}
+  <span class="lf-spacer"></span>
+</div>
+
+<div class="lf-toolbar">
+  {{#if isGM}}
+  <button data-action="create-storyboard">{{label.createStoryboard}}</button>
+  <button data-action="create-beat">{{label.createBeat}}</button>
+  <button data-action="delete-storyboard">{{label.deleteStoryboard}}</button>
+  <span class="lf-divider"></span>
+  {{#if needsStartBeat}}<button class="lf-start-btn" disabled>{{label.needsStartBeat}}</button>{{/if}}
+  <div class="lf-mode-toggle">
+    <button class="{{#if (lumenn-eq mode 'edit')}}active{{/if}}" data-action="toggle-mode">{{label.editMode}}</button>
+    <button class="{{#if (lumenn-eq mode 'live')}}active{{/if}}" data-action="toggle-mode">{{label.liveMode}}</button>
   </div>
-  <div class="beats-canvas">
+  {{/if}}
+</div>
+
+<div class="lf-canvas">
+  {{#if beats.length}}
+  <div class="beats-canvas" style="position:relative;min-height:100%;">
     <svg class="connectors"></svg>
     {{#each beats}}
-      <div class="beat-node {{#if isActive}}active{{/if}} {{#if isConnected}}connected{{/if}} {{#unless isValid}}invalid{{/unless}}"
-           data-id="{{id}}" data-x="{{position.x}}" data-y="{{position.y}}" style="left:{{position.x}}px;top:{{position.y}}px">
-        <div class="beat-name">{{sceneName}}</div>
-        <div class="beat-detail">{{audioLabel}}</div>
-        {{#if (lumenn-eq ../mode "edit")}}
-          <div class="beat-actions">
-            <button data-action="set-start-beat" data-id="{{id}}" title="Definir como Beat ativo inicial">Início</button>
-            <button data-action="edit-beat" data-id="{{id}}">Edit</button>
-            <button data-action="delete-beat" data-id="{{id}}">Del</button>
-            <button data-action="connect-beat" data-id="{{id}}">Link</button>
-          </div>
+    <div class="beat-node{{#if isActive}} active{{/if}}{{#if isConnected}} connected{{/if}}{{#unless isValid}} invalid{{/unless}}"
+         data-id="{{this.id}}"
+         style="left:{{this.position.x}}px;top:{{this.position.y}}px;">
+      <div class="beat-thumb">
+        {{#if this.sceneThumb}}
+          <img src="{{this.sceneThumb}}" alt="{{this.sceneName}}" loading="lazy">
         {{else}}
-          {{#if isConnected}}
-            <div class="beat-actions">
-              <button data-action="navigate-beat" data-id="{{id}}">Go</button>
-            </div>
-          {{/if}}
+          <span class="beat-placeholder">&#127909;</span>
         {{/if}}
       </div>
+      <div class="beat-label">{{this.sceneName}}</div>
+      <div class="beat-meta">
+        {{#if this.isActive}}<span class="beat-badge start-badge">{{../label.start}}</span>{{/if}}
+        {{#if this.audioLabel}}<span class="beat-badge">{{this.audioLabel}}</span>{{/if}}
+      </div>
+      {{#if ../isGM}}
+      <div class="beat-actions">
+        {{#unless this.isActive}}<button class="start-action" data-action="set-start-beat" data-id="{{this.id}}" title="{{../label.start}}">&#9733;</button>{{/unless}}
+        <button data-action="edit-beat" data-id="{{this.id}}" title="{{../label.edit}}">&#9998;</button>
+        <button data-action="connect-beat" data-id="{{this.id}}" title="{{../label.link}}">&#9741;</button>
+        <button data-action="delete-beat" data-id="{{this.id}}" title="{{../label.delete}}">&#10005;</button>
+      </div>
+      {{/if}}
+    </div>
     {{/each}}
   </div>
+  {{else}}
+  <div class="lf-empty-state">
+    <div class="lf-empty-icon">&#127909;</div>
+    <div class="lf-empty-title">{{label.emptyState}}</div>
+    <div class="lf-empty-hint">{{label.emptyHint}}<br>{{label.dropHint}}</div>
+  </div>
+  {{/if}}
 </div>

@@ -78,6 +78,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
   #dragDrop;
   #selected = { kind: null, id: null };
   #connectState = null;
+  #edgeFrame = null;
   #expanded = false;
   #prevPosition = null;
   #transitioning = false;
@@ -395,7 +396,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const navigable = new Set();
     if (this.#mode === "live" && activeGraph?.activeNodeId) {
       for (const e of activeGraph.edges ?? []) {
-        if (e.type === "flow" && e.from === activeGraph.activeNodeId)
+        if ((e.type === "flow" || e.type === "audio") && e.from === activeGraph.activeNodeId)
           navigable.add(e.to);
       }
     }
@@ -663,7 +664,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const w = this.#screenToWorld(this.#clientToScreen(ev, viewport));
         node.style.left = `${Math.round(w.x - grab.x)}px`;
         node.style.top = `${Math.round(w.y - grab.y)}px`;
-        this.#drawEdges(root);
+        this.#scheduleEdgeDraw(root);
       };
       const up = async (ev) => {
         if (node.hasPointerCapture?.(ev.pointerId))
@@ -773,7 +774,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
   #isNavigable(id) {
     const graph = LumennGraphStore.getGraph(this.#graphId);
     return !!graph?.edges?.some(
-      (e) => e.type === "flow" && e.from === graph.activeNodeId && e.to === id,
+      (e) =>
+        (e.type === "flow" || e.type === "audio") &&
+        e.from === graph.activeNodeId &&
+        e.to === id,
     );
   }
 
@@ -879,6 +883,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   #drawEdges(root) {
+    this.#edgeFrame = null;
     const svg = root.querySelector(".lf-edges");
     const graph = LumennGraphStore.getGraph(this.#graphId);
     if (!svg) return;
@@ -1025,6 +1030,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     ghost.setAttribute("stroke-dasharray", "6 4");
     ghost.setAttribute("d", this.#connectState ? this.#ghostPath() : "");
     svg.appendChild(ghost);
+  }
+
+  #scheduleEdgeDraw(root = this.element) {
+    if (this.#edgeFrame !== null) return;
+    this.#edgeFrame = requestAnimationFrame(() => this.#drawEdges(root));
   }
 
   #ghostPath() {
@@ -1414,6 +1424,13 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
   #audioSourcesFor(graph, nodeId) {
     const sources = [];
     const visited = new Set();
+    const root = graph?.nodes?.find((n) => n.id === nodeId);
+    if (root?.type === "audio" && root.data?.audioType && root.data?.audioId) {
+      sources.push({
+        type: root.data.audioType === "playlist" ? "playlist" : "track",
+        id: root.data.audioId,
+      });
+    }
     const visit = (targetId) => {
       if (!targetId || visited.has(targetId)) return;
       visited.add(targetId);
@@ -1457,7 +1474,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if (this.#transitioning) return;
     const graph = LumennGraphStore.getGraph(this.#graphId);
     const edge = graph?.edges?.find(
-      (e) => e.type === "flow" && e.from === graph.activeNodeId && e.to === id,
+      (e) =>
+        (e.type === "flow" || e.type === "audio") &&
+        e.from === graph.activeNodeId &&
+        e.to === id,
     );
     if (!edge) return;
     if (LumennSettings.get("confirmSceneTransition")) {
@@ -1472,9 +1492,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this.#transitioning = true;
     await this.render();
     try {
-      const scope = ["audio", "scene", "both"].includes(edge.transition?.scope)
-        ? edge.transition.scope
-        : "both";
+      const scope = edge.type === "audio"
+        ? "audio"
+        : ["audio", "scene", "both"].includes(edge.transition?.scope)
+          ? edge.transition.scope
+          : "both";
       const sceneTrans = edge.transition?.scene ?? { type: "cut", duration: 0 };
       const audioTrans = this.#audioTransitionFor(graph, edge);
       const targetNode = graph.nodes.find((n) => n.id === id);

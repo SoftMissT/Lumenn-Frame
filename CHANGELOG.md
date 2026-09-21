@@ -431,3 +431,14 @@ Transições via documento em vez de `Sound#fade()` direto fades locais não sin
 - Conexões podem encaixar no corpo/lado compatível do nó, sem exigir precisão no círculo da porta.
 - Transições de áudio ficaram editáveis também na associação de áudio; durações são limitadas a 10 segundos.
 - Seleção/arraste de nós reforçados e linhas mantêm espessura/contraste em zoom baixo.
+
+## [0.0.23] - 2026-09-21 — arraste e nó inicial
+
+- Redraw das conexões durante o arraste limitado a um `requestAnimationFrame`, evitando reconstruções repetidas do SVG e gradientes no mesmo gesto.
+- O nó continua acompanhando o ponteiro localmente e persiste a posição somente ao soltar.
+
+### Nó inicial de áudio/cena
+
+- O modo Ao Vivo agora considera `FLOW` e `AUDIO` como saídas navegáveis.
+- Um Audio Node marcado como inicial passa a fornecer sua própria fonte de áudio; não fica sem origem nem bloqueia o grafo.
+- AUDIO → Scene executa áudio sem forçar troca de cena; FLOW continua controlando cena/beat.

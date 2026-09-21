@@ -419,3 +419,8 @@ Transições via documento em vez de `Sound#fade()` direto fades locais não sin
 - Corrigido CSS que colocava o `OUT` no lado esquerdo, impedindo conexões `Áudio → Áudio`.
 - O runtime resolve cadeias de áudio conectadas até a Scene de destino.
 - Validação estática aprovada; validação runtime no Foundry permanece pendente.
+
+## [0.0.21] - 2026-09-21 — interação do grafo
+
+- Removidas as setas visuais das conexões; a direção continua definida por `OUT → IN`.
+- Liberado o pointer capture ao finalizar uma conexão, evitando travar o canvas após o arraste.

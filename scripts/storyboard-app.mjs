@@ -877,11 +877,9 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const svg = root.querySelector(".lf-edges");
     const graph = LumennGraphStore.getGraph(this.#graphId);
     if (!svg) return;
-    svg.innerHTML = `<defs>
-      <marker id="lf-arrow-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--lf-amber)" />
-      </marker>
-    </defs>`;
+    // As conexões são direcionais pelo sentido dos ports; não desenhar setas
+    // sobre o canvas, pois elas poluem o grafo e sugerem um estado travado.
+    svg.innerHTML = "";
     for (const e of graph?.edges ?? []) {
       const from = LumennGraphStore.getNode(this.#graphId, e.from);
       const to = LumennGraphStore.getNode(this.#graphId, e.to);
@@ -934,7 +932,6 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             : "var(--lf-muted)";
         path.setAttribute("stroke-width", selected ? 4 : 3);
         path.setAttribute("opacity", selected ? 1 : 0.8);
-        path.setAttribute("marker-end", "url(#lf-arrow-flow)");
       } else {
         path.style.stroke = selected ? "#ffffff" : "var(--lf-teal)";
         path.setAttribute("stroke-width", selected ? 2.5 : 1.5);
@@ -1097,6 +1094,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   #finishConnect(ev) {
+    const viewport = this.element.querySelector(".lf-viewport");
+    if (viewport?.hasPointerCapture?.(ev.pointerId)) {
+      viewport.releasePointerCapture(ev.pointerId);
+    }
     const state = this.#connectState;
     this.#connectState = null;
     this.#updateGhost();

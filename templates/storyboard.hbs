@@ -67,8 +67,8 @@
           </div>
           <div class="lf-ports">
             {{#if (lumenn-eq this.type 'scene')}}
-            <span class="lf-port lf-port-in" data-port="flow-in" data-node="{{this.id}}" title="FLOW IN"></span>
-            <span class="lf-port lf-port-out" data-port="flow-out" data-node="{{this.id}}" title="FLOW OUT"></span>
+            <span class="lf-port lf-port-in lf-port-flow-in" data-port="flow-in" data-node="{{this.id}}" title="FLOW IN"></span>
+            <span class="lf-port lf-port-out lf-port-flow-out" data-port="flow-out" data-node="{{this.id}}" title="FLOW OUT"></span>
             <span class="lf-port lf-port-audio" data-port="audio-in" data-node="{{this.id}}" title="AUDIO IN"></span>
             {{/if}}
             {{#if (lumenn-eq this.type 'audio')}}
@@ -81,6 +81,12 @@
       </div>
       {{#if showConnectHint}}
       <div class="lf-connect-hint">{{connectHint}}</div>
+      {{/if}}
+      {{#if editable}}
+      <div class="lf-audio-legend" aria-label="Legenda de áudio">
+        <span class="lf-audio-key lf-audio-key-left"><i></i>L / IN</span>
+        <span class="lf-audio-key lf-audio-key-right"><i></i>R / OUT</span>
+      </div>
       {{/if}}
       {{#if transitioning}}
       <div class="lf-transitioning"><span class="lf-transitioning-dot"></span>{{label.transition}}</div>
@@ -254,6 +260,28 @@
         {{else}}
         <h3 class="lf-insp-title">{{label.audioEdge}}</h3>
         <p class="lf-insp-p">{{label.from}}: {{inspector.fromLabel}} &rarr; {{label.to}}: {{inspector.toLabel}}</p>
+        <p class="lf-insp-p lf-audio-routing-note">{{label.audioRoutingNote}}</p>
+        <label class="lf-insp-label">{{label.audioTrans}}</label>
+        <select data-insp="transition.audio.mode">
+          <option value="auto" {{#if (lumenn-eq inspector.audioTransition.mode 'auto')}}selected{{/if}}>{{label.auto}}</option>
+          <option value="keep" {{#if (lumenn-eq inspector.audioTransition.mode 'keep')}}selected{{/if}}>{{label.keep}}</option>
+          <option value="cut" {{#if (lumenn-eq inspector.audioTransition.mode 'cut')}}selected{{/if}}>{{label.cut}}</option>
+          <option value="crossfade" {{#if (lumenn-eq inspector.audioTransition.mode 'crossfade')}}selected{{/if}}>{{label.crossfade}}</option>
+          <option value="fadeout" {{#if (lumenn-eq inspector.audioTransition.mode 'fadeout')}}selected{{/if}}>{{label.fadeout}}</option>
+          <option value="fadein" {{#if (lumenn-eq inspector.audioTransition.mode 'fadein')}}selected{{/if}}>{{label.fadein}}</option>
+        </select>
+        <label class="lf-insp-label">{{label.crossfadeDur}} (ms)</label>
+        <input type="number" min="0" max="10000" step="50" data-insp="transition.audio.crossfadeDuration" value="{{inspector.audioTransition.crossfadeDuration}}">
+        <label class="lf-insp-label">{{label.fadeIn}} (ms)</label>
+        <input type="number" min="0" max="10000" step="50" data-insp="transition.audio.fadeInDuration" value="{{inspector.audioTransition.fadeInDuration}}">
+        <label class="lf-insp-label">{{label.fadeOut}} (ms)</label>
+        <input type="number" min="0" max="10000" step="50" data-insp="transition.audio.fadeOutDuration" value="{{inspector.audioTransition.fadeOutDuration}}">
+        <label class="lf-insp-label">{{label.curve}}</label>
+        <select data-insp="transition.audio.curve">
+          {{#each inspector.curveOptions}}
+          <option value="{{this}}" {{#if (lumenn-eq this ../inspector.audioTransition.curve)}}selected{{/if}}>{{this}}</option>
+          {{/each}}
+        </select>
         {{#if editable}}
         <div class="lf-insp-actions"><button class="danger" data-insp-action="delete-edge">{{label.delete}}</button></div>
         {{/if}}

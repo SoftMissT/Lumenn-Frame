@@ -54,6 +54,7 @@
   "LUMENN_FRAME.Inspector.Note": "Note",
   "LUMENN_FRAME.Inspector.FlowEdge": "Flow Edge",
   "LUMENN_FRAME.Inspector.AudioEdge": "Audio Attachment",
+  "LUMENN_FRAME.Inspector.AudioRoutingNote": "Adjust this association's crossfade here. The FLOW entering the scene applies these values.",
   "LUMENN_FRAME.Inspector.Color": "Color",
   "LUMENN_FRAME.Inspector.Size": "Size",
   "LUMENN_FRAME.Inspector.Notes": "Notes",

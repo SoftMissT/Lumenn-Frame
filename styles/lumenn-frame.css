@@ -305,6 +305,7 @@
 }
 .lf-edge-flow { stroke-linecap: round; }
 .lf-edge-audio { stroke-linecap: round; stroke-width: 2.5px; }
+.lf-edge-audio-left { stroke: #ffffff; }
 .lf-edge:hover {
   stroke-width: 4px;
   filter: brightness(1.45);
@@ -332,6 +333,28 @@
   pointer-events: none;
   animation: lf-fadeIn .18s ease;
 }
+
+.lf-audio-legend {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  display: flex;
+  gap: 9px;
+  padding: 4px 7px;
+  border: 1px solid #ffffff18;
+  border-radius: 4px;
+  background: #101014dd;
+  color: var(--lf-muted);
+  font-size: 9px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  pointer-events: none;
+  z-index: 8;
+}
+.lf-audio-key { display: inline-flex; align-items: center; gap: 4px; }
+.lf-audio-key i { width: 15px; height: 2px; display: inline-block; border-radius: 2px; }
+.lf-audio-key-left i { background: #fff; }
+.lf-audio-key-right i { background: #ef4444; }
 
 /* ── Nodes ─────────────────────────────────────────────────────────── */
 .lf-node {
@@ -510,7 +533,7 @@
 .lf-port::after {
   content: "";
   position: absolute;
-  inset: -5px;
+  inset: -9px;
   border-radius: 50%;
 }
 /* Em modo Edição os ports ficam sempre visíveis; FLOW âmbar, AUDIO teal. */
@@ -532,11 +555,38 @@
   color: var(--lf-amber);
 }
 
+.lf-port-flow-in {
+  border-color: #f0a321;
+  color: #f0a321;
+}
+.lf-port-flow-out {
+  border-color: #ffd166;
+  color: #ffd166;
+}
+
 .lf-port-audio {
-  border-color: var(--lf-teal);
-  color: var(--lf-teal);
+  border-color: #ffffff;
+  color: #ffffff;
   width: 12px;
   height: 12px;
+}
+
+.lf-node-audio .lf-port-in,
+.lf-node-scene .lf-port-audio {
+  border-color: #ffffff;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px #ffffff20;
+}
+
+.lf-node-audio .lf-port-out {
+  border-color: #ef4444;
+  color: #ef4444;
+  box-shadow: 0 0 0 2px #ef444420;
+}
+
+.lf-port-audio:hover,
+.lf-node-audio .lf-port-audio:hover {
+  box-shadow: 0 0 0 4px currentColor, 0 0 12px currentColor;
 }
 
 .lf-port-in {
@@ -628,7 +678,7 @@
 
 /* ── Inspector ─────────────────────────────────────────────────────── */
 .lf-inspector {
-  flex: 0 0 320px;
+  flex: 0 0 280px;
   min-width: 0;
   padding: 10px;
   overflow-y: auto;
@@ -682,13 +732,13 @@
 .lf-inspector input[type="number"],
 .lf-inspector textarea {
   width: 100%;
-  padding: 5px 8px;
+  padding: 4px 7px;
   border: 1px solid var(--lf-badge-border);
   border-radius: var(--lf-radius);
   background: var(--lf-badge);
   color: var(--lf-text);
   font-family: var(--lf-font-body);
-  font-size: 12px;
+  font-size: 11px;
   box-sizing: border-box;
 }
 
@@ -709,6 +759,12 @@
   color: var(--lf-text);
   opacity: .85;
   line-height: 1.4;
+}
+
+.lf-audio-routing-note {
+  border-left: 2px solid #ef4444;
+  padding-left: 7px;
+  color: #f3f4f6;
 }
 
 .lf-insp-edges {

@@ -424,3 +424,10 @@ Transições via documento em vez de `Sound#fade()` direto fades locais não sin
 
 - Removidas as setas visuais das conexões; a direção continua definida por `OUT → IN`.
 - Liberado o pointer capture ao finalizar uma conexão, evitando travar o canvas após o arraste.
+
+## [0.0.22] - 2026-09-21 — transições completas e conectividade
+
+- Linhas de áudio agora mostram os canais esquerdo (branco) e direito (vermelho), com `AUDIO IN` branco e `AUDIO OUT` vermelho.
+- Conexões podem encaixar no corpo/lado compatível do nó, sem exigir precisão no círculo da porta.
+- Transições de áudio ficaram editáveis também na associação de áudio; durações são limitadas a 10 segundos.
+- Seleção/arraste de nós reforçados e linhas mantêm espessura/contraste em zoom baixo.

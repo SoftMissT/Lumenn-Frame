@@ -481,6 +481,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         note: L("LUMENN_FRAME.Inspector.Note"),
         flowEdge: L("LUMENN_FRAME.Inspector.FlowEdge"),
         audioEdge: L("LUMENN_FRAME.Inspector.AudioEdge"),
+        audioRoutingNote: L("LUMENN_FRAME.Inspector.AudioRoutingNote"),
         none: L("LUMENN_FRAME.Config.None"),
         save: L("LUMENN_FRAME.Config.Save"),
         delete: L("LUMENN_FRAME.Beat.Delete"),
@@ -651,6 +652,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       if (this.#tool === "hand") return;
       e.preventDefault();
       this.#suppressClick = true;
+      this.#selected = { kind: "node", id: node.dataset.id };
       node.setPointerCapture(e.pointerId);
       const viewport = root.querySelector(".lf-viewport");
       const beat = LumennGraphStore.getNode(this.#graphId, node.dataset.id);
@@ -664,9 +666,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#drawEdges(root);
       };
       const up = async (ev) => {
-        node.releasePointerCapture(ev.pointerId);
+        if (node.hasPointerCapture?.(ev.pointerId))
+          node.releasePointerCapture(ev.pointerId);
         node.removeEventListener("pointermove", move);
         node.removeEventListener("pointerup", up);
+        node.removeEventListener("pointercancel", up);
         const w = this.#screenToWorld(this.#clientToScreen(ev, viewport));
         await LumennGraphStore.updateNode(this.#graphId, node.dataset.id, {
           position: {
@@ -679,6 +683,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       };
       node.addEventListener("pointermove", move);
       node.addEventListener("pointerup", up, { once: true });
+      node.addEventListener("pointercancel", up, { once: true });
     });
   }
 
@@ -925,18 +930,44 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const selected =
         this.#selected.kind === "edge" && this.#selected.id === e.id;
       if (e.type === "flow") {
-        path.style.stroke = selected
-          ? "#ffffff"
-          : from.id === graph.activeNodeId
-            ? "var(--lf-amber)"
-            : "var(--lf-muted)";
+        if (selected) path.style.stroke = "#ffffff";
+        else {
+          const gradient = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "linearGradient",
+          );
+          const gradientId = `lf-flow-${e.id}`;
+          gradient.setAttribute("id", gradientId);
+          gradient.setAttribute("x1", "0%");
+          gradient.setAttribute("x2", "100%");
+          gradient.setAttribute("y1", "0%");
+          gradient.setAttribute("y2", "0%");
+          const start = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+          start.setAttribute("offset", "0%");
+          start.setAttribute("stop-color", from.id === graph.activeNodeId ? "#ffd166" : "#f0a321");
+          const end = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+          end.setAttribute("offset", "100%");
+          end.setAttribute("stop-color", "#8b6a28");
+          gradient.append(start, end);
+          const defs = svg.querySelector("defs") ?? document.createElementNS("http://www.w3.org/2000/svg", "defs");
+          if (!defs.parentNode) svg.prepend(defs);
+          defs.appendChild(gradient);
+          path.style.stroke = `url(#${gradientId})`;
+        }
         path.setAttribute("stroke-width", selected ? 4 : 3);
         path.setAttribute("opacity", selected ? 1 : 0.8);
       } else {
-        path.style.stroke = selected ? "#ffffff" : "var(--lf-teal)";
-        path.setAttribute("stroke-width", selected ? 2.5 : 1.5);
-        path.setAttribute("stroke-dasharray", "6 4");
-        path.setAttribute("opacity", selected ? 1 : 0.7);
+        // Cabo estéreo: vermelho = canal direito/saída, branco = canal
+        // esquerdo/entrada. As duas linhas ficam paralelas e legíveis em zoom.
+        path.style.stroke = selected ? "#ff7b7b" : "#ef4444";
+        path.setAttribute("stroke-width", selected ? 3.2 : 2.4);
+        path.setAttribute("opacity", selected ? 1 : 0.9);
+        path.setAttribute("transform", `translate(${nx * 2.5} ${ny * 2.5})`);
+        const left = path.cloneNode(true);
+        left.classList.add("lf-edge-audio-left");
+        left.style.stroke = "#ffffff";
+        left.setAttribute("transform", `translate(${-nx * 2.5} ${-ny * 2.5})`);
+        svg.appendChild(left);
       }
       svg.appendChild(path);
 
@@ -1068,18 +1099,18 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const up = (ev) => {
       viewport.removeEventListener("pointermove", move);
       viewport.removeEventListener("pointerup", up);
+      viewport.removeEventListener("pointercancel", up);
       this.#finishConnect(ev);
     };
     viewport.addEventListener("pointermove", move);
     viewport.addEventListener("pointerup", up, { once: true });
+    viewport.addEventListener("pointercancel", up, { once: true });
   }
 
   #highlightTarget(ev) {
-    const el = document
-      .elementFromPoint(ev.clientX, ev.clientY)
-      ?.closest?.("[data-port]");
-    const nodeId = el?.dataset?.node ?? null;
-    const port = el?.dataset?.port ?? null;
+    const target = this.#findConnectTarget(ev.clientX, ev.clientY);
+    const nodeId = target?.nodeId ?? null;
+    const port = target?.port ?? null;
     if (this.#connectState.targetNodeId === nodeId) return;
     this.#connectState.targetNodeId = nodeId;
     this.#connectState.targetPort = port;
@@ -1091,6 +1122,43 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       root
         .querySelector(`.lf-node[data-id="${nodeId}"]`)
         ?.classList.add("target-hi");
+  }
+
+  #findConnectTarget(clientX, clientY, connectState = this.#connectState) {
+    const state = connectState;
+    if (!state) return null;
+    const expected = state.port === "flow-out" ? "flow-in" : "audio-in";
+    const direct = document
+      .elementFromPoint(clientX, clientY)
+      ?.closest?.(`[data-port="${expected}"]`);
+    if (direct?.dataset?.node && direct.dataset.node !== state.nodeId)
+      return { nodeId: direct.dataset.node, port: expected };
+
+    // A porta visual continua pequena, mas o lado compatível inteiro do nó é
+    // uma área de encaixe. Isso evita exigir precisão de pixel no zoom baixo.
+    const node = document
+      .elementFromPoint(clientX, clientY)
+      ?.closest?.(".lf-node");
+    if (node?.dataset?.id && node.dataset.id !== state.nodeId) {
+      const port = node.querySelector(`[data-port="${expected}"]`);
+      if (port) return { nodeId: node.dataset.id, port: expected };
+    }
+
+    let best = null;
+    let bestDistance = Infinity;
+    this.element.querySelectorAll(`[data-port="${expected}"]`).forEach((candidate) => {
+      if (candidate.dataset.node === state.nodeId) return;
+      const r = candidate.getBoundingClientRect();
+      const pad = 30;
+      const dx = Math.max(r.left - clientX, 0, clientX - r.right);
+      const dy = Math.max(r.top - clientY, 0, clientY - r.bottom);
+      const distance = Math.hypot(dx, dy);
+      if (distance <= pad && distance < bestDistance) {
+        best = { nodeId: candidate.dataset.node, port: expected };
+        bestDistance = distance;
+      }
+    });
+    return best;
   }
 
   #finishConnect(ev) {
@@ -1106,11 +1174,9 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       .forEach((n) => n.classList.remove("target-hi"));
     if (!state) return;
     // Usa o alvo rastreado durante o move; fallback elementFromPoint.
-    const hitEl = document
-      .elementFromPoint(ev.clientX, ev.clientY)
-      ?.closest?.("[data-port]");
-    const toNodeId = state.targetNodeId ?? hitEl?.dataset?.node ?? null;
-    const toPort = state.targetPort ?? hitEl?.dataset?.port ?? null;
+    const hit = this.#findConnectTarget(ev.clientX, ev.clientY, state);
+    const toNodeId = state.targetNodeId ?? hit?.nodeId ?? null;
+    const toPort = state.targetPort ?? hit?.port ?? null;
     if (!toNodeId || toNodeId === state.nodeId) return;
     const valid =
       (state.port === "flow-out" && toPort === "flow-in") ||
@@ -1185,7 +1251,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       typeof val === "string" &&
       /Duration|volume|fadeIn|fadeOut|duration/.test(path)
     )
-      val = Number(val) || null;
+      val = Number.isFinite(Number(val)) ? Number(val) : null;
+    if (typeof val === "number" && /Duration|duration|fadeIn|fadeOut/.test(path))
+      val = Math.max(0, Math.min(10000, val));
+    if (typeof val === "number" && path.endsWith("volume"))
+      val = Math.max(0, Math.min(1, val));
     const kind = this.#selected.kind;
     const id = this.#selected.id;
     if (!path || !kind || !id) return;
@@ -1365,6 +1435,24 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     return sources;
   }
 
+  #audioTransitionFor(graph, flowEdge) {
+    const base = {
+      mode: "auto",
+      crossfadeDuration: LumennGraphStore.getDefaultCrossfadeDuration(),
+      fadeInDuration: 0,
+      fadeOutDuration: 0,
+      curve: "linear",
+      ...(flowEdge.transition?.audio ?? {}),
+    };
+    // Uma associação AUDIO pode configurar o crossfade diretamente. O valor
+    // do FLOW continua sendo o fallback para preservar grafos antigos.
+    for (const audioEdge of graph?.edges ?? []) {
+      if (audioEdge.type !== "audio" || audioEdge.to !== flowEdge.to) continue;
+      Object.assign(base, audioEdge.transition?.audio ?? {});
+    }
+    return base;
+  }
+
   async #navigateTo(id) {
     if (this.#transitioning) return;
     const graph = LumennGraphStore.getGraph(this.#graphId);
@@ -1388,10 +1476,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         ? edge.transition.scope
         : "both";
       const sceneTrans = edge.transition?.scene ?? { type: "cut", duration: 0 };
-      const audioTrans = edge.transition?.audio ?? {
-        mode: "auto",
-        crossfadeDuration: LumennGraphStore.getDefaultCrossfadeDuration(),
-      };
+      const audioTrans = this.#audioTransitionFor(graph, edge);
       const targetNode = graph.nodes.find((n) => n.id === id);
       const scene = targetNode?.data?.sceneId
         ? game.scenes.get(targetNode.data.sceneId)
@@ -1512,6 +1597,13 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
           kind: "edge",
           edge,
           edgeType: edge.type,
+          audioTransition: edge.transition?.audio ?? {
+            mode: "auto",
+            crossfadeDuration: LumennGraphStore.getDefaultCrossfadeDuration(),
+            fadeInDuration: 0,
+            fadeOutDuration: 0,
+            curve: "linear",
+          },
           transitionScope: ["audio", "scene", "both"].includes(edge.transition?.scope)
             ? edge.transition.scope
             : "both",

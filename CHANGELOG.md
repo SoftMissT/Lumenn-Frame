@@ -403,3 +403,12 @@ Transições via documento em vez de `Sound#fade()` direto fades locais não sin
 
 - [ ] Rodar `macros/test-audio-engine.mjs` em mundo real (v14.367 e, se possível, 13.350+).
 - [ ] CT-001..CT-008 manuais conforme Specs §5.
+
+## [0.0.19] — escopo de transição e correção do grafo
+
+- FLOW edges agora distinguem `audio`, `scene` e `both` (Beat).
+- AUDIO edges podem associar múltiplas fontes à mesma Scene; crossfade continua sendo resolvido em lote pelo motor.
+- Conectores SVG receberam curvas recíprocas, espessura não escalável, seta nativa e área de seleção ampla.
+- HUD e nós foram ampliados; caracteres emoji foram removidos da interface/documentação.
+- Escopo `audio` não ativa Scene; troca de Scene só ocorre em `scene`/`both`.
+- Validação estática aprovada; QA Foundry ainda pendente para diferenciar redraw de Canvas e reload de página.

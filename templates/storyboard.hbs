@@ -199,6 +199,12 @@
         {{#if (lumenn-eq inspector.edgeType 'flow')}}
         <h3 class="lf-insp-title">{{label.flowEdge}} <span class="lf-insp-native">{{#if inspector.hasNativeTransitions}}{{label.v14Native}}{{else}}{{label.fallbackMode}}{{/if}}</span></h3>
         <p class="lf-insp-p">{{label.from}}: {{inspector.fromLabel}} &rarr; {{label.to}}: {{inspector.toLabel}}</p>
+        <label class="lf-insp-label">{{label.transitionScope}}</label>
+        <select data-insp="transition.scope">
+          <option value="audio" {{#if (lumenn-eq inspector.transitionScope 'audio')}}selected{{/if}}>{{label.audioOnly}}</option>
+          <option value="scene" {{#if (lumenn-eq inspector.transitionScope 'scene')}}selected{{/if}}>{{label.sceneOnly}}</option>
+          <option value="both" {{#if (lumenn-eq inspector.transitionScope 'both')}}selected{{/if}}>{{label.beatBoth}}</option>
+        </select>
         <label class="lf-insp-label">{{label.sceneTrans}}</label>
         <select data-insp="transition.scene.type">
           <option value="cut" {{#if (lumenn-eq inspector.edge.transition.scene.type 'cut')}}selected{{/if}}>{{label.cut}}</option>

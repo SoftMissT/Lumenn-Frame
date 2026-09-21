@@ -65,7 +65,8 @@ Hooks.once("ready", () => {
     if (!payload?.type) return;
     if (LumennCompat.isGM()) return; // GM já executou localmente
     if (payload.type === "transition:start") {
-      if (LumennSettings.get("playerSceneFade")) {
+      const scope = payload.scope ?? "both";
+      if ((scope === "scene" || scope === "both") && LumennSettings.get("playerSceneFade")) {
         lumennClientSceneFade(payload.sceneId ?? null, payload.sceneTrans ?? {});
       }
     }

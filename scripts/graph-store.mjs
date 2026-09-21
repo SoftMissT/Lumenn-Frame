@@ -167,6 +167,7 @@ static getAll() {
 if (edge.type === "flow" && !edge.transition) {
       const t = LumennSettings.getTransitionDefaults();
       edge.transition = {
+        scope: "both",
         scene: { type: t.sceneType, duration: t.sceneDuration, color: t.dipColor },
         audio: {
           mode: t.audioMode,
@@ -319,6 +320,7 @@ if (edge.type === "flow" && !edge.transition) {
               from: beat.id,
               to: targetId,
               transition: {
+                scope: "both",
                 scene: { type: "cut", duration: 0 },
                 audio: {
                   mode: "auto",

@@ -30,14 +30,15 @@ A spatial node editor (interaction model inspired by Obsidian Canvas and DaVinci
 - Fit All / 100% reset
 
 ### Nodes
-- Scene Nodes (`🎬` Foundry Scene, with thumbnail)
-- Audio Nodes (`♫` Playlist / PlaylistSound, distinct look)
-- Note Nodes (`📝` GM annotation — not navigable)
+- Scene Nodes (Foundry Scene, with thumbnail)
+- Audio Nodes (Playlist / PlaylistSound, distinct look)
+- Note Nodes (GM annotation — not navigable)
 - Per-node colors
 - Per-node sizes (`compact` / `normal` / `large`)
 
 ### Graph
 - Directional FLOW edges (`Scene → Scene`)
+- Cada FLOW pode executar somente Áudio, somente Cena ou o Beat completo (Cena + Áudio)
 - AUDIO attachment edges (dashed, non-navigable)
 - Reciprocal `A→B` / `B→A` as independent edges (offset curves)
 - Selectable edges (thick invisible hit target)
@@ -69,9 +70,9 @@ A spatial node editor (interaction model inspired by Obsidian Canvas and DaVinci
 
 | Node | Source | Navigation |
 | :-- | :-- | :-- |
-| 🎬 Scene Node | Foundry Scene | Yes (FLOW) |
-| ♫ Audio Node | Playlist / PlaylistSound | No — attaches sound to a Scene via AUDIO edge |
-| 📝 Note Node | GM annotation | No |
+| Scene Node | Foundry Scene | Yes (FLOW) |
+| Audio Node | Playlist / PlaylistSound | No — attaches sound to a Scene via AUDIO edge |
+| Note Node | GM annotation | No |
 
 Legacy Beat schema is migrated into **Graph Schema v2** automatically (with backup).
 

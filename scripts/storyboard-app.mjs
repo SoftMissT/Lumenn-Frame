@@ -11,9 +11,9 @@ const MAX_ZOOM = 2.0;
 const ZOOM_STEP = 1.25;
 
 const NODE_SIZES = {
-  scene: { compact: [200, 140], normal: [260, 175], large: [340, 220] },
-  audio: { compact: [180, 110], normal: [230, 135], large: [300, 170] },
-  note: { compact: [170, 110], normal: [210, 140], large: [280, 180] },
+  scene: { compact: [230, 160], normal: [320, 215], large: [400, 260] },
+  audio: { compact: [210, 130], normal: [285, 165], large: [360, 205] },
+  note: { compact: [200, 130], normal: [260, 170], large: [340, 220] },
 };
 
 const COLORS = [
@@ -88,7 +88,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     classes: ["lumenn-frame", "graph-editor", "app", "window-app"],
     title: "Lumenn Frame",
     tag: "div",
-    position: { width: 1280, height: 820 },
+    position: { width: 1440, height: 900 },
     window: { resizable: true },
     dragDrop: [{ dropSelector: ".lf-viewport" }],
   };
@@ -525,6 +525,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         noScenes: L("LUMENN_FRAME.Inspector.NoScenes"),
         noAudioNodes: L("LUMENN_FRAME.Inspector.NoAudioNodes"),
         editTransition: L("LUMENN_FRAME.Edge.EditTransition"),
+        transitionScope: L("LUMENN_FRAME.Inspector.TransitionScope"),
+        audioOnly: L("LUMENN_FRAME.Inspector.AudioOnly"),
+        sceneOnly: L("LUMENN_FRAME.Inspector.SceneOnly"),
+        beatBoth: L("LUMENN_FRAME.Inspector.BeatBoth"),
       },
     };
   }
@@ -849,8 +853,8 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       maxY = viewport.clientHeight;
     for (const n of graph?.nodes ?? []) {
       const [w, h] = nodeSize(n.type, n.size);
-      maxX = Math.max(maxX, n.position.x + w + 80);
-      maxY = Math.max(maxY, n.position.y + h + 80);
+      maxX = Math.max(maxX, n.position.x + w + 400);
+      maxY = Math.max(maxY, n.position.y + h + 400);
     }
     world.style.width = `${maxX}px`;
     world.style.height = `${maxY}px`;
@@ -873,7 +877,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const svg = root.querySelector(".lf-edges");
     const graph = LumennGraphStore.getGraph(this.#graphId);
     if (!svg) return;
-    svg.innerHTML = "";
+    svg.innerHTML = `<defs>
+      <marker id="lf-arrow-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--lf-amber)" />
+      </marker>
+    </defs>`;
     for (const e of graph?.edges ?? []) {
       const from = LumennGraphStore.getNode(this.#graphId, e.from);
       const to = LumennGraphStore.getNode(this.#graphId, e.to);
@@ -891,9 +899,21 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         graph.edges.some(
           (x) => x.type === "flow" && x.from === e.to && x.to === e.from,
         );
-      const bend = e.type === "flow" ? (e.from < e.to ? 36 : -36) : 18;
-      const midX = (a.x + b.x) / 2;
-      const d = `M ${a.x} ${a.y} C ${midX} ${a.y + bend}, ${midX} ${b.y + bend}, ${b.x} ${b.y}`;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const length = Math.max(1, Math.hypot(dx, dy));
+      const nx = -dy / length;
+      const ny = dx / length;
+      const bend = e.type === "flow" && hasReverse
+        ? (e.from < e.to ? 54 : -54)
+        : e.type === "audio" ? 18 : 0;
+      const c1x = a.x + dx * 0.33 + nx * bend;
+      const c1y = a.y + dy * 0.33 + ny * bend;
+      const c2x = a.x + dx * 0.66 + nx * bend;
+      const c2y = a.y + dy * 0.66 + ny * bend;
+      const midX = (a.x + b.x) / 2 + nx * bend;
+      const midY = (a.y + b.y) / 2 + ny * bend;
+      const d = `M ${a.x} ${a.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${b.x} ${b.y}`;
 
       const path = document.createElementNS(
         "http://www.w3.org/2000/svg",
@@ -901,8 +921,9 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       );
       path.setAttribute("d", d);
       path.setAttribute("fill", "none");
-      path.setAttribute("class", "lf-edge");
+      path.setAttribute("class", `lf-edge lf-edge-${e.type}`);
       path.setAttribute("data-edge-id", e.id);
+      path.setAttribute("vector-effect", "non-scaling-stroke");
       const selected =
         this.#selected.kind === "edge" && this.#selected.id === e.id;
       if (e.type === "flow") {
@@ -911,26 +932,9 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
           : from.id === graph.activeNodeId
             ? "var(--lf-amber)"
             : "var(--lf-muted)";
-        path.setAttribute("stroke-width", selected ? 3 : 2);
+        path.setAttribute("stroke-width", selected ? 4 : 3);
         path.setAttribute("opacity", selected ? 1 : 0.8);
-        const angle = Math.atan2(b.y - a.y, b.x - a.x);
-        const ax = b.x - 8 * Math.cos(angle),
-          ay = b.y - 8 * Math.sin(angle);
-        const arrow = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "polygon",
-        );
-        arrow.setAttribute(
-          "points",
-          `${b.x},${b.y} ${ax - 5 * Math.cos(angle - Math.PI / 6)},${ay - 5 * Math.sin(angle - Math.PI / 6)} ${ax - 5 * Math.cos(angle + Math.PI / 6)},${ay - 5 * Math.sin(angle + Math.PI / 6)}`,
-        );
-        arrow.style.fill = selected
-          ? "#ffffff"
-          : from.id === graph.activeNodeId
-            ? "var(--lf-amber)"
-            : "var(--lf-muted)";
-        arrow.setAttribute("opacity", selected ? 1 : 0.8);
-        svg.appendChild(arrow);
+        path.setAttribute("marker-end", "url(#lf-arrow-flow)");
       } else {
         path.style.stroke = selected ? "#ffffff" : "var(--lf-teal)";
         path.setAttribute("stroke-width", selected ? 2.5 : 1.5);
@@ -944,7 +948,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const label = this.#edgeLabelText(e);
         if (label) {
           const lx = midX;
-          const ly = (a.y + b.y) / 2 + bend - 4;
+          const ly = midY - 6;
           const text = document.createElementNS(
             "http://www.w3.org/2000/svg",
             "text",
@@ -975,6 +979,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       hit.setAttribute("stroke-width", "16");
       hit.setAttribute("class", "lf-edge-hit");
       hit.setAttribute("data-edge-id", e.id);
+      hit.setAttribute("vector-effect", "non-scaling-stroke");
       hit.setAttribute(
         "title",
         `${this.#nodeLabel(from)} → ${this.#nodeLabel(to)} — ${game.i18n.localize("LUMENN_FRAME.Edge.EditTransition")}`,
@@ -1017,7 +1022,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if (ghost) ghost.setAttribute("d", this.#ghostPath());
   }
 
-  /** Texto do label central da FLOW edge: "Fade 1.0s · ♫ Auto 3.0s". */
+  /** Texto do label central da FLOW edge: "Fade 1.0s · Auto 3.0s". */
   #edgeLabelText(e) {
     const t = e.transition;
     if (!t) return null;
@@ -1032,7 +1037,12 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       fadein: "LUMENN_FRAME.Edge.FadeIn",
       cut: "LUMENN_FRAME.Edge.Cut",
     }[t.audio?.mode ?? "auto"];
-    return `${sceneLbl} ${sec(t.scene?.duration)} · ${L(modeKey)} ${sec(t.audio?.crossfadeDuration)}`;
+    const scopeKey = {
+      audio: "LUMENN_FRAME.Inspector.AudioOnly",
+      scene: "LUMENN_FRAME.Inspector.SceneOnly",
+      both: "LUMENN_FRAME.Inspector.BeatBoth",
+    }[t.scope ?? "both"];
+    return `${L(scopeKey)} · ${sceneLbl} ${sec(t.scene?.duration)} · ${L(modeKey)} ${sec(t.audio?.crossfadeDuration)}`;
   }
 
   /* ── Connect (port → port) ──────────────────────────────────────── */
@@ -1111,20 +1121,6 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       from: state.nodeId,
       to: toNodeId,
     };
-    // MVP: uma fonte musical principal por Scene — rejeita a 2ª AUDIO edge.
-    if (edge.type === "audio") {
-      const graph = LumennGraphStore.getGraph(this.#graphId);
-      const already = (graph?.edges ?? []).some(
-        (e) => e.type === "audio" && e.to === toNodeId,
-      );
-      if (already) {
-        ui.notifications.warn(
-          game.i18n.localize("LUMENN_FRAME.WarnSingleAudioAttachment"),
-        );
-        this.render();
-        return;
-      }
-    }
     LumennGraphStore.addEdge(this.#graphId, edge).then((created) => {
       if (created) {
         // Auto-seleciona a edge nova → Inspector da transição abre imediatamente.
@@ -1265,16 +1261,6 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     } else if (action === "attach-audio") {
       const audioId = root.querySelector('[data-insp-pick="audioAttach"]')?.value;
       if (audioId && this.#selected.kind === "node") {
-        const graph = LumennGraphStore.getGraph(this.#graphId);
-        const already = (graph?.edges ?? []).some(
-          (e) => e.type === "audio" && e.to === this.#selected.id,
-        );
-        if (already) {
-          ui.notifications.warn(
-            game.i18n.localize("LUMENN_FRAME.WarnSingleAudioAttachment"),
-          );
-          return;
-        }
         const edge = { id: `edge_${foundry.utils.randomID(16)}`, type: "audio", from: audioId, to: this.#selected.id };
         LumennGraphStore.addEdge(this.#graphId, edge).then((created) => {
           if (created) { this.#selected = { kind: "edge", id: created.id }; this.render(); }
@@ -1287,13 +1273,18 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const scene = target?.data?.sceneId
         ? game.scenes.get(target.data.sceneId)
         : null;
+      const scope = ["audio", "scene", "both"].includes(edge.transition?.scope)
+        ? edge.transition.scope
+        : "both";
       const sceneTrans = edge.transition?.scene ?? { type: "cut", duration: 0 };
-      LumennCompat.runSceneTransition({
-        scene,
-        type: sceneTrans.type ?? "cut",
-        duration: sceneTrans.duration ?? 1000,
-        color: sceneTrans.color ?? "#000000",
-      });
+      if ((scope === "scene" || scope === "both") && scene) {
+        LumennCompat.runSceneTransition({
+          scene,
+          type: sceneTrans.type ?? "cut",
+          duration: sceneTrans.duration ?? 1000,
+          color: sceneTrans.color ?? "#000000",
+        });
+      }
     } else if (action === "add-return") {
       LumennGraphStore.addReturn(this.#graphId, this.#selected.id).then(() =>
         this.render(),
@@ -1383,6 +1374,9 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this.#transitioning = true;
     await this.render();
     try {
+      const scope = ["audio", "scene", "both"].includes(edge.transition?.scope)
+        ? edge.transition.scope
+        : "both";
       const sceneTrans = edge.transition?.scene ?? { type: "cut", duration: 0 };
       const audioTrans = edge.transition?.audio ?? {
         mode: "auto",
@@ -1399,28 +1393,36 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         sceneId: scene?.id ?? null,
         sceneTrans,
         audioTrans,
+        scope,
       });
-      // Scene transition: V14 nativa quando disponível; fallback Lumenn fade/dip.
-      const scResult = await LumennCompat.runSceneTransition({
-        scene,
-        type: sceneTrans.type ?? "cut",
-        duration: sceneTrans.duration ?? 1000,
-        color: sceneTrans.color ?? "#000000",
-      });
-      if (scResult === "fallback") {
-        await lumennClientSceneFade(scene?.id ?? null, sceneTrans);
+      if (scope === "scene" || scope === "both") {
+        // Scene transition: V14 nativa quando disponível; fallback Lumenn fade/dip.
+        const sameScene = scene?.id && canvas.scene?.id === scene.id;
+        if (!sameScene && scene) {
+          const scResult = await LumennCompat.runSceneTransition({
+            scene,
+            type: sceneTrans.type ?? "cut",
+            duration: sceneTrans.duration ?? 1000,
+            color: sceneTrans.color ?? "#000000",
+          });
+          if (scResult === "fallback") {
+            await lumennClientSceneFade(scene.id, sceneTrans);
+          }
+        }
       }
-      const result = await this.#controller.goToAudio(
-        currentSources,
-        targetSources,
-        audioTrans,
-        LumennGraphStore.getDefaultCrossfadeDuration(),
-        audioTrans?.curve ?? "linear",
-      );
-      if (result === "invalid-source")
-        ui.notifications.warn(
-          game.i18n.localize("LUMENN_FRAME.WarnInvalidAudioSource"),
+      if (scope === "audio" || scope === "both") {
+        const result = await this.#controller.goToAudio(
+          currentSources,
+          targetSources,
+          audioTrans,
+          LumennGraphStore.getDefaultCrossfadeDuration(),
+          audioTrans?.curve ?? "linear",
         );
+        if (result === "invalid-source")
+          ui.notifications.warn(
+            game.i18n.localize("LUMENN_FRAME.WarnInvalidAudioSource"),
+          );
+      }
       await LumennGraphStore.setActiveNode(this.#graphId, id);
       LumennCompat.socketEmit({ type: "transition:end" });
     } finally {
@@ -1500,6 +1502,9 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
           kind: "edge",
           edge,
           edgeType: edge.type,
+          transitionScope: ["audio", "scene", "both"].includes(edge.transition?.scope)
+            ? edge.transition.scope
+            : "both",
           fromLabel: from ? this.#nodeLabel(from) : edge.from,
           toLabel: to ? this.#nodeLabel(to) : edge.to,
           reverse,

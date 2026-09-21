@@ -27,7 +27,7 @@
   background: var(--lf-ink);
   color: var(--lf-text);
   font-family: var(--lf-font-body);
-  font-size: 13px;
+  font-size: 15px;
   overflow: hidden;
   isolation: isolate;
 }
@@ -286,6 +286,7 @@
   height: 100%;
   pointer-events: none;
   z-index: 2;
+  overflow: visible;
 }
 
 .lf-edges .lf-edge-hit {
@@ -299,8 +300,11 @@
 
 /* ── Edge hover / labels ──────────────────────────────────────────── */
 .lf-edge {
-  transition: stroke-width var(--lf-transition), filter var(--lf-transition);
+  vector-effect: non-scaling-stroke;
+  transition: stroke-width var(--lf-transition), filter var(--lf-transition), opacity var(--lf-transition);
 }
+.lf-edge-flow { stroke-linecap: round; }
+.lf-edge-audio { stroke-linecap: round; stroke-width: 2.5px; }
 .lf-edge:hover {
   stroke-width: 4px;
   filter: brightness(1.45);
@@ -622,7 +626,7 @@
 
 /* ── Inspector ─────────────────────────────────────────────────────── */
 .lf-inspector {
-  flex: 0 0 264px;
+  flex: 0 0 320px;
   min-width: 0;
   padding: 10px;
   overflow-y: auto;
@@ -632,6 +636,13 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+@media (max-width: 1100px) {
+  .lf-inspector { flex-basis: 280px; }
+  .lf-topbar { gap: 6px; padding: 8px 12px; }
+  .lf-toolbar-left { width: 48px; flex-basis: 48px; }
+  .lf-tool { width: 38px; height: 38px; font-size: 17px; }
 }
 
 .lf-insp-title {

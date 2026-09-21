@@ -1342,16 +1342,25 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   #audioSourcesFor(graph, nodeId) {
     const sources = [];
-    for (const e of graph?.edges ?? []) {
-      if (e.type !== "audio" || e.to !== nodeId) continue;
-      const n = graph.nodes.find((x) => x.id === e.from);
-      if (n?.type === "audio" && n.data?.audioType && n.data?.audioId) {
-        sources.push({
-          type: n.data.audioType === "playlist" ? "playlist" : "track",
-          id: n.data.audioId,
-        });
+    const visited = new Set();
+    const visit = (targetId) => {
+      if (!targetId || visited.has(targetId)) return;
+      visited.add(targetId);
+      for (const e of graph?.edges ?? []) {
+        if (e.type !== "audio" || e.to !== targetId) continue;
+        const n = graph.nodes.find((x) => x.id === e.from);
+        if (n?.type !== "audio") continue;
+        if (n.data?.audioType && n.data?.audioId) {
+          sources.push({
+            type: n.data.audioType === "playlist" ? "playlist" : "track",
+            id: n.data.audioId,
+          });
+        }
+        // Permite cadeia Audio A → Audio B → Scene.
+        visit(n.id);
       }
-    }
+    };
+    visit(nodeId);
     return sources;
   }
 

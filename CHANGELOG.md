@@ -412,3 +412,10 @@ Transições via documento em vez de `Sound#fade()` direto fades locais não sin
 - HUD e nós foram ampliados; caracteres emoji foram removidos da interface/documentação.
 - Escopo `audio` não ativa Scene; troca de Scene só ocorre em `scene`/`both`.
 - Validação estática aprovada; QA Foundry ainda pendente para diferenciar redraw de Canvas e reload de página.
+
+## [0.0.20] - 2026-09-21 — conexão entre nós de áudio
+
+- Nós de áudio agora exibem `AUDIO IN` e `AUDIO OUT` em lados distintos.
+- Corrigido CSS que colocava o `OUT` no lado esquerdo, impedindo conexões `Áudio → Áudio`.
+- O runtime resolve cadeias de áudio conectadas até a Scene de destino.
+- Validação estática aprovada; validação runtime no Foundry permanece pendente.

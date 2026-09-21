@@ -550,6 +550,8 @@
 }
 
 .lf-node-audio .lf-port-out {
+  left: auto;
+  right: -7px;
   top: 62%;
 }
 

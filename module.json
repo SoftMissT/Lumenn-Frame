@@ -2,14 +2,14 @@
   "id": "lumenn-frame",
   "title": "Lumenn Frame",
   "description": "Lumenn Frame is a cinematic graph editor for Foundry VTT, providing Scene, Audio and Note nodes, directional narrative flow edges, configurable scene/audio transitions, audio continuity, an infinite pan/zoom canvas with Fit All, a contextual Inspector, live GM navigation and GM-to-player synchronization. Primary target Foundry 14.367, backward compatible with 13.350+.",
-  "version": "0.0.19",
+  "version": "0.0.20",
   "license": "GPL-3.0",
   "url": "https://github.com/SoftMissT/Lumenn-Frame",
   "readme": "README.md",
   "bugs": "https://github.com/SoftMissT/Lumenn-Frame/issues",
   "changelog": "CHANGELOG.md",
   "manifest": "https://github.com/SoftMissT/Lumenn-Frame/releases/latest/download/module.json",
-  "download": "https://github.com/SoftMissT/Lumenn-Frame/releases/download/v0.0.19/lumenn-frame-v0.0.19.zip",
+  "download": "https://github.com/SoftMissT/Lumenn-Frame/releases/download/v0.0.20/lumenn-frame-v0.0.20.zip",
   "authors": [
     {
       "name": "Nelson"

@@ -2,6 +2,38 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.24] - 2026-09-22 — áudio, transições e paleta semântica
+
+### Fixed
+
+- O clique em uma FLOW/AUDIO edge não propaga mais até o viewport e, portanto,
+  não perde a seleção imediatamente após abrir o Inspector.
+- A área invisível de clique das conexões aumentou de 16 px para 24 px.
+- As conexões de um nó agora também abrem a transição pelo bloco
+  **Entradas / Saídas** do Inspector.
+- `Playlist#playAll` foi removido do motor: Playlist inicia uma única faixa por
+  `Playlist#playSound`.
+- A resolução de áudio escolhe uma única fonte de destino e encerra fontes
+  concorrentes controladas pelo storyboard, evitando reprodução em massa.
+- Zoom mínimo elevado para 40% e adicionado índice de Audio Nodes no Inspector,
+  com foco e seleção centralizados.
+- Audio Nodes agora possuem função **Música** (violeta) ou **SFX** (ciano).
+  Cada cena aceita uma música principal e múltiplos efeitos simultâneos; os fios
+  estéreo continuam branco/vermelho.
+- Paleta semântica completa no grafo: Cena/FLOW âmbar, FLOW IN amarelo,
+  FLOW OUT laranja, Música violeta, SFX ciano, Nota azul, nó ativo verde,
+  seleção branca e alvo de conexão rosa. Tipo, direção e estado usam camadas
+  visuais separadas para que uma indicação não esconda a outra.
+
+### Documentation
+
+- README reestruturado em pt-BR com instalação, fluxo rápido, semântica das
+  conexões, controles de transição, compatibilidade e estrutura do repositório.
+- ZIPs locais de builds anteriores foram removidos; os artefatos continuam nas
+  Releases do GitHub e permanecem ignorados por `*.zip`.
+- Removido `SHA256SUMS.txt` obsoleto, que ainda descrevia somente a v0.0.18;
+  checksums passam a acompanhar a validação de cada Release.
+
 ## [0.0.18] - 2026-09-15
 
 > **Hotfix bloqueador de fade.** Correção do schema de fade do PlaylistSound/Playlist (V13 e V14). Nenhuma feature nova.

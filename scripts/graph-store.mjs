@@ -112,7 +112,7 @@ static getAll() {
       color: node.color ?? d.color,
       size: node.size ?? d.size,
       notes: node.notes ?? "",
-      data: node.data ?? (node.type === "audio" ? { audioType: null, audioId: null, volume: 0.75, loop: true, fadeIn: null, fadeOut: null } : {}),
+      data: node.data ?? (node.type === "audio" ? { audioRole: "music", audioType: null, audioId: null, volume: 0.75, loop: true, fadeIn: null, fadeOut: null } : {}),
     };
     graph.nodes.push(n);
     await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
@@ -294,6 +294,7 @@ if (edge.type === "flow" && !edge.transition) {
               size: "normal",
               notes: "",
               data: {
+                audioRole: "music",
                 audioType: src.type,
                 audioId: src.id,
                 volume: 0.75,

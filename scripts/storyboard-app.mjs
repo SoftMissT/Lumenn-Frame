@@ -6,7 +6,9 @@ import { LumennSettings } from "./settings.mjs";
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 const { DragDrop } = foundry.applications.ux;
 
-const MIN_ZOOM = 0.25;
+// Abaixo de 40% os Audio Nodes viram alvos menores que uma linha de texto e
+// deixam de ser operáveis. Fit All respeita este piso e o operador usa pan.
+const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 2.0;
 const ZOOM_STEP = 1.25;
 
@@ -233,6 +235,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         type: "audio",
         position: { x: node.position.x + w + 40, y: node.position.y },
         data: {
+          audioRole: "music",
           audioType: doc.documentName === "Playlist" ? "playlist" : "track",
           audioId: doc.documentName === "Playlist" ? doc.id : doc.uuid,
           volume: 0.75,
@@ -258,7 +261,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
   #resolveDropItems(doc) {
     const imp = LumennSettings.getImportDefaults();
     const items = [];
-    const audioDefaults = { volume: 0.75, loop: true, fadeIn: null, fadeOut: null };
+    const audioDefaults = { audioRole: "music", volume: 0.75, loop: true, fadeIn: null, fadeOut: null };
     const push = (d, rootFolder) => {
       const folder = d.folder ?? rootFolder;
       const meta = {
@@ -429,6 +432,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const label = this.#audioLabel(n.data);
         out.audioLabel = label.name;
         out.audioBadge = label.badge;
+        out.audioRole = n.data?.audioRole === "sfx" ? "sfx" : "music";
+        out.audioRoleLabel = out.audioRole === "sfx"
+          ? L("LUMENN_FRAME.AudioRole.Sfx")
+          : L("LUMENN_FRAME.AudioRole.Music");
       }
       return out;
     });
@@ -479,6 +486,15 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         graph: L("LUMENN_FRAME.Inspector.Graph"),
         scene: L("LUMENN_FRAME.Inspector.Scene"),
         audio: L("LUMENN_FRAME.Inspector.Audio"),
+        audioNodes: L("LUMENN_FRAME.Inspector.AudioNodes"),
+        focusNode: L("LUMENN_FRAME.Inspector.FocusNode"),
+        audioRole: L("LUMENN_FRAME.AudioRole.Label"),
+        musicRole: L("LUMENN_FRAME.AudioRole.Music"),
+        sfxRole: L("LUMENN_FRAME.AudioRole.Sfx"),
+        activeState: L("LUMENN_FRAME.Legend.Active"),
+        navigableState: L("LUMENN_FRAME.Legend.Navigable"),
+        selectedState: L("LUMENN_FRAME.Legend.Selected"),
+        targetState: L("LUMENN_FRAME.Legend.Target"),
         note: L("LUMENN_FRAME.Inspector.Note"),
         flowEdge: L("LUMENN_FRAME.Inspector.FlowEdge"),
         audioEdge: L("LUMENN_FRAME.Inspector.AudioEdge"),
@@ -706,6 +722,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const hit = e.target.closest?.(".lf-edge-hit");
     if (!hit?.dataset?.edgeId) return;
     if (this.#mode === "live") return;
+    // O SVG vive dentro do viewport. Sem interromper o evento, o mesmo clique
+    // seleciona a edge aqui e logo depois o viewport a interpreta como fundo,
+    // limpando a seleção antes que o Inspector permaneça aberto.
+    e.preventDefault();
+    e.stopPropagation();
     this.#selected = { kind: "edge", id: hit.dataset.edgeId };
     this.render();
   }
@@ -718,6 +739,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if (
       e.target.closest(".lf-node") ||
       e.target.closest("[data-port]") ||
+      e.target.closest(".lf-edge-hit") ||
       e.target.closest(".lf-camera-bar")
     )
       return;
@@ -755,6 +777,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
           ? { sceneId: null }
           : type === "audio"
             ? {
+                audioRole: "music",
                 audioType: null,
                 audioId: null,
                 volume: 0.75,
@@ -923,6 +946,22 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const midY = (a.y + b.y) / 2 + ny * bend;
       const d = `M ${a.x} ${a.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${b.x} ${b.y}`;
 
+      if (e.type === "audio") {
+        const role = from.data?.audioRole === "sfx" ? "sfx" : "music";
+        const rolePath = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "path",
+        );
+        rolePath.setAttribute("d", d);
+        rolePath.setAttribute("fill", "none");
+        rolePath.setAttribute(
+          "class",
+          `lf-edge-audio-role lf-edge-audio-role-${role}`,
+        );
+        rolePath.setAttribute("vector-effect", "non-scaling-stroke");
+        svg.appendChild(rolePath);
+      }
+
       const path = document.createElementNS(
         "http://www.w3.org/2000/svg",
         "path",
@@ -1009,7 +1048,8 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       hit.setAttribute("d", d);
       hit.setAttribute("fill", "none");
       hit.setAttribute("stroke", "transparent");
-      hit.setAttribute("stroke-width", "16");
+      // Alvo confortável em qualquer zoom, sem alterar a espessura visual.
+      hit.setAttribute("stroke-width", "24");
       hit.setAttribute("class", "lf-edge-hit");
       hit.setAttribute("data-edge-id", e.id);
       hit.setAttribute("vector-effect", "non-scaling-stroke");
@@ -1316,7 +1356,24 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!this.#editable()) return;
     const action = e.currentTarget.dataset.inspAction;
     const root = this.element;
-    if (action === "set-initial") {
+    if (action === "focus-node") {
+      const nodeId = e.currentTarget.dataset.inspNode;
+      const node = LumennGraphStore.getNode(this.#graphId, nodeId);
+      const viewport = root.querySelector(".lf-viewport");
+      if (!node || !viewport) return;
+      const [width, height] = nodeSize(node.type, node.size);
+      this.#selected = { kind: "node", id: nodeId };
+      this.#camera.panX = viewport.clientWidth / 2 -
+        (node.position.x + width / 2) * this.#camera.zoom;
+      this.#camera.panY = viewport.clientHeight / 2 -
+        (node.position.y + height / 2) * this.#camera.zoom;
+      this.render();
+    } else if (action === "select-edge") {
+      const edgeId = e.currentTarget.dataset.inspEdge;
+      if (!edgeId) return;
+      this.#selected = { kind: "edge", id: edgeId };
+      this.render();
+    } else if (action === "set-initial") {
       LumennGraphStore.setActiveNode(this.#graphId, this.#selected.id).then(
         () => this.render(),
       );
@@ -1422,33 +1479,65 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /* ── Live navigation ────────────────────────────────────────────── */
 
   #audioSourcesFor(graph, nodeId) {
-    const sources = [];
-    const visited = new Set();
-    const root = graph?.nodes?.find((n) => n.id === nodeId);
-    if (root?.type === "audio" && root.data?.audioType && root.data?.audioId) {
-      sources.push({
-        type: root.data.audioType === "playlist" ? "playlist" : "track",
-        id: root.data.audioId,
-      });
-    }
-    const visit = (targetId) => {
-      if (!targetId || visited.has(targetId)) return;
-      visited.add(targetId);
-      for (const e of graph?.edges ?? []) {
-        if (e.type !== "audio" || e.to !== targetId) continue;
-        const n = graph.nodes.find((x) => x.id === e.from);
-        if (n?.type !== "audio") continue;
-        if (n.data?.audioType && n.data?.audioId) {
-          sources.push({
-            type: n.data.audioType === "playlist" ? "playlist" : "track",
-            id: n.data.audioId,
-          });
-        }
-        // Permite cadeia Audio A → Audio B → Scene.
-        visit(n.id);
+    const resolve = (targetId, visited = new Set()) => {
+      if (!targetId || visited.has(targetId)) return null;
+      const nextVisited = new Set(visited);
+      nextVisited.add(targetId);
+      const node = graph?.nodes?.find((entry) => entry.id === targetId);
+      if (node?.type === "audio" && node.data?.audioType && node.data?.audioId)
+        return {
+          type: node.data.audioType === "playlist" ? "playlist" : "track",
+          id: node.data.audioId,
+          role: node.data.audioRole === "sfx" ? "sfx" : "music",
+        };
+      const incoming = (graph?.edges ?? []).filter(
+        (edge) => edge.type === "audio" && edge.to === targetId,
+      );
+      for (const edge of [...incoming].reverse()) {
+        const source = resolve(edge.from, nextVisited);
+        if (source) return source;
       }
+      return null;
     };
-    visit(nodeId);
+    const root = graph?.nodes?.find((node) => node.id === nodeId);
+    if (root?.type === "audio") {
+      const source = resolve(nodeId);
+      return source ? [source] : [];
+    }
+    const incoming = (graph?.edges ?? []).filter(
+      (edge) => edge.type === "audio" && edge.to === nodeId,
+    );
+    const candidates = incoming
+      .map((edge) => resolve(edge.from))
+      .filter(Boolean);
+    const music = candidates.filter((source) => source.role === "music").at(-1);
+    const seenSfx = new Set();
+    const sfx = candidates.filter((source) => {
+      if (source.role !== "sfx") return false;
+      const key = `${source.type}:${source.id}`;
+      if (seenSfx.has(key)) return false;
+      seenSfx.add(key);
+      return true;
+    });
+    return [...(music ? [music] : []), ...sfx];
+  }
+
+  #allAudioSources(graph) {
+    const sources = [];
+    const seen = new Set();
+    for (const node of graph?.nodes ?? []) {
+      if (node.type !== "audio" || !node.data?.audioType || !node.data?.audioId)
+        continue;
+      const source = {
+        type: node.data.audioType === "playlist" ? "playlist" : "track",
+        id: node.data.audioId,
+        role: node.data.audioRole === "sfx" ? "sfx" : "music",
+      };
+      const key = `${source.role}:${source.type}:${source.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      sources.push(source);
+    }
     return sources;
   }
 
@@ -1503,7 +1592,9 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const scene = targetNode?.data?.sceneId
         ? game.scenes.get(targetNode.data.sceneId)
         : null;
-      const currentSources = this.#audioSourcesFor(graph, graph.activeNodeId);
+      // Limpa fontes concorrentes deixadas por rotas anteriores ou grafos que
+      // foram montados antes da regra de uma faixa principal por transição.
+      const currentSources = this.#allAudioSources(graph);
       const targetSources = this.#audioSourcesFor(graph, id);
       LumennCompat.socketEmit({
         type: "transition:start",
@@ -1593,6 +1684,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
           kind: "node",
           node,
           nodeType: node.type,
+          audioRole: node.data?.audioRole === "sfx" ? "sfx" : "music",
           nodeEdges: edges,
           flowTargets: (graph?.nodes ?? [])
             .filter((n) => n.type === "scene" && n.id !== node.id)
@@ -1638,6 +1730,12 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         };
       }
     }
-    return { ...base, kind: "graph" };
+    return {
+      ...base,
+      kind: "graph",
+      audioNodeIndex: (graph?.nodes ?? [])
+        .filter((node) => node.type === "audio")
+        .map((node) => ({ id: node.id, name: this.#nodeLabel(node) })),
+    };
   }
 }

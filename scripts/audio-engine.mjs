@@ -10,7 +10,9 @@
  * - `PlaylistSound#fadeDuration` — accessor computado (NUNCA gravar).
  * - `PlaylistData.fade?: number` — fade da Playlist; combina com o fade do Track
  *   (double-fade). Por isso o Lumenn aplica fade em UM nível por transição:
- *   Track → `PlaylistSound.fade`; Playlist → `Playlist.fade` (playAll/stopAll).
+ *   Track → `PlaylistSound.fade`; Playlist → `Playlist.fade`
+ *   (`playSound`/`stopAll`). `playAll` nunca é usado porque inicia todas as
+ *   faixas simultaneamente.
  *
  * Preservação: o valor anterior de `fade` é salvo antes da transição e
  * restaurado ao final — a configuração de Playlist/Track do usuário não é
@@ -130,17 +132,59 @@ export class LumennAudioEngine {
 
   /**
    * Inicia uma fonte. Track → grava `PlaylistSound.fade`; Playlist → grava
-   * `Playlist.fade` (uma única autoridade, evitando double-fade com playAll).
+   * `Playlist.fade` (uma única autoridade, evitando double-fade).
    */
-  async #start(doc, duration) {
+  async #start(doc, duration, exclusive = true) {
     if (doc.documentName === "PlaylistSound") {
       this.#saveFade(doc);
-      await doc.update({ fade: duration, playing: true });
+      if (!exclusive) {
+        await doc.update({ fade: duration, playing: true });
+        return;
+      }
+      await doc.update({ fade: duration });
+      const playlist = doc.parent;
+      const competing = playlist?.sounds?.filter(
+        (sound) => sound.id !== doc.id && sound.playing,
+      ) ?? [];
+      if (competing.length && playlist?.updateEmbeddedDocuments) {
+        await playlist.updateEmbeddedDocuments(
+          "PlaylistSound",
+          competing.map((sound) => ({ _id: sound.id, playing: false })),
+        );
+      } else if (competing.length) {
+        await Promise.all(competing.map((sound) => sound.update({ playing: false })));
+      }
+      if (playlist?.playSound) await playlist.playSound(doc);
+      else await doc.update({ playing: true });
+      return;
+    }
+    if (!exclusive) {
+      const sounds = doc.sounds?.contents ?? [...(doc.sounds?.values?.() ?? [])];
+      const sound = sounds[0] ?? null;
+      if (sound) await this.#start(sound, duration, false);
       return;
     }
     this.#saveFade(doc);
     await doc.update({ fade: duration });
-    await doc.playAll();
+    // Playlist#playAll inicia TODAS as faixas ao mesmo tempo. Para usar uma
+    // Playlist como fonte narrativa, iniciamos somente uma faixa e deixamos o
+    // próprio Playlist#playSound aplicar as regras do modo da playlist.
+    const sounds = doc.sounds?.contents ?? [...(doc.sounds?.values?.() ?? [])];
+    const sound = sounds.find((entry) => entry.playing) ?? sounds[0] ?? null;
+    if (sound) {
+      const competing = sounds.filter(
+        (entry) => entry.id !== sound.id && entry.playing,
+      );
+      if (competing.length && doc.updateEmbeddedDocuments) {
+        await doc.updateEmbeddedDocuments(
+          "PlaylistSound",
+          competing.map((entry) => ({ _id: entry.id, playing: false })),
+        );
+      } else if (competing.length) {
+        await Promise.all(competing.map((entry) => entry.update({ playing: false })));
+      }
+      if (!sound.playing) await doc.playSound(sound);
+    }
   }
 
   /** Para uma fonte. Mesma política de autoridade única do fade. */
@@ -156,7 +200,8 @@ export class LumennAudioEngine {
   }
 
   /**
-   * Transição de áudio dirigida por modo, com múltiplas fontes (Audio Nodes).
+   * Transição dirigida por modo. Há no máximo uma música principal, enquanto
+   * múltiplos efeitos sonoros podem tocar junto com ela.
    * @param {"auto"|"keep"|"cut"|"crossfade"|"fadeout"|"fadein"} mode
    * @param {Array<{type:"track"|"playlist", id:string}|null>} currentSources
    * @param {Array<{type:"track"|"playlist", id:string}|null>} targetSources
@@ -169,69 +214,90 @@ export class LumennAudioEngine {
     if (this.#transitioning) return "ignored";
     this.#transitioning = true;
     try {
-      const current = (currentSources ?? [])
-        .map((s) => (s ? this.#resolve(s) : null))
-        .filter(Boolean);
-      const target = (targetSources ?? [])
-        .map((s) => (s ? this.#resolve(s) : null))
-        .filter(Boolean);
-      const stopAll = () =>
-        Promise.all(current.map((d) => this.#stop(d, duration)));
-      const startAll = () =>
-        Promise.all(target.map((d) => this.#start(d, duration)));
+      const uniqueEntries = (sources, strict = false) => {
+        const entries = [];
+        const seen = new Set();
+        for (const source of sources ?? []) {
+          if (!source) continue;
+          const doc = strict ? this.#resolveStrict(source) : this.#resolve(source);
+          if (!doc) continue;
+          const key = doc.uuid ?? `${doc.documentName}:${doc.id}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          entries.push({
+            doc,
+            role: source.role === "sfx" ? "sfx" : "music",
+          });
+        }
+        return entries;
+      };
+      const current = uniqueEntries(currentSources)
+        .filter((entry) => entry.doc.playing);
+      const requested = uniqueEntries(targetSources, true);
+      const musicTarget = requested
+        .filter((entry) => entry.role === "music")
+        .at(-1) ?? null;
+      const sfxTargets = requested.filter((entry) => entry.role === "sfx");
+      const targets = [...(musicTarget ? [musicTarget] : []), ...sfxTargets];
+      const keyOf = (entry) => entry?.doc?.uuid ??
+        `${entry?.doc?.documentName}:${entry?.doc?.id}`;
+      const stopOutside = async (desired, fade) => {
+        const desiredKeys = new Set(desired.map(keyOf));
+        await Promise.all(
+          current
+            .filter((entry) => !desiredKeys.has(keyOf(entry)))
+            .map((entry) => this.#stop(entry.doc, fade)),
+        );
+      };
+      const startMissing = async (desired, fade) => {
+        for (const entry of desired) {
+          if (!entry.doc.playing)
+            await this.#start(entry.doc, fade, entry.role === "music");
+        }
+      };
 
       switch (mode) {
-        case "keep":
-          for (const d of current)
-            if (!d.playing) await this.#start(d, duration);
+        case "keep": {
+          const keeper = current.find((entry) => entry.role === "music") ??
+            musicTarget;
+          const desired = [...(keeper ? [keeper] : []), ...sfxTargets];
+          await stopOutside(desired, 0);
+          await startMissing(desired, duration);
           return "kept";
+        }
         case "cut":
-          // Fonte anterior termina e nova inicia imediatamente (fade 0).
-          await Promise.all([
-            ...current.map((d) => this.#stop(d, 0)),
-            ...target.map((d) => this.#start(d, 0)),
-          ]);
+          await stopOutside(targets, 0);
+          await startMissing(targets, 0);
           return "cut";
         case "fadeout":
-          await stopAll();
+          await Promise.all(current.map((entry) => this.#stop(entry.doc, duration)));
           return "faded-out";
         case "fadein":
-          await startAll();
+          await stopOutside(targets, 0);
+          await startMissing(targets, duration);
           return "started";
         case "crossfade":
-          await Promise.all([
-            ...current.map((d) => this.#stop(d, duration)),
-            ...target.map((d) => this.#start(d, duration)),
-          ]);
+          await stopOutside(targets, duration);
+          await startMissing(targets, duration);
           return "crossfaded";
         case "auto":
         default: {
-          const same =
-            current.length === target.length &&
-            current.length > 0 &&
-            current.every((c) =>
-              target.some(
-                (t) => t.id === c.id && t.documentName === c.documentName,
-              ),
-            );
-          if (same) {
-            for (const d of target)
-              if (!d.playing) await this.#start(d, duration);
-            return "kept";
-          }
-          if (!target.length && current.length) {
-            await stopAll();
+          const currentKeys = new Set(current.map(keyOf));
+          const targetKeys = new Set(targets.map(keyOf));
+          const same = currentKeys.size === targetKeys.size &&
+            [...currentKeys].every((key) => targetKeys.has(key));
+          if (same && targets.length) return "kept";
+          if (!targets.length && current.length) {
+            await Promise.all(current.map((entry) => this.#stop(entry.doc, duration)));
             return "faded-out";
           }
-          if (!current.length && target.length) {
-            await startAll();
+          if (!current.length && targets.length) {
+            await startMissing(targets, duration);
             return "started";
           }
-          if (!current.length && !target.length) return "kept";
-          await Promise.all([
-            ...current.map((d) => this.#stop(d, duration)),
-            ...target.map((d) => this.#start(d, duration)),
-          ]);
+          if (!current.length && !targets.length) return "kept";
+          await stopOutside(targets, duration);
+          await startMissing(targets, duration);
           return "crossfaded";
         }
       }

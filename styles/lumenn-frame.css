@@ -13,6 +13,18 @@
   --lf-teal: #2dd4bf;
   --lf-teal-dim: #2dd4bf55;
   --lf-danger: #e45656;
+  --lf-scene: #f59e0b;
+  --lf-flow-in: #facc15;
+  --lf-flow-out: #f97316;
+  --lf-music: #8b5cf6;
+  --lf-sfx: #22d3ee;
+  --lf-note: #3b82f6;
+  --lf-active: #22c55e;
+  --lf-navigable: #84cc16;
+  --lf-target: #ec4899;
+  --lf-input: #f8fafc;
+  --lf-output: #ef4444;
+  --lf-selected: #ffffff;
   --lf-badge: #2b2c33;
   --lf-badge-border: #3b3c44;
   --lf-shadow: 0 2px 10px #00000060;
@@ -221,6 +233,7 @@
 }
 
 .lf-tool {
+  --lf-tool-color: var(--lf-text);
   width: 32px;
   height: 32px;
   display: flex;
@@ -234,6 +247,12 @@
   cursor: pointer;
   transition: background var(--lf-transition), color var(--lf-transition), border-color var(--lf-transition);
 }
+.lf-tool[data-tool="select"] { --lf-tool-color: var(--lf-selected); color: var(--lf-selected); }
+.lf-tool[data-tool="hand"] { --lf-tool-color: #94a3b8; color: #94a3b8; }
+.lf-tool[data-tool="connect"] { --lf-tool-color: var(--lf-flow-out); color: var(--lf-flow-out); }
+.lf-tool[data-tool="scene"] { --lf-tool-color: var(--lf-scene); color: var(--lf-scene); }
+.lf-tool[data-tool="audio"] { --lf-tool-color: var(--lf-music); color: var(--lf-music); }
+.lf-tool[data-tool="note"] { --lf-tool-color: var(--lf-note); color: var(--lf-note); }
 
 .lf-tool:hover {
   color: var(--lf-text);
@@ -241,9 +260,9 @@
 }
 
 .lf-tool.active {
-  background: var(--lf-amber);
+  background: var(--lf-tool-color);
   color: var(--lf-ink);
-  border-color: var(--lf-amber);
+  border-color: var(--lf-tool-color);
 }
 
 /* ── Viewport / Camera / World ─────────────────────────────────────── */
@@ -293,6 +312,9 @@
   pointer-events: stroke;
   cursor: pointer;
 }
+.lf-edges .lf-edge-hit:hover {
+  stroke: rgba(255, 255, 255, .08);
+}
 
 .lf-edges .lf-ghost {
   pointer-events: none;
@@ -339,6 +361,8 @@
   right: 12px;
   bottom: 10px;
   display: flex;
+  flex-wrap: wrap;
+  max-width: min(520px, calc(100% - 24px));
   gap: 9px;
   padding: 4px 7px;
   border: 1px solid #ffffff18;
@@ -353,8 +377,18 @@
 }
 .lf-audio-key { display: inline-flex; align-items: center; gap: 4px; }
 .lf-audio-key i { width: 15px; height: 2px; display: inline-block; border-radius: 2px; }
-.lf-audio-key-left i { background: #fff; }
-.lf-audio-key-right i { background: #ef4444; }
+.lf-audio-key-scene i { background: var(--lf-scene); height: 4px; }
+.lf-audio-key-music i { background: var(--lf-music); height: 4px; }
+.lf-audio-key-sfx i { background: var(--lf-sfx); height: 4px; }
+.lf-audio-key-note i { background: var(--lf-note); height: 4px; }
+.lf-audio-key-active i { background: var(--lf-active); height: 4px; }
+.lf-audio-key-navigable i { background: var(--lf-navigable); height: 4px; }
+.lf-audio-key-selected i { background: var(--lf-selected); height: 4px; }
+.lf-audio-key-target i { background: var(--lf-target); height: 4px; }
+.lf-audio-key-flow-in i { background: var(--lf-flow-in); height: 4px; }
+.lf-audio-key-flow-out i { background: var(--lf-flow-out); height: 4px; }
+.lf-audio-key-left i { background: var(--lf-input); }
+.lf-audio-key-right i { background: var(--lf-output); }
 
 /* ── Nodes ─────────────────────────────────────────────────────────── */
 .lf-node {
@@ -369,6 +403,7 @@
   z-index: 3;
   cursor: grab;
   transition: border-color var(--lf-transition), box-shadow var(--lf-transition);
+  box-shadow: inset 3px 0 var(--node-color), var(--lf-shadow);
 }
 
 /* Conteúdo interno clippado (thumbnail/título), mantendo o card arredondado. */
@@ -386,23 +421,76 @@
 }
 
 .lf-node.selected {
-  border-color: #ffffff;
-  box-shadow: 0 0 0 2px #ffffff40, 0 4px 16px #00000080;
+  outline: 2px solid var(--lf-selected);
+  outline-offset: 2px;
+  box-shadow: inset 3px 0 var(--node-color), 0 0 0 1px #ffffff40, 0 4px 16px #00000080;
 }
 
 .lf-node.target-hi {
-  border-color: var(--lf-teal);
-  box-shadow: 0 0 0 2px var(--lf-teal-dim);
+  outline: 3px solid var(--lf-target);
+  outline-offset: 3px;
+  box-shadow: inset 3px 0 var(--node-color), 0 0 16px #ec489966, 0 4px 16px #00000080;
 }
 
+.lf-node-scene .lf-node-head { background: var(--lf-scene) !important; }
+.lf-node-note .lf-node-head { background: var(--lf-note) !important; }
+
+/* Função do áudio: violeta = música contínua, ciano = efeito sonoro. */
+.lf-node-audio.lf-audio-role-music {
+  border-color: #8b5cf680;
+}
+.lf-node-audio.lf-audio-role-music .lf-node-head {
+  background: var(--lf-music) !important;
+}
+.lf-node-audio.lf-audio-role-sfx {
+  border-color: #22d3ee80;
+}
+.lf-node-audio.lf-audio-role-sfx .lf-node-head {
+  background: var(--lf-sfx) !important;
+}
+.lf-audio-role-badge {
+  display: inline-block;
+  margin-right: 5px;
+  padding: 1px 5px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.lf-audio-role-music .lf-audio-role-badge { color: #c4b5fd; }
+.lf-audio-role-sfx .lf-audio-role-badge { color: #67e8f9; }
+
+.lf-edge-audio-role {
+  pointer-events: none;
+  stroke-width: 8px;
+  opacity: .32;
+  filter: blur(.3px);
+}
+.lf-edge-audio-role-music { stroke: var(--lf-music); }
+.lf-edge-audio-role-sfx { stroke: var(--lf-sfx); }
+
 .lf-node.active {
-  border-color: var(--lf-amber);
-  box-shadow: 0 0 18px var(--lf-amber-dim), 0 4px 16px #00000080;
+  box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-active), 0 0 18px #22c55e66, 0 4px 16px #00000080;
 }
 
 .lf-node.navigable {
   cursor: pointer;
-  border-color: var(--lf-teal);
+  box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-navigable), 0 4px 16px #00000080;
+}
+
+.lf-node.active.navigable {
+  box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-active), 0 0 0 5px var(--lf-navigable), 0 0 18px #22c55e66;
+}
+
+.lf-node.active.selected,
+.lf-node.navigable.selected {
+  outline: 2px solid var(--lf-selected);
+  outline-offset: 6px;
+}
+
+.lf-node.target-hi,
+.lf-node.target-hi.selected {
+  outline-color: var(--lf-target);
+  outline-offset: 6px;
 }
 
 .lf-node.dimmed {
@@ -536,7 +624,7 @@
   inset: -9px;
   border-radius: 50%;
 }
-/* Em modo Edição os ports ficam sempre visíveis; FLOW âmbar, AUDIO teal. */
+/* Em Edição os ports ficam visíveis: FLOW amarelo/laranja, AUDIO branco/vermelho. */
 .lumenn-frame.graph-editor.editing .lf-port { opacity: 1; }
 .lf-node:hover .lf-port,
 .lf-node.selected .lf-port,
@@ -556,31 +644,31 @@
 }
 
 .lf-port-flow-in {
-  border-color: #f0a321;
-  color: #f0a321;
+  border-color: var(--lf-flow-in);
+  color: var(--lf-flow-in);
 }
 .lf-port-flow-out {
-  border-color: #ffd166;
-  color: #ffd166;
+  border-color: var(--lf-flow-out);
+  color: var(--lf-flow-out);
 }
 
 .lf-port-audio {
-  border-color: #ffffff;
-  color: #ffffff;
+  border-color: var(--lf-input);
+  color: var(--lf-input);
   width: 12px;
   height: 12px;
 }
 
 .lf-node-audio .lf-port-in,
 .lf-node-scene .lf-port-audio {
-  border-color: #ffffff;
-  color: #ffffff;
+  border-color: var(--lf-input);
+  color: var(--lf-input);
   box-shadow: 0 0 0 2px #ffffff20;
 }
 
 .lf-node-audio .lf-port-out {
-  border-color: #ef4444;
-  color: #ef4444;
+  border-color: var(--lf-output);
+  color: var(--lf-output);
   box-shadow: 0 0 0 2px #ef444420;
 }
 
@@ -792,6 +880,26 @@
   text-overflow: ellipsis;
 }
 .lf-insp-edge-dir { color: var(--lf-muted); flex: 0 0 auto; }
+.lf-insp-edge-open {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+.lf-insp-edge-open span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lf-insp-edge-open:hover { color: var(--lf-amber); }
 .lf-insp-x {
   flex: 0 0 auto;
   margin-left: auto;

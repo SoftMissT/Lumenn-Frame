@@ -42,11 +42,11 @@
       <div class="lf-camera">
         <svg class="lf-edges"></svg>
         {{#each nodes}}
-        <div class="lf-node lf-node-{{this.type}}{{#if this.isActive}} active{{/if}}{{#if this.isNavigable}} navigable{{/if}}{{#if this.isDimmed}} dimmed{{/if}}{{#if this.selected}} selected{{/if}}{{#if this.targetHi}} target-hi{{/if}}"
+        <div class="lf-node lf-node-{{this.type}}{{#if (lumenn-eq this.type 'audio')}} lf-audio-role-{{this.audioRole}}{{/if}}{{#if this.isActive}} active{{/if}}{{#if this.isNavigable}} navigable{{/if}}{{#if this.isDimmed}} dimmed{{/if}}{{#if this.selected}} selected{{/if}}{{#if this.targetHi}} target-hi{{/if}}"
              data-id="{{this.id}}"
              style="left:{{this.position.x}}px;top:{{this.position.y}}px;width:{{this.width}}px;height:{{this.height}}px;--node-color:{{this.color}};">
           <div class="lf-node-content">
-            <div class="lf-node-head" style="background:{{this.color}}"></div>
+            <div class="lf-node-head"></div>
             {{#if (lumenn-eq this.type 'scene')}}
             <div class="lf-node-thumb">
               {{#if this.sceneThumb}}<img src="{{this.sceneThumb}}" alt="{{this.sceneName}}" loading="lazy">{{else}}<span class="lf-node-thumb-ph"><i class="fa-solid fa-image"></i></span>{{/if}}
@@ -56,7 +56,7 @@
             {{/if}}
             {{#if (lumenn-eq this.type 'audio')}}
             <div class="lf-node-title"><i class="fa-solid fa-music"></i> {{this.audioLabel}}</div>
-            <div class="lf-node-tag">{{this.audioBadge}}</div>
+            <div class="lf-node-tag"><span class="lf-audio-role-badge">{{this.audioRoleLabel}}</span> {{this.audioBadge}}</div>
             <div class="lf-node-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
             {{/if}}
             {{#if (lumenn-eq this.type 'note')}}
@@ -84,6 +84,16 @@
       {{/if}}
       {{#if editable}}
       <div class="lf-audio-legend" aria-label="Legenda de áudio">
+        <span class="lf-audio-key lf-audio-key-scene"><i></i>{{label.scene}}</span>
+        <span class="lf-audio-key lf-audio-key-music"><i></i>{{label.musicRole}}</span>
+        <span class="lf-audio-key lf-audio-key-sfx"><i></i>{{label.sfxRole}}</span>
+        <span class="lf-audio-key lf-audio-key-note"><i></i>{{label.note}}</span>
+        <span class="lf-audio-key lf-audio-key-active"><i></i>{{label.activeState}}</span>
+        <span class="lf-audio-key lf-audio-key-navigable"><i></i>{{label.navigableState}}</span>
+        <span class="lf-audio-key lf-audio-key-selected"><i></i>{{label.selectedState}}</span>
+        <span class="lf-audio-key lf-audio-key-target"><i></i>{{label.targetState}}</span>
+        <span class="lf-audio-key lf-audio-key-flow-in"><i></i>FLOW IN</span>
+        <span class="lf-audio-key lf-audio-key-flow-out"><i></i>FLOW OUT</span>
         <span class="lf-audio-key lf-audio-key-left"><i></i>L / IN</span>
         <span class="lf-audio-key lf-audio-key-right"><i></i>R / OUT</span>
       </div>
@@ -138,13 +148,24 @@
         <label class="lf-insp-label">{{label.incoming}} / {{label.outgoing}}</label>
         <ul class="lf-insp-edges">
           {{#each inspector.nodeEdges}}
-          <li><span class="lf-insp-edge-dir">{{#if (lumenn-eq this.from ../inspector.node.id)}}&rarr;{{else}}&larr;{{/if}}</span>{{this.fromLabel}} &rarr; {{this.toLabel}}<button class="lf-insp-x" data-insp-action="delete-edge" data-insp-edge="{{this.id}}" title="{{../../label.delete}}">&#10005;</button></li>
+          <li>
+            <button class="lf-insp-edge-open" data-insp-action="select-edge" data-insp-edge="{{this.id}}" title="{{../../label.editTransition}}">
+              <span class="lf-insp-edge-dir">{{#if (lumenn-eq this.from ../inspector.node.id)}}&rarr;{{else}}&larr;{{/if}}</span>
+              <span>{{this.fromLabel}} &rarr; {{this.toLabel}}</span>
+            </button>
+            <button class="lf-insp-x" data-insp-action="delete-edge" data-insp-edge="{{this.id}}" title="{{../../label.delete}}">&#10005;</button>
+          </li>
           {{/each}}
         </ul>
         {{/if}}
         {{/if}}
         {{#if (lumenn-eq inspector.nodeType 'audio')}}
         <h3 class="lf-insp-title">{{label.audio}}</h3>
+        <label class="lf-insp-label">{{label.audioRole}}</label>
+        <select data-insp="data.audioRole">
+          <option value="music" {{#if (lumenn-eq inspector.audioRole 'music')}}selected{{/if}}>{{label.musicRole}}</option>
+          <option value="sfx" {{#if (lumenn-eq inspector.audioRole 'sfx')}}selected{{/if}}>{{label.sfxRole}}</option>
+        </select>
         <label class="lf-insp-label">{{label.source}}</label>
         <select data-insp="data.audioType">
           <option value="">{{label.none}}</option>
@@ -293,6 +314,19 @@
       <p class="lf-insp-p">{{activeGraph.name}}</p>
       <p class="lf-insp-p">{{nodes.length}} nodes &middot; {{edgeCount}} edges</p>
       <p class="lf-insp-p">Schema v2 &middot; graph editor</p>
+      {{#if inspector.audioNodeIndex.length}}
+      <label class="lf-insp-label">{{label.audioNodes}}</label>
+      <ul class="lf-insp-edges lf-audio-node-index">
+        {{#each inspector.audioNodeIndex}}
+        <li>
+          <button class="lf-insp-edge-open" data-insp-action="focus-node" data-insp-node="{{this.id}}" title="{{../label.focusNode}}">
+            <i class="fa-solid fa-music"></i>
+            <span>{{this.name}}</span>
+          </button>
+        </li>
+        {{/each}}
+      </ul>
+      {{/if}}
       {{#if editable}}
       <div class="lf-insp-actions">
         <button data-insp-action="rename-graph">{{label.renameGraph}}</button>

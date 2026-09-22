@@ -11,7 +11,8 @@
  *   CT-006 lock 2ª transição durante fade é ignorada (RF-008)
  *   CT-007 duração própria aplicada ao fade            (RF-012)
  *   CT-A  started do silêncio para uma fonte
- *   CT-B  playlist inteira como fonte (fix v0.1.1)
+ *   CT-B  playlist inicia somente uma faixa
+ *   CT-C  uma música + múltiplos SFX podem coexistir
  *   RF-011 fonte inválida → LumennInvalidAudioSourceError
  *
  * Uso (como GM):
@@ -112,12 +113,29 @@ export async function run() {
     `res=${res}`,
   );
 
-  // CT-B playlist inteira como fonte (fix v0.1.1: game.playlists.get)
+  // CT-B Playlist é fonte, mas nunca dispara todas as faixas em paralelo.
   res = await engine.transition(null, pl(playlist.id), 1200);
+  const playingInPlaylist = playlist.sounds.filter((sound) => sound.playing);
   check(
-    "CT-B started via playlist (Playlist#playAll)",
-    res === "started" && playlist.playing === true,
-    `res=${res}`,
+    "CT-B playlist inicia exatamente uma faixa",
+    res === "started" && playingInPlaylist.length === 1,
+    `res=${res}, tocando=${playingInPlaylist.length}`,
+  );
+
+  await stopAll();
+  res = await engine.applyMode(
+    "auto",
+    [],
+    [
+      { ...track(a.uuid), role: "music" },
+      { ...track(b.uuid), role: "sfx" },
+    ],
+    0,
+  );
+  check(
+    "CT-C cena aceita música + SFX",
+    ["started", "crossfaded"].includes(res) && a.playing && b.playing,
+    `res=${res}, música=${a.playing}, sfx=${b.playing}`,
   );
 
   // RF-011 fonte inválida: erro tipado, sem exceção não tratada

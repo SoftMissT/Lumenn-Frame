@@ -6,9 +6,10 @@ import { LumennSettings } from "./settings.mjs";
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 const { DragDrop } = foundry.applications.ux;
 
-// Abaixo de 40% os Audio Nodes viram alvos menores que uma linha de texto e
-// deixam de ser operáveis. Fit All respeita este piso e o operador usa pan.
-const MIN_ZOOM = 0.4;
+// Abaixo de 55% os nodes e ports deixam de ser alvos confortáveis. Fit All
+// respeita este piso: grafos grandes continuam acessíveis por pan, sem reduzir
+// o editor a uma miniatura impossível de operar.
+const MIN_ZOOM = 0.55;
 const MAX_ZOOM = 2.0;
 const ZOOM_STEP = 1.25;
 
@@ -29,6 +30,17 @@ const COLORS = [
   "#ffffff",
 ];
 const SIZES = ["compact", "normal", "large"];
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+function normalizeHexColor(value, fallback = "#000000") {
+  const raw = String(value ?? "").trim();
+  if (HEX_COLOR.test(raw)) return raw;
+  if (/^#[0-9a-f]{3}$/i.test(raw)) {
+    return `#${[...raw.slice(1)].map((c) => `${c}${c}`).join("")}`;
+  }
+  return HEX_COLOR.test(fallback) ? fallback : "#000000";
+}
 
 function nodeSize(type, size) {
   return NODE_SIZES[type]?.[size] ?? NODE_SIZES[type]?.normal ?? [260, 175];
@@ -81,10 +93,13 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
   #selected = { kind: null, id: null };
   #connectState = null;
   #edgeFrame = null;
+  #pendingEdgeNodes = new Map();
+  #edgeGraphSnapshot = null;
   #expanded = false;
   #prevPosition = null;
   #transitioning = false;
   #suppressClick = false;
+  #suppressNodeClick = false;
 
   static DEFAULT_OPTIONS = {
     id: "lumenn-storyboard",
@@ -319,7 +334,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
   #applyCamera(root = this.element) {
     const camEl = root.querySelector(".lf-camera");
     if (camEl)
-      camEl.style.transform = `translate(${this.#camera.panX}px, ${this.#camera.panY}px) scale(${this.#camera.zoom})`;
+      camEl.style.transform = `translate3d(${this.#camera.panX}px, ${this.#camera.panY}px, 0) scale(${this.#camera.zoom})`;
     const pct = root.querySelector("[data-camera-percent]");
     if (pct) pct.textContent = `${Math.round(this.#camera.zoom * 100)}%`;
   }
@@ -404,10 +419,15 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     }
 
+    const defaultColors = LumennGraphStore.getDefaultColors();
     const nodes = (activeGraph?.nodes ?? []).map((n) => {
       const [w, h] = nodeSize(n.type, n.size);
       const out = {
         ...n,
+        color: normalizeHexColor(
+          n.color,
+          defaultColors[n.type] ?? "#73707c",
+        ),
         width: w,
         height: h,
         isActive: n.id === activeGraph.activeNodeId,
@@ -663,40 +683,84 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   #bindNode(root, node) {
     if (!this.#editable()) return;
+    // Scene thumbnails are draggable by default in Chromium. That native drag
+    // competes with Foundry's DragDrop and can move/attach a second node.
+    node.addEventListener("dragstart", (event) => event.preventDefault());
     node.addEventListener("pointerdown", (e) => {
       if (e.target.closest("button") || e.target.closest("[data-port]")) return;
       if (this.#spaceDown || e.button !== 0) return;
       if (this.#tool === "hand") return;
       e.preventDefault();
-      this.#suppressClick = true;
+      e.stopPropagation();
+      this.#suppressNodeClick = false;
       this.#selected = { kind: "node", id: node.dataset.id };
+      root
+        .querySelectorAll(".lf-node.selected")
+        .forEach((el) => el.classList.remove("selected"));
+      node.classList.add("selected");
       node.setPointerCapture(e.pointerId);
       const viewport = root.querySelector(".lf-viewport");
-      const beat = LumennGraphStore.getNode(this.#graphId, node.dataset.id);
+      const viewportRect = viewport.getBoundingClientRect();
+      const graphSnapshot = LumennGraphStore.getGraph(this.#graphId);
+      const beat = graphSnapshot?.nodes?.find(
+        (candidate) => candidate.id === node.dataset.id,
+      );
       const base = beat?.position ?? { x: 0, y: 0 };
-      const w0 = this.#screenToWorld(this.#clientToScreen(e, viewport));
+      const pointerToWorld = (event) => this.#screenToWorld({
+        x: event.clientX - viewportRect.left,
+        y: event.clientY - viewportRect.top,
+      });
+      const w0 = pointerToWorld(e);
       const grab = { x: w0.x - base.x, y: w0.y - base.y };
+      let next = { ...base };
+      let moved = false;
+      node.classList.add("dragging");
       const move = (ev) => {
-        const w = this.#screenToWorld(this.#clientToScreen(ev, viewport));
-        node.style.left = `${Math.round(w.x - grab.x)}px`;
-        node.style.top = `${Math.round(w.y - grab.y)}px`;
-        this.#scheduleEdgeDraw(root);
+        ev.preventDefault();
+        ev.stopPropagation();
+        const w = pointerToWorld(ev);
+        next = {
+          x: Math.round(w.x - grab.x),
+          y: Math.round(w.y - grab.y),
+        };
+        const dx = next.x - base.x;
+        const dy = next.y - base.y;
+        if (!moved && Math.hypot(dx, dy) >= 3) moved = true;
+        node.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+        this.#scheduleEdgeDraw(root, node.dataset.id, next, graphSnapshot);
       };
       const up = async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
         if (node.hasPointerCapture?.(ev.pointerId))
           node.releasePointerCapture(ev.pointerId);
         node.removeEventListener("pointermove", move);
         node.removeEventListener("pointerup", up);
         node.removeEventListener("pointercancel", up);
-        const w = this.#screenToWorld(this.#clientToScreen(ev, viewport));
-        await LumennGraphStore.updateNode(this.#graphId, node.dataset.id, {
-          position: {
-            x: Math.round(w.x - grab.x),
-            y: Math.round(w.y - grab.y),
-          },
+        node.classList.remove("dragging");
+        node.style.transform = "";
+        node.style.left = `${next.x}px`;
+        node.style.top = `${next.y}px`;
+        this.#suppressNodeClick = moved;
+        if (this.#edgeFrame !== null) cancelAnimationFrame(this.#edgeFrame);
+        this.#edgeFrame = null;
+        this.#pendingEdgeNodes.clear();
+        this.#edgeGraphSnapshot = null;
+        this.#updateIncidentEdges(
+          root,
+          graphSnapshot,
+          new Map([[node.dataset.id, next]]),
+        );
+        const updated = await LumennGraphStore.updateNode(this.#graphId, node.dataset.id, {
+          position: next,
         });
+        if (!updated) {
+          node.style.left = `${base.x}px`;
+          node.style.top = `${base.y}px`;
+          this.#drawEdges(root);
+          return;
+        }
         this.#resizeWorld(root);
-        this.#drawEdges(root);
       };
       node.addEventListener("pointermove", move);
       node.addEventListener("pointerup", up, { once: true });
@@ -708,6 +772,12 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const nodeEl = e.target.closest?.(".lf-node");
     if (!nodeEl) return;
     if (e.target.closest("button") || e.target.closest("[data-port]")) return;
+    if (this.#suppressNodeClick) {
+      this.#suppressNodeClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (this.#mode === "live") {
       if (nodeEl.dataset.id && this.#isNavigable(nodeEl.dataset.id))
         this.#navigateTo(nodeEl.dataset.id);
@@ -894,19 +964,57 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /* ── Edges ──────────────────────────────────────────────────────── */
 
-  #portAnchor(nodeId, port) {
-    const node = LumennGraphStore.getNode(this.#graphId, nodeId);
+  #portAnchor(nodeId, port, positionOverride = null, graph = null) {
+    const node = graph?.nodes?.find((candidate) => candidate.id === nodeId) ??
+      LumennGraphStore.getNode(this.#graphId, nodeId);
     if (!node) return { x: 0, y: 0 };
     const [w, h] = nodeSize(node.type, node.size);
-    const p = node.position;
+    const p = positionOverride ?? node.position;
     if (port === "flow-out") return { x: p.x + w, y: p.y + h * 0.3 };
     if (port === "flow-in") return { x: p.x, y: p.y + h * 0.3 };
     if (port === "audio-out") return { x: p.x + w, y: p.y + h * 0.62 };
     return { x: p.x, y: p.y + h * 0.62 };
   }
 
+  #edgeGeometry(edge, graph, positionOverrides = null) {
+    const fromPosition = positionOverrides?.get(edge.from) ?? null;
+    const toPosition = positionOverrides?.get(edge.to) ?? null;
+    const a = edge.type === "flow"
+      ? this.#portAnchor(edge.from, "flow-out", fromPosition, graph)
+      : this.#portAnchor(edge.from, "audio-out", fromPosition, graph);
+    const b = edge.type === "flow"
+      ? this.#portAnchor(edge.to, "flow-in", toPosition, graph)
+      : this.#portAnchor(edge.to, "audio-in", toPosition, graph);
+    const hasReverse = edge.type === "flow" && graph.edges.some(
+      (candidate) => candidate.type === "flow" &&
+        candidate.from === edge.to && candidate.to === edge.from,
+    );
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const length = Math.max(1, Math.hypot(dx, dy));
+    const nx = -dy / length;
+    const ny = dx / length;
+    const bend = edge.type === "flow" && hasReverse
+      ? (edge.from < edge.to ? 54 : -54)
+      : edge.type === "audio" ? 18 : 0;
+    const c1x = a.x + dx * 0.33 + nx * bend;
+    const c1y = a.y + dy * 0.33 + ny * bend;
+    const c2x = a.x + dx * 0.66 + nx * bend;
+    const c2y = a.y + dy * 0.66 + ny * bend;
+    return {
+      d: `M ${a.x} ${a.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${b.x} ${b.y}`,
+      midX: (a.x + b.x) / 2 + nx * bend,
+      midY: (a.y + b.y) / 2 + ny * bend,
+      nx,
+      ny,
+    };
+  }
+
   #drawEdges(root) {
+    if (this.#edgeFrame !== null) cancelAnimationFrame(this.#edgeFrame);
     this.#edgeFrame = null;
+    this.#pendingEdgeNodes.clear();
+    this.#edgeGraphSnapshot = null;
     const svg = root.querySelector(".lf-edges");
     const graph = LumennGraphStore.getGraph(this.#graphId);
     if (!svg) return;
@@ -914,37 +1022,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     // sobre o canvas, pois elas poluem o grafo e sugerem um estado travado.
     svg.innerHTML = "";
     for (const e of graph?.edges ?? []) {
-      const from = LumennGraphStore.getNode(this.#graphId, e.from);
-      const to = LumennGraphStore.getNode(this.#graphId, e.to);
+      const from = graph.nodes.find((node) => node.id === e.from);
+      const to = graph.nodes.find((node) => node.id === e.to);
       if (!from || !to) continue;
-      const a =
-        e.type === "flow"
-          ? this.#portAnchor(e.from, "flow-out")
-          : this.#portAnchor(e.from, "audio-out");
-      const b =
-        e.type === "flow"
-          ? this.#portAnchor(e.to, "flow-in")
-          : this.#portAnchor(e.to, "audio-in");
-      const hasReverse =
-        e.type === "flow" &&
-        graph.edges.some(
-          (x) => x.type === "flow" && x.from === e.to && x.to === e.from,
-        );
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const length = Math.max(1, Math.hypot(dx, dy));
-      const nx = -dy / length;
-      const ny = dx / length;
-      const bend = e.type === "flow" && hasReverse
-        ? (e.from < e.to ? 54 : -54)
-        : e.type === "audio" ? 18 : 0;
-      const c1x = a.x + dx * 0.33 + nx * bend;
-      const c1y = a.y + dy * 0.33 + ny * bend;
-      const c2x = a.x + dx * 0.66 + nx * bend;
-      const c2y = a.y + dy * 0.66 + ny * bend;
-      const midX = (a.x + b.x) / 2 + nx * bend;
-      const midY = (a.y + b.y) / 2 + ny * bend;
-      const d = `M ${a.x} ${a.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${b.x} ${b.y}`;
+      const { d, midX, midY, nx, ny } = this.#edgeGeometry(e, graph);
 
       if (e.type === "audio") {
         const role = from.data?.audioRole === "sfx" ? "sfx" : "music";
@@ -958,6 +1039,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
           "class",
           `lf-edge-audio-role lf-edge-audio-role-${role}`,
         );
+        rolePath.setAttribute("data-edge-id", e.id);
         rolePath.setAttribute("vector-effect", "non-scaling-stroke");
         svg.appendChild(rolePath);
       }
@@ -1036,6 +1118,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
           text.setAttribute("stroke-linejoin", "round");
           text.setAttribute("paint-order", "stroke");
           text.setAttribute("class", "lf-edge-label");
+          text.setAttribute("data-edge-id", e.id);
           text.textContent = label;
           svg.appendChild(text);
         }
@@ -1072,9 +1155,57 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     svg.appendChild(ghost);
   }
 
-  #scheduleEdgeDraw(root = this.element) {
+  #updateIncidentEdges(root, graph, positionOverrides) {
+    const svg = root.querySelector(".lf-edges");
+    if (!svg || !graph) return;
+    const dirtyNodes = new Set(positionOverrides.keys());
+    for (const edge of graph.edges ?? []) {
+      if (!dirtyNodes.has(edge.from) && !dirtyNodes.has(edge.to)) continue;
+      const geometry = this.#edgeGeometry(edge, graph, positionOverrides);
+      const elements = svg.querySelectorAll(`[data-edge-id="${edge.id}"]`);
+      for (const element of elements) {
+        if (element.tagName.toLowerCase() === "text") {
+          element.setAttribute("x", geometry.midX);
+          element.setAttribute("y", geometry.midY - 6);
+          continue;
+        }
+        element.setAttribute("d", geometry.d);
+        if (edge.type !== "audio" || element.classList.contains("lf-edge-hit") || element.classList.contains("lf-edge-audio-role")) continue;
+        const side = element.classList.contains("lf-edge-audio-left") ? -2.5 : 2.5;
+        element.setAttribute(
+          "transform",
+          `translate(${geometry.nx * side} ${geometry.ny * side})`,
+        );
+      }
+    }
+  }
+
+  #scheduleEdgeDraw(
+    root = this.element,
+    nodeId = null,
+    position = null,
+    graphSnapshot = null,
+  ) {
+    if (nodeId && position) this.#pendingEdgeNodes.set(nodeId, position);
+    if (graphSnapshot) this.#edgeGraphSnapshot = graphSnapshot;
     if (this.#edgeFrame !== null) return;
-    this.#edgeFrame = requestAnimationFrame(() => this.#drawEdges(root));
+    this.#edgeFrame = requestAnimationFrame(() => {
+      this.#edgeFrame = null;
+      if (!this.#pendingEdgeNodes.size) {
+        this.#drawEdges(root);
+        return;
+      }
+      const overrides = new Map(this.#pendingEdgeNodes);
+      this.#pendingEdgeNodes.clear();
+      const graph = this.#edgeGraphSnapshot ??
+        LumennGraphStore.getGraph(this.#graphId);
+      this.#edgeGraphSnapshot = null;
+      this.#updateIncidentEdges(
+        root,
+        graph,
+        overrides,
+      );
+    });
   }
 
   #ghostPath() {
@@ -1291,6 +1422,30 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     cur[parts[parts.length - 1]] = val;
   }
 
+  #mergeEdgePatch(edge, patch) {
+    if (!patch.transition) return patch;
+    const merged = {
+      ...patch,
+      transition: {
+        ...(edge?.transition ?? {}),
+        ...patch.transition,
+        scene: {
+          ...(edge?.transition?.scene ?? {}),
+          ...(patch.transition.scene ?? {}),
+        },
+        audio: {
+          ...(edge?.transition?.audio ?? {}),
+          ...(patch.transition.audio ?? {}),
+        },
+      },
+    };
+    merged.transition.scene.color = normalizeHexColor(
+      merged.transition.scene.color,
+      "#000000",
+    );
+    return merged;
+  }
+
   #inspectorChange(e) {
     const path = e.currentTarget.dataset.insp;
     let val =
@@ -1309,6 +1464,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const kind = this.#selected.kind;
     const id = this.#selected.id;
     if (!path || !kind || !id) return;
+    if (path.endsWith(".color")) {
+      val = normalizeHexColor(val, "#000000");
+      e.currentTarget.value = val;
+    }
     if (kind === "node") {
       const node = LumennGraphStore.getNode(this.#graphId, id);
       const patch = {};
@@ -1318,11 +1477,22 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         data: { ...node.data, ...(patch.data ?? {}) },
       }).then(() => this.render());
     } else if (kind === "edge") {
+      const edge = LumennGraphStore.getEdge(this.#graphId, id);
       const patch = {};
       this.#setPath(patch, path, val);
-      LumennGraphStore.updateEdge(this.#graphId, id, patch).then(() =>
-        this.render(),
-      );
+      LumennGraphStore.updateEdge(
+        this.#graphId,
+        id,
+        this.#mergeEdgePatch(edge, patch),
+      ).then(() => {
+        const graph = LumennGraphStore.getGraph(this.#graphId);
+        const edge = graph?.edges?.find((candidate) => candidate.id === id);
+        if (!edge) return;
+        const label = this.element.querySelector(
+          `.lf-edge-label[data-edge-id="${id}"]`,
+        );
+        if (label) label.textContent = this.#edgeLabelText(edge) ?? "";
+      });
     }
   }
 
@@ -1343,9 +1513,14 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
           data: { ...node.data, ...(patch.data ?? {}) },
         }).then(() => this.render());
       } else if (kind === "edge") {
+        const edge = LumennGraphStore.getEdge(this.#graphId, id);
         const patch = {};
         this.#setPath(patch, path, val);
-        LumennGraphStore.updateEdge(this.#graphId, id, patch).then(() =>
+        LumennGraphStore.updateEdge(
+          this.#graphId,
+          id,
+          this.#mergeEdgePatch(edge, patch),
+        ).then(() =>
           this.render(),
         );
       }
@@ -1420,7 +1595,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
           scene,
           type: sceneTrans.type ?? "cut",
           duration: sceneTrans.duration ?? 1000,
-          color: sceneTrans.color ?? "#000000",
+          color: normalizeHexColor(sceneTrans.color, "#000000"),
         });
       }
     } else if (action === "add-return") {
@@ -1611,7 +1786,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             scene,
             type: sceneTrans.type ?? "cut",
             duration: sceneTrans.duration ?? 1000,
-            color: sceneTrans.color ?? "#000000",
+            color: normalizeHexColor(sceneTrans.color, "#000000"),
           });
           if (scResult === "fallback") {
             await lumennClientSceneFade(scene.id, sceneTrans);
@@ -1710,6 +1885,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
           ...base,
           kind: "edge",
           edge,
+          sceneColor: normalizeHexColor(
+            edge.transition?.scene?.color,
+            "#000000",
+          ),
           edgeType: edge.type,
           audioTransition: edge.transition?.audio ?? {
             mode: "auto",

@@ -273,6 +273,7 @@
   overflow: hidden;
   background: var(--lf-ink);
   z-index: 1;
+  touch-action: none;
 }
 
 .lf-camera {
@@ -404,6 +405,16 @@
   cursor: grab;
   transition: border-color var(--lf-transition), box-shadow var(--lf-transition);
   box-shadow: inset 3px 0 var(--node-color), var(--lf-shadow);
+  user-select: none;
+  touch-action: none;
+  contain: layout style;
+}
+
+.lf-node.dragging {
+  cursor: grabbing;
+  z-index: 7;
+  will-change: transform;
+  transition: none;
 }
 
 /* Conteúdo interno clippado (thumbnail/título), mantendo o card arredondado. */
@@ -524,6 +535,8 @@
   object-fit: cover;
   display: block;
   pointer-events: none;
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 .lf-node-thumb .lf-node-thumb-ph {

@@ -2,6 +2,37 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.25] - 2026-09-22 — canvas interativo e SVG incremental
+
+### Fixed
+
+- Arrastar um nó usa `translate3d` durante o gesto e grava `left/top` somente
+  ao soltar, evitando layout completo a cada evento de ponteiro.
+- O SVG deixa de ser destruído e recriado durante o arraste: somente as
+  geometrias das conexões incidentes ao nó movido são atualizadas, uma vez por
+  frame com `requestAnimationFrame`.
+- O término de um arraste não é mais interpretado como clique no nó, evitando
+  renderização integral do editor e ativação acidental de cena.
+- O gesto do nó deixa de propagar para o viewport/DragDrop do Foundry;
+  thumbnails não iniciam drag nativo e cada card possui contenção de layout,
+  impedindo que mover um nó desloque ou anexe outro.
+- Leituras de nós durante o desenho reutilizam o snapshot do Graph, em vez de
+  clonar o setting mundial repetidamente para cada extremidade de cada edge.
+- Cores vazias ou inválidas são normalizadas antes de alimentar
+  `<input type="color">`, removendo o erro repetido de formato `#rrggbb`.
+- Patches de campos aninhados agora preservam o restante de `transition.scene`
+  e `transition.audio`; editar um controle não apaga os demais.
+- Alterações de uma transição conectada atualizam seu label sem renderizar toda
+  a ApplicationV2.
+- O zoom mínimo do `Fit` passou de 40% para 55%, mantendo cards, textos e ports
+  operáveis; grafos maiores continuam navegáveis por pan.
+
+### Runtime Validation Pending
+
+- Medir arraste e pan em Foundry 14.367 com o Graph real de 20 nós / 47 edges.
+- Confirmar seleção, conexão e edição pós-arraste em GM e visualização em
+  jogador conectado.
+
 ## [0.0.24] - 2026-09-22 — áudio, transições e paleta semântica
 
 ### Fixed

@@ -247,12 +247,36 @@
   cursor: pointer;
   transition: background var(--lf-transition), color var(--lf-transition), border-color var(--lf-transition);
 }
-.lf-tool[data-tool="select"] { --lf-tool-color: var(--lf-selected); color: var(--lf-selected); }
-.lf-tool[data-tool="hand"] { --lf-tool-color: #94a3b8; color: #94a3b8; }
-.lf-tool[data-tool="connect"] { --lf-tool-color: var(--lf-flow-out); color: var(--lf-flow-out); }
-.lf-tool[data-tool="scene"] { --lf-tool-color: var(--lf-scene); color: var(--lf-scene); }
-.lf-tool[data-tool="audio"] { --lf-tool-color: var(--lf-music); color: var(--lf-music); }
-.lf-tool[data-tool="note"] { --lf-tool-color: var(--lf-note); color: var(--lf-note); }
+
+.lf-tool[data-tool="select"] {
+  --lf-tool-color: var(--lf-selected);
+  color: var(--lf-selected);
+}
+
+.lf-tool[data-tool="hand"] {
+  --lf-tool-color: #94a3b8;
+  color: #94a3b8;
+}
+
+.lf-tool[data-tool="connect"] {
+  --lf-tool-color: var(--lf-flow-out);
+  color: var(--lf-flow-out);
+}
+
+.lf-tool[data-tool="scene"] {
+  --lf-tool-color: var(--lf-scene);
+  color: var(--lf-scene);
+}
+
+.lf-tool[data-tool="audio"] {
+  --lf-tool-color: var(--lf-music);
+  color: var(--lf-music);
+}
+
+.lf-tool[data-tool="note"] {
+  --lf-tool-color: var(--lf-note);
+  color: var(--lf-note);
+}
 
 .lf-tool:hover {
   color: var(--lf-text);
@@ -274,6 +298,7 @@
   background: var(--lf-ink);
   z-index: 1;
   touch-action: none;
+  overscroll-behavior: contain;
 }
 
 .lf-camera {
@@ -313,6 +338,7 @@
   pointer-events: stroke;
   cursor: pointer;
 }
+
 .lf-edges .lf-edge-hit:hover {
   stroke: rgba(255, 255, 255, .08);
 }
@@ -326,13 +352,39 @@
   vector-effect: non-scaling-stroke;
   transition: stroke-width var(--lf-transition), filter var(--lf-transition), opacity var(--lf-transition);
 }
-.lf-edge-flow { stroke-linecap: round; }
-.lf-edge-audio { stroke-linecap: round; stroke-width: 2.5px; }
-.lf-edge-audio-left { stroke: #ffffff; }
+
+.lf-edge-flow {
+  stroke-linecap: round;
+}
+
+.lf-edge-audio {
+  stroke-linecap: round;
+  stroke-width: 2.5px;
+}
+
+.lf-edge-audio-left {
+  stroke: #ffffff;
+}
+
+.lf-edge-dock {
+  pointer-events: none;
+  stroke: #101014;
+  stroke-width: 1.5px;
+}
+
+.lf-edge-dock-flow {
+  fill: var(--lf-amber);
+}
+
+.lf-edge-dock-audio {
+  fill: #ef4444;
+}
+
 .lf-edge:hover {
   stroke-width: 4px;
   filter: brightness(1.45);
 }
+
 .lf-edge-label {
   font-weight: 600;
   user-select: none;
@@ -376,20 +428,77 @@
   pointer-events: none;
   z-index: 8;
 }
-.lf-audio-key { display: inline-flex; align-items: center; gap: 4px; }
-.lf-audio-key i { width: 15px; height: 2px; display: inline-block; border-radius: 2px; }
-.lf-audio-key-scene i { background: var(--lf-scene); height: 4px; }
-.lf-audio-key-music i { background: var(--lf-music); height: 4px; }
-.lf-audio-key-sfx i { background: var(--lf-sfx); height: 4px; }
-.lf-audio-key-note i { background: var(--lf-note); height: 4px; }
-.lf-audio-key-active i { background: var(--lf-active); height: 4px; }
-.lf-audio-key-navigable i { background: var(--lf-navigable); height: 4px; }
-.lf-audio-key-selected i { background: var(--lf-selected); height: 4px; }
-.lf-audio-key-target i { background: var(--lf-target); height: 4px; }
-.lf-audio-key-flow-in i { background: var(--lf-flow-in); height: 4px; }
-.lf-audio-key-flow-out i { background: var(--lf-flow-out); height: 4px; }
-.lf-audio-key-left i { background: var(--lf-input); }
-.lf-audio-key-right i { background: var(--lf-output); }
+
+.lf-audio-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lf-audio-key i {
+  width: 15px;
+  height: 2px;
+  display: inline-block;
+  border-radius: 2px;
+}
+
+.lf-audio-key-scene i {
+  background: var(--lf-scene);
+  height: 4px;
+}
+
+.lf-audio-key-music i {
+  background: var(--lf-music);
+  height: 4px;
+}
+
+.lf-audio-key-sfx i {
+  background: var(--lf-sfx);
+  height: 4px;
+}
+
+.lf-audio-key-note i {
+  background: var(--lf-note);
+  height: 4px;
+}
+
+.lf-audio-key-active i {
+  background: var(--lf-active);
+  height: 4px;
+}
+
+.lf-audio-key-navigable i {
+  background: var(--lf-navigable);
+  height: 4px;
+}
+
+.lf-audio-key-selected i {
+  background: var(--lf-selected);
+  height: 4px;
+}
+
+.lf-audio-key-target i {
+  background: var(--lf-target);
+  height: 4px;
+}
+
+.lf-audio-key-flow-in i {
+  background: var(--lf-flow-in);
+  height: 4px;
+}
+
+.lf-audio-key-flow-out i {
+  background: var(--lf-flow-out);
+  height: 4px;
+}
+
+.lf-audio-key-left i {
+  background: var(--lf-input);
+}
+
+.lf-audio-key-right i {
+  background: var(--lf-output);
+}
 
 /* ── Nodes ─────────────────────────────────────────────────────────── */
 .lf-node {
@@ -400,7 +509,8 @@
   border: 2px solid var(--lf-badge-border);
   border-radius: 6px;
   box-shadow: var(--lf-shadow);
-  overflow: visible;      /* ports externos não podem ser recortados */
+  overflow: visible;
+  /* ports externos não podem ser recortados */
   z-index: 3;
   cursor: grab;
   transition: border-color var(--lf-transition), box-shadow var(--lf-transition);
@@ -443,22 +553,31 @@
   box-shadow: inset 3px 0 var(--node-color), 0 0 16px #ec489966, 0 4px 16px #00000080;
 }
 
-.lf-node-scene .lf-node-head { background: var(--lf-scene) !important; }
-.lf-node-note .lf-node-head { background: var(--lf-note) !important; }
+.lf-node-scene .lf-node-head {
+  background: var(--lf-scene) !important;
+}
+
+.lf-node-note .lf-node-head {
+  background: var(--lf-note) !important;
+}
 
 /* Função do áudio: violeta = música contínua, ciano = efeito sonoro. */
 .lf-node-audio.lf-audio-role-music {
   border-color: #8b5cf680;
 }
+
 .lf-node-audio.lf-audio-role-music .lf-node-head {
   background: var(--lf-music) !important;
 }
+
 .lf-node-audio.lf-audio-role-sfx {
   border-color: #22d3ee80;
 }
+
 .lf-node-audio.lf-audio-role-sfx .lf-node-head {
   background: var(--lf-sfx) !important;
 }
+
 .lf-audio-role-badge {
   display: inline-block;
   margin-right: 5px;
@@ -467,8 +586,14 @@
   border-radius: 999px;
   font-weight: 700;
 }
-.lf-audio-role-music .lf-audio-role-badge { color: #c4b5fd; }
-.lf-audio-role-sfx .lf-audio-role-badge { color: #67e8f9; }
+
+.lf-audio-role-music .lf-audio-role-badge {
+  color: #c4b5fd;
+}
+
+.lf-audio-role-sfx .lf-audio-role-badge {
+  color: #67e8f9;
+}
 
 .lf-edge-audio-role {
   pointer-events: none;
@@ -476,8 +601,14 @@
   opacity: .32;
   filter: blur(.3px);
 }
-.lf-edge-audio-role-music { stroke: var(--lf-music); }
-.lf-edge-audio-role-sfx { stroke: var(--lf-sfx); }
+
+.lf-edge-audio-role-music {
+  stroke: var(--lf-music);
+}
+
+.lf-edge-audio-role-sfx {
+  stroke: var(--lf-sfx);
+}
 
 .lf-node.active {
   box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-active), 0 0 18px #22c55e66, 0 4px 16px #00000080;
@@ -630,6 +761,7 @@
   z-index: 5;
   transition: opacity var(--lf-transition), border-color var(--lf-transition), box-shadow var(--lf-transition), transform var(--lf-transition);
 }
+
 /* Hit area expandida (mín. ~24px) sem inflar o círculo visual. */
 .lf-port::after {
   content: "";
@@ -637,8 +769,12 @@
   inset: -9px;
   border-radius: 50%;
 }
+
 /* Em Edição os ports ficam visíveis: FLOW amarelo/laranja, AUDIO branco/vermelho. */
-.lumenn-frame.graph-editor.editing .lf-port { opacity: 1; }
+.lumenn-frame.graph-editor.editing .lf-port {
+  opacity: 1;
+}
+
 .lf-node:hover .lf-port,
 .lf-node.selected .lf-port,
 .lf-viewport.connect-mode .lf-port {
@@ -660,6 +796,7 @@
   border-color: var(--lf-flow-in);
   color: var(--lf-flow-in);
 }
+
 .lf-port-flow-out {
   border-color: var(--lf-flow-out);
   color: var(--lf-flow-out);
@@ -779,10 +916,14 @@
 
 /* ── Inspector ─────────────────────────────────────────────────────── */
 .lf-inspector {
-  flex: 0 0 280px;
-  min-width: 0;
+  flex: 0 1 340px;
+  width: 340px;
+  min-width: 320px;
+  min-height: 0;
   padding: 10px;
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
   background: var(--lf-panel);
   border-left: 1px solid #ffffff0a;
   z-index: 60;
@@ -792,10 +933,27 @@
 }
 
 @media (max-width: 1100px) {
-  .lf-inspector { flex-basis: 280px; }
-  .lf-topbar { gap: 6px; padding: 8px 12px; }
-  .lf-toolbar-left { width: 48px; flex-basis: 48px; }
-  .lf-tool { width: 38px; height: 38px; font-size: 17px; }
+  .lf-inspector {
+    flex-basis: 320px;
+    width: 320px;
+    min-width: 300px;
+  }
+
+  .lf-topbar {
+    gap: 6px;
+    padding: 8px 12px;
+  }
+
+  .lf-toolbar-left {
+    width: 48px;
+    flex-basis: 48px;
+  }
+
+  .lf-tool {
+    width: 38px;
+    height: 38px;
+    font-size: 17px;
+  }
 }
 
 .lf-insp-title {
@@ -860,6 +1018,7 @@
   color: var(--lf-text);
   opacity: .85;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .lf-audio-routing-note {
@@ -878,6 +1037,7 @@
   max-height: 140px;
   overflow-y: auto;
 }
+
 .lf-insp-edges li {
   display: flex;
   align-items: center;
@@ -892,7 +1052,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.lf-insp-edge-dir { color: var(--lf-muted); flex: 0 0 auto; }
+
+.lf-insp-edge-dir {
+  color: var(--lf-muted);
+  flex: 0 0 auto;
+}
+
 .lf-insp-edge-open {
   min-width: 0;
   flex: 1 1 auto;
@@ -908,11 +1073,16 @@
   cursor: pointer;
   overflow: hidden;
 }
+
 .lf-insp-edge-open span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.lf-insp-edge-open:hover { color: var(--lf-amber); }
+
+.lf-insp-edge-open:hover {
+  color: var(--lf-amber);
+}
+
 .lf-insp-x {
   flex: 0 0 auto;
   margin-left: auto;
@@ -923,7 +1093,10 @@
   font-size: 10px;
   line-height: 1;
 }
-.lf-insp-x:hover { color: var(--lf-danger); }
+
+.lf-insp-x:hover {
+  color: var(--lf-danger);
+}
 
 .lf-swatches {
   display: flex;
@@ -1003,18 +1176,22 @@
   font-size: 15px;
   line-height: 1;
 }
+
 .lf-node-tag i,
 .lf-node-title i {
   margin-right: 4px;
   font-size: 10px;
   opacity: .8;
 }
+
 .lf-node-title i {
   font-size: 11px;
 }
+
 .lf-empty-icon i {
   font-size: 32px;
 }
+
 .lf-node-thumb-ph i {
   font-size: 26px;
   color: var(--lf-muted);

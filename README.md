@@ -48,13 +48,13 @@ quando o grafo estiver muito cheio.
 
 ## Nós e conexões
 
-| Elemento | Função | Navegação ao vivo |
-| :-- | :-- | :-- |
-| Cena | Representa uma Scene do Foundry | Sim |
-| Áudio | Playlist ou PlaylistSound | Sim, quando ligada por AUDIO |
-| Nota | Anotação privada do mestre | Não |
-| FLOW | Define caminho e transição narrativa | Sim |
-| AUDIO | Roteia áudio e sua transição | Sim entre os nós ligados |
+| Elemento | Função                               | Navegação ao vivo            |
+| :------- | :----------------------------------- | :--------------------------- |
+| Cena     | Representa uma Scene do Foundry      | Sim                          |
+| Áudio    | Playlist ou PlaylistSound            | Sim, quando ligada por AUDIO |
+| Nota     | Anotação privada do mestre           | Não                          |
+| FLOW     | Define caminho e transição narrativa | Sim                          |
+| AUDIO    | Roteia áudio e sua transição         | Sim entre os nós ligados     |
 
 As conexões são direcionais: `A → B` não cria automaticamente `B → A`.
 
@@ -63,19 +63,19 @@ As conexões são direcionais: `A → B` não cria automaticamente `B → A`.
 Cada cor possui uma função única e permanece visível mesmo quando o nó é
 selecionado ou está ativo:
 
-| Cor | Significado |
-| :-- | :-- |
-| Âmbar | Cena e conexão FLOW |
-| Amarelo | Porta FLOW IN |
-| Laranja | Porta FLOW OUT |
-| Violeta | Música e rota musical |
-| Ciano | Efeito sonoro (SFX) e sua rota |
-| Azul | Nota |
-| Verde | Nó inicial/ativo |
-| Verde-limão | Destino navegável no modo Ao Vivo |
-| Branco | Seleção, AUDIO IN e canal esquerdo |
-| Vermelho | AUDIO OUT e canal direito |
-| Rosa | Destino válido durante uma conexão |
+| Cor         | Significado                        |
+| :---------- | :--------------------------------- |
+| Âmbar       | Cena e conexão FLOW                |
+| Amarelo     | Porta FLOW IN                      |
+| Laranja     | Porta FLOW OUT                     |
+| Violeta     | Música e rota musical              |
+| Ciano       | Efeito sonoro (SFX) e sua rota     |
+| Azul        | Nota                               |
+| Verde       | Nó inicial/ativo                   |
+| Verde-limão | Destino navegável no modo Ao Vivo  |
+| Branco      | Seleção, AUDIO IN e canal esquerdo |
+| Vermelho    | AUDIO OUT e canal direito          |
+| Rosa        | Destino válido durante uma conexão |
 
 O cabeçalho identifica o tipo do nó; as portas indicam entrada e saída; o
 contorno mostra o estado. As linhas possuem uma área invisível de clique maior
@@ -93,6 +93,11 @@ Cada FLOW possui escopo independente:
 
 Também é possível configurar o tipo e a duração da transição de cena, além do
 comportamento de áudio daquele caminho.
+
+No Foundry v14, o select também inclui três filtros próprios do Lumenn:
+**Zoom In**, **Zoom Out** e **Dissolver cruzado**. Eles usam o mesmo pipeline
+`canvas.transition.run` das transições nativas; em clientes jogadores, a
+transição é reproduzida localmente sem ativar a Scene globalmente.
 
 ### AUDIO
 
@@ -118,27 +123,29 @@ prioridade; os SFX são disparados juntos. Um nó de Playlist inicia uma faixa c
 
 ## Controles do canvas
 
-| Entrada | Ação |
-| :-- | :-- |
-| Roda do mouse | Zoom centralizado no cursor |
-| `Espaço` + arrastar | Mover a câmera |
-| Botão do meio + arrastar | Mover a câmera |
-| `-`, `100%`, `+` | Controlar zoom |
-| `Fit` | Enquadrar todos os nós |
-| `Expandir` | Usar o espaço completo da janela |
+| Entrada                  | Ação                             |
+| :----------------------- | :------------------------------- |
+| Roda do mouse / trackpad | Deslocar o canvas                |
+| `Shift` + roda           | Deslocar horizontalmente         |
+| `Ctrl`/`Cmd` + roda      | Zoom centralizado no cursor      |
+| `Espaço` + arrastar      | Mover a câmera                   |
+| Botão do meio + arrastar | Mover a câmera                   |
+| `-`, `100%`, `+`         | Controlar zoom                   |
+| `Fit`                    | Enquadrar todos os nós           |
+| `Expandir`               | Usar o espaço completo da janela |
 
-O zoom mínimo é 40% para manter os Audio Nodes legíveis e clicáveis. No
+O zoom mínimo é 20% para permitir uma visão geral de grafos extensos. No
 Inspector do storyboard, a lista **Nós de áudio** centraliza e seleciona qualquer
 Audio Node mesmo em grafos grandes.
 
 ## Compatibilidade
 
-| Foundry | Estado |
-| :-- | :-- |
-| 14.367 | Alvo principal declarado no manifesto |
-| 13.350+ | Compatibilidade retroativa pretendida |
-| Abaixo de 13.350 | Não suportado |
-| 15 ou superior | Ainda não declarado |
+| Foundry          | Estado                                |
+| :--------------- | :------------------------------------ |
+| 14.367           | Alvo principal declarado no manifesto |
+| 13.350+          | Compatibilidade retroativa pretendida |
+| Abaixo de 13.350 | Não suportado                         |
+| 15 ou superior   | Ainda não declarado                   |
 
 As diferenças entre versões ficam concentradas em
 `scripts/foundry-compat.mjs`. Consulte [COMPATIBILITY.md](COMPATIBILITY.md) para

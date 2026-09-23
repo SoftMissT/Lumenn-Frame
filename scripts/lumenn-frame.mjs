@@ -8,10 +8,12 @@ import { LumennSettings } from "./settings.mjs";
 import { LumennCompat, SOCKET_NAME } from "./foundry-compat.mjs";
 import { LumennGraphApp, lumennClientSceneFade } from "./storyboard-app.mjs";
 import { registerHandlebarsHelpers } from "./handlebars-helpers.mjs";
+import { registerLumennTransitions } from "./custom-transitions.mjs";
 
 const MODULE_ID = "lumenn-frame";
 
 Hooks.once("init", () => {
+  registerLumennTransitions();
   registerHandlebarsHelpers();
   LumennSettings.register();
   LumennGraphStore.registerSettings();
@@ -66,8 +68,14 @@ Hooks.once("ready", () => {
     if (LumennCompat.isGM()) return; // GM já executou localmente
     if (payload.type === "transition:start") {
       const scope = payload.scope ?? "both";
-      if ((scope === "scene" || scope === "both") && LumennSettings.get("playerSceneFade")) {
-        lumennClientSceneFade(payload.sceneId ?? null, payload.sceneTrans ?? {});
+      if (
+        (scope === "scene" || scope === "both") &&
+        LumennSettings.get("playerSceneFade")
+      ) {
+        lumennClientSceneFade(
+          payload.sceneId ?? null,
+          payload.sceneTrans ?? {},
+        );
       }
     }
   });

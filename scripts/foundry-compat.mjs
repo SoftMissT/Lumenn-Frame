@@ -1,9 +1,9 @@
 /**
- * LumennCompat — camada central de compatibilidade Foundry.
+ * LumennCompat camada central de compatibilidade Foundry.
  *
  * PRIMÁRIO:  Foundry VTT 14.367 (API canônica).
  * RETROATIVO: Foundry VTT 13.350+ (adapter apenas onde há diferença verificada).
- * Faixa: 13.350 → 14.999.
+ * Faixa: 13.350 ? 14.999.
  *
  * Regra: cada método documenta a implementação V14, o fallback V13 e a fonte.
  * Nenhuma API exclusiva de uma geração é usada fora desta camada.
@@ -33,7 +33,7 @@ export const LumennCompat = {
    * Extrai o payload do drag (sidebar) de forma compatível.
    * V14: `foundry.applications.ux.TextEditor.getDragEventData(event)`.
    * V13: mesmo namespace (idêntico). Fallback: parse manual do `text/plain`.
-   * Fonte: Context7 (ApplicationV2/DragDrop), idêntico v13→v14.
+   * Fonte: Context7 (ApplicationV2/DragDrop), idêntico v13?v14.
    */
   getDragData(event) {
     const TE = foundry.applications?.ux?.TextEditor;
@@ -85,7 +85,7 @@ export const LumennCompat = {
 
   /**
    * Atualiza um PlaylistSound (fade/playing).
-   * V14: `PlaylistSound#update({fade, playing})` — campo persistido é `fade`;
+   * V14: `PlaylistSound#update({fade, playing})` campo persistido é `fade`;
    *      `fadeDuration` é accessor computado (NUNCA gravar). V13: idêntico.
    * Fonte: schema PlaylistSoundData (`fade?: number`) + accessor `fadeDuration`.
    */
@@ -103,13 +103,13 @@ export const LumennCompat = {
     return sound.fade ?? sound.fadeDuration ?? sound.data?.fade ?? null;
   },
 
-  /** Grava o fade persistido (campo `fade`) — nunca `fadeDuration`. */
+  /** Grava o fade persistido (campo `fade`) nunca `fadeDuration`. */
   setPlaylistSoundFade(sound, value) {
     if (sound?.update) return sound.update({ fade: value });
     return null;
   },
 
-  /* ── Sockets (module socket) ─────────────────────────────────────── */
+  /* -- Sockets (module socket) --------------------------------------- */
   // V14: `game.socket.emit/on` com `"socket": true` no manifest. V13: idêntico.
   // Fonte: Context7 (sockets).
 
@@ -151,11 +151,16 @@ export const LumennCompat = {
   expandWorkspace(app) {
     const { width, height } = this.getViewportSize();
     const prev = { ...(app.position ?? {}) };
-    app.setPosition({ left: 8, top: 8, width: width - 16, height: height - 16 });
+    app.setPosition({
+      left: 8,
+      top: 8,
+      width: width - 16,
+      height: height - 16,
+    });
     return prev;
   },
 
-  /* ── Scene transitions (V14 canônico) ────────────────────────────── */
+  /* -- Scene transitions (V14 canônico) ------------------------------ */
 
   /**
    * Enumera transições de Scene disponíveis em runtime.
@@ -165,11 +170,31 @@ export const LumennCompat = {
   getSceneTransitions() {
     const registry = CONFIG.Canvas?.sceneTransitions;
     if (registry && Object.keys(registry).length) {
-      return Object.values(registry).map((d) => ({
-        id: d.id ?? d.transitionType,
-        label: d.label,
-        defaultDuration: d.defaultDuration ?? 1000,
-      }));
+      return Object.values(registry).map((d) => {
+        const id = d.id ?? d.transitionType;
+        const rawLabel = d.label ?? id;
+        const localized = game.i18n?.localize?.(rawLabel) ?? rawLabel;
+        const fallback = {
+          crosshatch: "Crosshatch",
+          dots: "Pontos",
+          fade: "Dissolver",
+          glitch: "Glitch",
+          hole: "Buraco",
+          holeSwirl: "Espiral",
+          hologram: "Holograma",
+          morph: "Morfose",
+          swirl: "Redemoinho",
+          waterDrop: "Gota d'água",
+          waves: "Ondas",
+          whiteNoise: "Ruído branco",
+          wind: "Vento",
+        };
+        return {
+          id,
+          label: localized !== rawLabel ? localized : (fallback[id] ?? id),
+          defaultDuration: d.defaultDuration ?? 1000,
+        };
+      });
     }
     return [
       { id: "cut", label: "Cut", defaultDuration: 0 },
@@ -180,19 +205,27 @@ export const LumennCompat = {
 
   /** true se a build expõe o registry nativo de transições de Scene. */
   hasNativeSceneTransitions() {
-    return !!(CONFIG.Canvas?.sceneTransitions && Object.keys(CONFIG.Canvas.sceneTransitions).length);
+    return !!(
+      CONFIG.Canvas?.sceneTransitions &&
+      Object.keys(CONFIG.Canvas.sceneTransitions).length
+    );
   },
 
   /**
    * Executa a transição de Scene.
    * V14: `canvas.transition.run({nextScene, activate, duration, transitionType})`
    *      usando o registry nativo (feature-detected).
-   * V13/fallback: retorna "cut" | "fallback" — o chamador aplica o fade Lumenn
+   * V13/fallback: retorna "cut" | "fallback" o chamador aplica o fade Lumenn
    *      (fade/dip-to-color) via overlay. Nunca finge transição que o fallback
    *      não implementa.
    * @returns {Promise<"native"|"cut"|"fallback"|null>}
    */
-  async runSceneTransition({ scene, type, duration = 1000, color = "#000000" }) {
+  async runSceneTransition({
+    scene,
+    type,
+    duration = 1000,
+    color = "#000000",
+  }) {
     const tr = type ?? "cut";
     const native =
       CONFIG.Canvas?.sceneTransitions?.[tr] ??
@@ -216,7 +249,7 @@ export const LumennCompat = {
     return "fallback";
   },
 
-  /* ── Folders (recursivo) ─────────────────────────────────────────── */
+  /* -- Folders (recursivo) ------------------------------------------- */
 
   /**
    * Coleta documentos de uma pasta e de TODAS as subpastas (árvore completa).

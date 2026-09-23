@@ -152,6 +152,8 @@
   "LUMENN_FRAME.Settings.AutoConnectScenes.Hint": "Encadeia Scene Nodes importados em sequência com FLOW edges (OFF por padrão).",
   "LUMENN_FRAME.Inspector.Curve": "Curva",
   "LUMENN_FRAME.Inspector.Preview": "Preview da Transição",
+  "LUMENN_FRAME.WarnTransitionPreview": "Lumenn Frame: não foi possível reproduzir o preview desta transição.",
+  "LUMENN_FRAME.WarnSceneTransitionFallback": "Lumenn Frame: esta transição não está disponível neste cliente; usando fallback.",
   "LUMENN_FRAME.Inspector.Native": "V14 Nativo",
   "LUMENN_FRAME.Inspector.FallbackMode": "Fallback de compatibilidade",
   "LUMENN_FRAME.Edge.DipToColor": "Dip to Color",

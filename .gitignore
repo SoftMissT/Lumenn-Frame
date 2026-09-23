@@ -4,3 +4,10 @@ node_modules/
 Thumbs.db
 /SDD
 .verify-v002/
+.kilo
+/assets/*
+!/assets/lumenn_frame.webp
+AGENTS.md
+CLAUDE.md
+/.CLAUDE
+/graphify-out

@@ -2,6 +2,17 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.27] - 2026-09-23 captura robusta e preview isolado
+
+### Fixed
+
+- Os filtros customizados agora reutilizam uniforms e mapeamento de UV compatíveis com o `TextureTransitionFilter` do Foundry.
+- O registro das transições Lumenn não depende da transição padrão da Scene estar habilitada.
+- GM, jogadores e preview usam modos de ativação separados; o preview não ativa Scene, não emite socket e não altera áudio.
+- A HUD fica invisível durante o preview e é restaurada mesmo quando a transição falha ou é cancelada.
+- Fallbacks de cena agora avisam quando a transição nativa não está disponível.
+- Adicionados testes para registro sem defaults nativos, uniforms do filtro e restauração da Scene no preview.
+
 ## [0.0.26] - 2026-09-22 transições customizadas e HUD navegável
 
 ### Fixed

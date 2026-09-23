@@ -225,6 +225,7 @@ export const LumennCompat = {
     type,
     duration = 1000,
     color = "#000000",
+    activate = true,
   }) {
     const tr = type ?? "cut";
     const native =
@@ -232,21 +233,57 @@ export const LumennCompat = {
       Object.values(CONFIG.Canvas?.sceneTransitions ?? {}).find(
         (d) => (d.id ?? d.transitionType) === tr,
       );
-    if (native && canvas.transition?.run && scene) {
-      await canvas.transition.run({
-        nextScene: scene,
-        activate: true,
-        duration,
-        transitionType: tr,
-        ...(tr === "dip" ? { color } : {}),
-      });
-      return "native";
+    if (native && canvas.transition?.run && scene && canvas.app?.renderer) {
+      try {
+        await this.preloadScene(scene);
+        await canvas.transition.run({
+          nextScene: scene,
+          activate,
+          duration,
+          transitionType: tr,
+          ...(tr === "dip" ? { color } : {}),
+        });
+        return "native";
+      } catch (error) {
+        console.error("Lumenn Frame: falha na transição nativa; usando fallback.", error);
+      }
     }
     if (tr === "cut") {
-      if (scene) await this.activateScene(scene);
+      if (scene) {
+        if (activate) await this.activateScene(scene);
+        else if (scene.view) await scene.view();
+      }
       return "cut";
     }
+    console.warn(`Lumenn Frame: transition "${tr}" unavailable; using fallback.`);
     return "fallback";
+  },
+
+  /**
+   * Reproduz uma transição somente neste cliente e restaura a Scene visualizada.
+   * Nunca ativa a Scene globalmente, emite socket ou altera áudio/storyboard.
+   */
+  async previewSceneTransition({ scene, type, duration = 1000, color = "#000000" }) {
+    const previous = canvas.scene ?? null;
+    if (!scene) return "missing-scene";
+    try {
+      const result = await this.runSceneTransition({
+        scene,
+        type,
+        duration,
+        color,
+        activate: false,
+      });
+      if (result === "fallback" && scene.view) {
+        await scene.view();
+        await new Promise((resolve) => setTimeout(resolve, Math.max(0, duration)));
+      }
+      return result;
+    } finally {
+      if (previous?.id && canvas.scene?.id !== previous.id && previous.view) {
+        await previous.view();
+      }
+    }
   },
 
   /* -- Folders (recursivo) ------------------------------------------- */

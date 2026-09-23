@@ -5,21 +5,28 @@ const CUSTOM_TYPES = Object.freeze({
 });
 
 function createLumennFilter() {
-  const BaseFilter = foundry.canvas?.rendering?.filters?.AbstractBaseFilter;
-  if (!BaseFilter || !globalThis.PIXI?.TextureMatrix) return null;
+  const filters = foundry.canvas?.rendering?.filters;
+  const BaseFilter = filters?.TextureTransitionFilter ?? filters?.AbstractBaseFilter;
+  if (!BaseFilter || !globalThis.PIXI?.Matrix) return null;
 
   return class LumennTransitionFilter extends BaseFilter {
     static get defaultUniforms() {
       return {
+        ...(super.defaultUniforms ?? {}),
         progress: 0,
-        effect: 0,
+        type: 0,
         targetTexture: null,
         targetUVMatrix: new PIXI.Matrix(),
+        filterMatrix: new PIXI.Matrix(),
+        filterMatrixInverse: new PIXI.Matrix(),
+        backgroundColor: [0, 0, 0, 1],
       };
     }
 
     get type() {
-      return this.uniforms.effect;
+      return [CUSTOM_TYPES.ZOOM_IN, CUSTOM_TYPES.ZOOM_OUT, CUSTOM_TYPES.CROSS_DISSOLVE][
+        this.uniforms.type
+      ];
     }
 
     set type(type) {
@@ -29,7 +36,7 @@ function createLumennFilter() {
         [CUSTOM_TYPES.CROSS_DISSOLVE]: 2,
       }[type];
       if (effect === undefined) throw new Error(`Unknown Lumenn transition: ${type}`);
-      this.uniforms.effect = effect;
+      this.uniforms.type = effect;
     }
 
     set targetTexture(texture) {
@@ -52,10 +59,16 @@ function createLumennFilter() {
         uniform vec4 outputFrame;
         varying vec2 vTextureCoord;
         varying vec2 vFilterCoord;
-        void main() {
+        vec4 filterVertexPosition() {
           vec2 position = aVertexPosition * max(outputFrame.zw, vec2(0.)) + outputFrame.xy;
-          gl_Position = vec4((projectionMatrix * vec3(position, 1.0)).xy, 0.0, 1.0);
-          vTextureCoord = aVertexPosition * (outputFrame.zw * inputSize.zw);
+          return vec4((projectionMatrix * vec3(position, 1.0)).xy, 0.0, 1.0);
+        }
+        vec2 filterTextureCoord() {
+          return aVertexPosition * (outputFrame.zw * inputSize.zw);
+        }
+        void main() {
+          gl_Position = filterVertexPosition();
+          vTextureCoord = filterTextureCoord();
           vFilterCoord = (filterMatrix * vec3(vTextureCoord, 1.0)).xy;
         }
       `;
@@ -65,24 +78,31 @@ function createLumennFilter() {
       return `
         precision ${PIXI.Program.defaultFragmentPrecision} float;
         uniform float progress;
-        uniform float effect;
+        uniform float type;
         uniform sampler2D uSampler;
         uniform sampler2D targetTexture;
+        uniform mat3 filterMatrixInverse;
         uniform mat3 targetUVMatrix;
-        varying vec2 vTextureCoord;
+        uniform vec4 backgroundColor;
         varying vec2 vFilterCoord;
+
+        vec2 sourceUv(vec2 uv) {
+          return (filterMatrixInverse * vec3(uv, 1.0)).xy;
+        }
         vec2 targetUv(vec2 uv) {
           return (targetUVMatrix * vec3(uv, 1.0)).xy;
         }
         void main() {
-          vec2 center = vec2(0.5);
           float p = smoothstep(0.0, 1.0, progress);
-          float zoom = effect < 0.5 ? (1.0 + p * 0.42) : (1.0 - p * 0.32);
-          vec2 sourceUv = clamp(center + (vTextureCoord - center) * zoom, 0.0, 1.0);
-          vec4 source = texture2D(uSampler, sourceUv);
+          vec2 center = vec2(0.5);
+          vec2 sourceCoord = sourceUv(vFilterCoord);
+          float zoom = type < 0.5 ? (1.0 + p * 0.42) : (1.0 - p * 0.32);
+          vec2 zoomedSource = clamp(center + (sourceCoord - center) * zoom, 0.0, 1.0);
+          vec4 source = texture2D(uSampler, zoomedSource);
           vec4 target = texture2D(targetTexture, targetUv(vFilterCoord));
-          float mixAmount = effect > 1.5 ? p : smoothstep(0.5, 1.0, p);
-          gl_FragColor = mix(source, target, mixAmount);
+          target = mix(backgroundColor, target, target.a);
+          float amount = type > 1.5 ? p : smoothstep(0.5, 1.0, p);
+          gl_FragColor = mix(source, target, amount);
         }
       `;
     }
@@ -90,9 +110,11 @@ function createLumennFilter() {
 }
 
 export function registerLumennTransitions() {
-  const registry = CONFIG.Canvas?.sceneTransitions;
+  const config = (globalThis.CONFIG ??= {});
+  const canvasConfig = (config.Canvas ??= {});
+  const registry = (canvasConfig.sceneTransitions ??= {});
   const Filter = createLumennFilter();
-  if (!registry || !Filter) return false;
+  if (!Filter) return false;
   const definitions = {
     "lumenn-zoom-in": {
       id: "lumenn-zoom-in",

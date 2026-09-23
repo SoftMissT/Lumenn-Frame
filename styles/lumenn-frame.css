@@ -44,6 +44,12 @@
   isolation: isolate;
 }
 
+/* Preview usa o canvas real do Foundry; a janela volta no finally do caller. */
+.lumenn-frame.graph-editor.lf-previewing {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .lumenn-frame .window-header {
   background: var(--lf-panel);
   border-bottom: 1px solid #ffffff0a;

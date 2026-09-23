@@ -152,6 +152,8 @@
   "LUMENN_FRAME.Settings.AutoConnectScenes.Hint": "Chain imported Scene Nodes sequentially with FLOW edges (default OFF).",
   "LUMENN_FRAME.Inspector.Curve": "Curve",
   "LUMENN_FRAME.Inspector.Preview": "Preview Transition",
+  "LUMENN_FRAME.WarnTransitionPreview": "Lumenn Frame: this transition preview could not be played.",
+  "LUMENN_FRAME.WarnSceneTransitionFallback": "Lumenn Frame: this transition is unavailable on this client; using fallback.",
   "LUMENN_FRAME.Inspector.Native": "V14 Native",
   "LUMENN_FRAME.Inspector.FallbackMode": "Compatibility fallback",
   "LUMENN_FRAME.Edge.DipToColor": "Dip to Color",

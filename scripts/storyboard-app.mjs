@@ -67,28 +67,24 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function lumennClientSceneFade(sceneId, sceneTrans = {}) {
   const type = sceneTrans?.type ?? "fade";
   const scene = sceneId ? game.scenes.get(sceneId) : null;
-  const native =
-    type !== "fade" &&
-    scene &&
-    canvas.transition?.run &&
-    CONFIG.Canvas?.sceneTransitions?.[type];
-  if (native) {
-    await canvas.transition.run({
-      nextScene: scene,
-      activate: false,
-      duration: sceneTrans?.duration ?? 1000,
-      transitionType: type,
-    });
-    return "native";
-  }
+  const nativeResult = await LumennCompat.runSceneTransition({
+    scene,
+    type,
+    duration: sceneTrans?.duration ?? 1000,
+    color: normalizeHexColor(sceneTrans?.color, "#000000"),
+    activate: false,
+  });
+  if (nativeResult === "native" || nativeResult === "cut") return nativeResult;
   const el = fadeOverlay();
-  const duration = type === "fade" ? (sceneTrans?.duration ?? 500) : 0;
+  const duration = sceneTrans?.duration ?? 500;
   if (duration <= 0) return;
   el.style.transition = `opacity ${duration}ms ease`;
   el.style.opacity = "1";
   await sleep(duration);
-  if (sceneId && LumennCompat.isGM())
-    await LumennCompat.activateScene(game.scenes.get(sceneId));
+  if (sceneId) {
+    if (LumennCompat.isGM()) await LumennCompat.activateScene(scene);
+    else if (scene?.view) await scene.view();
+  }
   await sleep(40);
   el.style.opacity = "0";
   await sleep(duration);
@@ -116,6 +112,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
   #expanded = false;
   #prevPosition = null;
   #transitioning = false;
+  #previewing = false;
   #suppressClick = false;
   #suppressNodeClick = false;
 
@@ -140,6 +137,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this.#camera.zoom = clampGraphZoom(LumennSettings.getCameraDefaults().zoom);
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
+        if (this.#previewing) {
+          canvas.transition?.cancel?.();
+          e.preventDefault();
+          return;
+        }
         if (this.#connectState) {
           this.#connectState = null;
           this.#updateGhost();
@@ -1684,7 +1686,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }, 300);
   }
 
-  #inspectorAction(e) {
+  async #inspectorAction(e) {
     if (!this.#editable()) return;
     const action = e.currentTarget.dataset.inspAction;
     const root = this.element;
@@ -1759,6 +1761,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         });
       }
     } else if (action === "preview-transition") {
+      if (this.#previewing) return;
       const edge = LumennGraphStore.getEdge(this.#graphId, this.#selected.id);
       if (edge?.type !== "flow") return;
       const target = LumennGraphStore.getNode(this.#graphId, edge.to);
@@ -1770,12 +1773,24 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         : "both";
       const sceneTrans = edge.transition?.scene ?? { type: "cut", duration: 0 };
       if ((scope === "scene" || scope === "both") && scene) {
-        LumennCompat.runSceneTransition({
-          scene,
-          type: sceneTrans.type ?? "cut",
-          duration: sceneTrans.duration ?? 1000,
-          color: normalizeHexColor(sceneTrans.color, "#000000"),
-        });
+        this.#previewing = true;
+        e.currentTarget.disabled = true;
+        this.element?.classList.add("lf-previewing");
+        try {
+          await LumennCompat.previewSceneTransition({
+            scene,
+            type: sceneTrans.type ?? "cut",
+            duration: sceneTrans.duration ?? 1000,
+            color: normalizeHexColor(sceneTrans.color, "#000000"),
+          });
+        } catch (error) {
+          console.error("Lumenn Frame: preview da transição falhou.", error);
+          ui.notifications.warn(game.i18n.localize("LUMENN_FRAME.WarnTransitionPreview"));
+        } finally {
+          this.#previewing = false;
+          this.element?.classList.remove("lf-previewing");
+          e.currentTarget.disabled = false;
+        }
       }
     } else if (action === "add-return") {
       LumennGraphStore.addReturn(this.#graphId, this.#selected.id).then(() =>
@@ -1969,6 +1984,9 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             color: normalizeHexColor(sceneTrans.color, "#000000"),
           });
           if (scResult === "fallback") {
+            ui.notifications.warn(
+              game.i18n.localize("LUMENN_FRAME.WarnSceneTransitionFallback"),
+            );
             await lumennClientSceneFade(scene.id, sceneTrans);
           }
         }
@@ -2061,6 +2079,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             (x) =>
               x.type === "flow" && x.from === edge.to && x.to === edge.from,
           );
+        const transitionScope = ["audio", "scene", "both"].includes(
+          edge.transition?.scope,
+        )
+          ? edge.transition.scope
+          : "both";
         return {
           ...base,
           kind: "edge",
@@ -2077,16 +2100,16 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             fadeOutDuration: 0,
             curve: "linear",
           },
-          transitionScope: ["audio", "scene", "both"].includes(
-            edge.transition?.scope,
-          )
-            ? edge.transition.scope
-            : "both",
+          transitionScope,
           fromLabel: from ? this.#nodeLabel(from) : edge.from,
           toLabel: to ? this.#nodeLabel(to) : edge.to,
           reverse,
           sceneTransitions: LumennCompat.getSceneTransitions(),
           hasNativeTransitions: LumennCompat.hasNativeSceneTransitions(),
+          canPreviewTransition:
+            edge.type === "flow" &&
+            transitionScope !== "audio" &&
+            !!to?.data?.sceneId,
           curveOptions: ["linear", "equal-power"],
         };
       }

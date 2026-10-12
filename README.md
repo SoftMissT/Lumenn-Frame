@@ -163,6 +163,9 @@ configurações.
   possíveis, com contorno **verde-limão**.
 - Nós sem caminho a partir do ativo ficam **esmaecidos** (opcional).
 - Há uma opção para **confirmar** cada transição antes de executar.
+- Clique em um **nó de Áudio** para acionar a música ou o SFX sem trocar de cena: a música faz **crossfade** a partir da que está tocando (usa o modo e a duração da linha AUDIO desse nó com a cena ativa); o SFX toca por cima; clicar de novo em um que está tocando faz fade out. O nó que está tocando fica com brilho.
+- Cena e música andam **juntas**: ao navegar, o efeito de cena e o crossfade começam ao mesmo tempo.
+- Se a Scene tiver playlist própria (aba de áudio da Scene no Foundry), o módulo suspende essa troca automática durante a navegação do storyboard, para a música seguir o que está nas linhas AUDIO e não ser cortada.
 - No Ao Vivo ainda é possível ajustar as **transições de áudio** da linha
   selecionada, sem sair do modo.
 - Com **Fade de cena para jogadores** ligado, os jogadores veem o mesmo efeito
@@ -229,10 +232,7 @@ contorno verde-limão, ligados ao nó ativo por uma linha FLOW. Defina o nó
 inicial antes (botão **Início** no Inspector).
 
 **A transição que escolhi não aparece.** Confira se o escopo da linha é **Cena**
-ou **Beat** e se o efeito escolhido existe na sua versão do Foundry. Até a
-v0.0.28 a transição configurada na linha era substituída pela da própria Scene
-na hora da ativação; isso foi corrigido na v0.0.29. Se atualizou agora, recarregue
-a página.
+ou **Beat** e se o efeito escolhido existe na sua versão do Foundry. Até a v0.0.29 o efeito escolhido na linha não chegava a tocar no Foundry 14 (a animação terminava sem rodar e a Scene aplicava o efeito dela); isso foi corrigido na v0.0.30. Depois de atualizar, recarregue a página (F5).
 
 **O áudio não troca.** O nó de Áudio precisa estar **ligado por uma linha AUDIO**
 à cena de destino e ter uma fonte escolhida (playlist ou faixa). Veja também o
@@ -470,6 +470,9 @@ settings.
   destinations have a **lime** outline.
 - Nodes with no path from the active one are **dimmed** (optional).
 - There is an option to **confirm** each transition before it runs.
+- Click an **Audio node** to trigger music or an SFX without changing scene: music **crossfades** from whatever is playing (it uses the mode and duration of that node's AUDIO line to the active scene); an SFX plays on top; clicking one that is already playing fades it out. The playing node glows.
+- Scene and music move **together**: when you navigate, the scene effect and the crossfade start at the same time.
+- If a Scene has its own playlist (the Scene's audio tab in Foundry), the module suspends that automatic switch while it drives the storyboard, so the music follows the AUDIO lines and is not cut.
 - In Live mode you can still adjust the **audio transitions** of the selected
   line without leaving the mode.
 - With **Scene fade for players** on, players see the same scene effect the GM
@@ -536,10 +539,7 @@ outline, linked to the active node by a FLOW line, are navigable. Set the
 initial node first (the **Start** button in the Inspector).
 
 **The transition I picked does not show.** Check that the line's scope is
-**Scene** or **Beat** and that the effect exists in your Foundry version. Up to
-v0.0.28 the transition configured on the line was overridden by the Scene's own
-at activation time; this was fixed in v0.0.29. If you just updated, reload the
-page.
+**Scene** or **Beat** and that the effect exists in your Foundry version. Up to v0.0.29 the effect chosen on the line did not actually play on Foundry 14 (the animation ended without running and the Scene applied its own effect); this was fixed in v0.0.30. After updating, reload the page (F5).
 
 **The audio does not switch.** The Audio node must be **connected by an AUDIO
 line** to the destination scene and must have a source chosen (playlist or

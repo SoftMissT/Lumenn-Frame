@@ -56,13 +56,15 @@ aqui é para que você decida com informação.
    `[inferência a partir do escopo; não testado em Foundry real]`.
    **Não guarde segredos de campanha em Notas.**
 2. **Mensagens de socket sem autenticação.** O módulo escuta o canal
-   `module.lumenn-frame` nos clientes de jogadores e confia no conteúdo
-   recebido (`transition:start`). O Foundry não identifica o remetente de
-   mensagens de socket de módulo `[conhecimento geral; não verificado nesta
-   versão do Foundry]`. Um cliente modificado poderia disparar, nos outros
-   jogadores, a exibição de uma Scene que o cliente deles já conhece (efeito
-   visual, sem vazamento de dados). Só tem efeito quando **Fade de cena para
-   jogadores** está ligado.
+   `module.lumenn-frame` nos clientes de jogadores. No **Foundry 14** o cliente do
+   jogador **não executa mais** troca de Scene a partir dessas mensagens: a troca
+   chega pela ativação feita pelo GM. No **Foundry 13** o modo de reserva ainda
+   confia no conteúdo (`transition:start`), e o Foundry não identifica o
+   remetente de mensagens de socket de módulo `[conhecimento geral; não
+   verificado nesta versão do Foundry]`: um cliente modificado poderia exibir nos
+   outros jogadores uma Scene que o cliente deles já conhece (efeito visual, sem
+   vazamento de dados). Só tem efeito quando **Fade de cena para jogadores** está
+   ligado.
 3. **Sem validação em Foundry real.** As versões 0.0.x passaram em testes
    estáticos; o teste com GM e jogador ainda está pendente. Trate o módulo como
    pré-lançamento.
@@ -135,12 +137,14 @@ decide with full information.
    console `[inference from the scope; not tested in real Foundry]`.
    **Do not keep campaign secrets in Notes.**
 2. **Unauthenticated socket messages.** The module listens on the
-   `module.lumenn-frame` channel on player clients and trusts the content it
-   receives (`transition:start`). Foundry does not identify the sender of module
-   socket messages `[general knowledge; not verified on this Foundry version]`.
-   A modified client could make other players' clients display a Scene their
-   client already knows about (a visual effect, no data leak). It only matters
-   when **Scene fade for players** is on.
+   `module.lumenn-frame` channel on player clients. On **Foundry 14** the player
+   client **no longer performs** a scene switch from those messages: the switch
+   arrives through the GM's activation. On **Foundry 13** the fallback mode still
+   trusts the content (`transition:start`), and Foundry does not identify the
+   sender of module socket messages `[general knowledge; not verified on this
+   Foundry version]`: a modified client could make other players display a Scene
+   their client already knows about (a visual effect, no data leak). It only
+   matters when **Scene fade for players** is on.
 3. **Not validated in real Foundry.** 0.0.x versions passed static tests; the
    GM-and-player test is still pending. Treat the module as pre-release.
 

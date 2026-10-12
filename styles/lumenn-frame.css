@@ -1,36 +1,61 @@
-/* Lumenn Frame – Graph Editor 2.0 (Cinematic Edit Bay theme) ──────────────── */
+/* Lumenn Frame – Graph Editor 2.0 (Cinematic Edit Bay) ─────────────────────
+   Direção: chrome calmo e preciso; cor só onde carrega significado (tipo de nó,
+   direção, estado). O âmbar é o único acento da interface; o resto é neutro.
+   Fontes: Modesto Condensed (títulos) e Signika (corpo), ambas já embutidas no
+   Foundry. Nada de CDN, nada de fonte que dependa da máquina do usuário. */
 
-/* ── Variables ─────────────────────────────────────────────────────── */
+/* ── Tokens ────────────────────────────────────────────────────────── */
 .lumenn-frame {
+  /* neutros */
   --lf-ink: #0c0c0f;
   --lf-surface: #16161a;
   --lf-panel: #1d1d23;
   --lf-panel-alt: #242430;
   --lf-text: #e0ddd4;
-  --lf-muted: #73707c;
+  /* texto secundário: 5,87:1 sobre --lf-panel (o antigo #73707c dava 3,46:1) */
+  --lf-muted: #9a97a6;
+  --lf-badge: #2b2c33;
+  --lf-badge-border: #3b3c44;
+  --lf-hairline: #ffffff0f;
+
+  /* acento da interface */
   --lf-amber: #f0a321;
   --lf-amber-dim: #f0a32166;
-  --lf-teal: #2dd4bf;
-  --lf-teal-dim: #2dd4bf55;
-  --lf-danger: #e45656;
+  --lf-focus: #ffd166;
+
+  /* semântica do grafo */
   --lf-scene: #f59e0b;
-  --lf-flow-in: #facc15;
-  --lf-flow-out: #f97316;
   --lf-music: #8b5cf6;
   --lf-sfx: #22d3ee;
   --lf-note: #3b82f6;
+  --lf-flow-in: #facc15;
+  --lf-flow-out: #f97316;
+  --lf-input: #f8fafc;
+  --lf-output: #ef4444;
+
+  /* estados */
   --lf-active: #22c55e;
   --lf-navigable: #84cc16;
   --lf-target: #ec4899;
-  --lf-input: #f8fafc;
-  --lf-output: #ef4444;
   --lf-selected: #ffffff;
-  --lf-badge: #2b2c33;
-  --lf-badge-border: #3b3c44;
+  --lf-teal: #2dd4bf;
+  --lf-teal-dim: #2dd4bf55;
+  --lf-danger: #e45656;
+  --lf-danger-solid: #c2414b; /* branco sobre ele: 5,06:1 */
+
   --lf-shadow: 0 2px 10px #00000060;
-  --lf-font-display: "Modesto Condensed", "Signika", serif;
-  --lf-font-body: "Montserrat", "Signika", sans-serif;
+  --lf-shadow-lift: 0 4px 16px #00000080;
+
+  /* tipografia: piso de 11px, escala curta */
+  --lf-font-display: "Modesto Condensed", "Signika", sans-serif;
+  --lf-font-body: "Signika", sans-serif;
+  --lf-fs-xs: 11px;
+  --lf-fs-sm: 12px;
+  --lf-fs-md: 13px;
+  --lf-fs-lg: 16px;
+
   --lf-radius: 4px;
+  --lf-control-h: 28px;
   --lf-transition: 0.15s ease;
 }
 
@@ -52,13 +77,13 @@
 
 .lumenn-frame .window-header {
   background: var(--lf-panel);
-  border-bottom: 1px solid #ffffff0a;
+  border-bottom: 1px solid var(--lf-hairline);
 }
 
 .lumenn-frame .window-header .window-title {
   font-family: var(--lf-font-display);
   color: var(--lf-amber);
-  letter-spacing: .04em;
+  letter-spacing: 0.04em;
 }
 
 .lumenn-frame.graph-editor .window-content {
@@ -76,25 +101,10 @@
   min-height: 0;
 }
 
-/* Film grain + vignette (sutis, não bloqueiam interação) */
-.lf-root::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 50;
-  opacity: .045;
-  background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 255, 255, .03) 2px, rgba(255, 255, 255, .03) 4px);
-  background-size: 100% 4px;
-}
-
-.lf-root::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 49;
-  background: radial-gradient(ellipse at center, transparent 62%, rgba(12, 12, 15, .5) 100%);
+/* Foco visível em todo controle (antes só havia troca de borda nos inputs). */
+.lumenn-frame :is(button, select, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--lf-focus);
+  outline-offset: 2px;
 }
 
 /* ── Topbar ────────────────────────────────────────────────────────── */
@@ -102,41 +112,38 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 8px;
+  gap: 6px 8px;
   padding: 6px 10px;
   background: var(--lf-panel);
-  border-bottom: 1px solid #ffffff0a;
+  border-bottom: 1px solid var(--lf-hairline);
   z-index: 60;
 }
 
+/* O título da janela do Foundry já diz "Lumenn Frame": repetir aqui só gasta largura. */
 .lf-brand {
-  font-family: var(--lf-font-display);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: .04em;
-  color: var(--lf-amber);
-  text-transform: uppercase;
-  white-space: nowrap;
+  display: none;
 }
 
 .lf-topbar select {
-  flex: 0 1 180px;
+  flex: 0 1 200px;
   min-width: 0;
+  height: var(--lf-control-h);
   background: var(--lf-badge);
   border: 1px solid var(--lf-badge-border);
   color: var(--lf-text);
   font-family: var(--lf-font-body);
-  font-size: 12px;
-  padding: 3px 6px;
+  font-size: var(--lf-fs-sm);
+  padding: 0 8px;
   border-radius: var(--lf-radius);
   cursor: pointer;
 }
 
 .lf-top-btn {
+  height: var(--lf-control-h);
   font-family: var(--lf-font-body);
-  font-size: 11.5px;
+  font-size: var(--lf-fs-sm);
   font-weight: 500;
-  padding: 3px 10px;
+  padding: 0 11px;
   border: 1px solid var(--lf-badge-border);
   border-radius: var(--lf-radius);
   background: var(--lf-badge);
@@ -155,7 +162,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding-left: 2px;
+  padding-left: 8px;
   border-left: 1px solid var(--lf-badge-border);
 }
 
@@ -166,8 +173,8 @@
 
 .lf-top-btn-danger:hover {
   color: #fff;
-  background: var(--lf-danger);
-  border-color: var(--lf-danger);
+  background: var(--lf-danger-solid);
+  border-color: var(--lf-danger-solid);
 }
 
 .lf-topbar-spacer {
@@ -176,6 +183,7 @@
 
 .lf-mode-toggle {
   display: flex;
+  height: var(--lf-control-h);
   border: 1px solid var(--lf-badge-border);
   border-radius: var(--lf-radius);
   overflow: hidden;
@@ -185,16 +193,24 @@
   border: none;
   border-radius: 0;
   font-family: var(--lf-font-body);
-  font-size: 11px;
-  padding: 3px 12px;
+  font-size: var(--lf-fs-sm);
+  font-weight: 500;
+  padding: 0 14px;
   color: var(--lf-muted);
   background: transparent;
   cursor: pointer;
+  transition: color var(--lf-transition), background var(--lf-transition);
+}
+
+.lf-mode-toggle button:not(.active):hover {
+  color: var(--lf-text);
+  background: var(--lf-panel-alt);
 }
 
 .lf-mode-toggle button.active {
   background: var(--lf-amber);
   color: var(--lf-ink);
+  font-weight: 600;
 }
 
 .lf-mode-toggle button:not(:first-child) {
@@ -204,19 +220,21 @@
 .lf-camera-controls {
   display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 2px;
+  gap: 2px;
+  height: var(--lf-control-h);
+  padding: 0 2px;
   background: var(--lf-badge);
   border: 1px solid var(--lf-badge-border);
   border-radius: var(--lf-radius);
 }
 
 .lf-camera-controls button {
+  height: 22px;
   font-family: var(--lf-font-body);
-  font-size: 11px;
+  font-size: var(--lf-fs-xs);
   font-weight: 600;
-  min-width: 22px;
-  padding: 2px 6px;
+  min-width: 24px;
+  padding: 0 7px;
   border: none;
   border-radius: 3px;
   background: transparent;
@@ -229,9 +247,9 @@
 }
 
 .lf-camera-controls .lf-camera-percent {
-  min-width: 40px;
+  min-width: 42px;
   text-align: center;
-  font-size: 11px;
+  font-size: var(--lf-fs-xs);
   color: var(--lf-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -249,18 +267,18 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 6px 4px;
-  width: 40px;
-  flex: 0 0 40px;
+  padding: 8px 4px;
+  width: 42px;
+  flex: 0 0 42px;
   background: var(--lf-panel);
-  border-right: 1px solid #ffffff0a;
+  border-right: 1px solid var(--lf-hairline);
   z-index: 60;
 }
 
 .lf-tool {
   --lf-tool-color: var(--lf-text);
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -268,44 +286,21 @@
   border: 1px solid var(--lf-badge-border);
   border-radius: var(--lf-radius);
   background: var(--lf-badge);
-  color: var(--lf-muted);
+  color: var(--lf-tool-color);
   cursor: pointer;
   transition: background var(--lf-transition), color var(--lf-transition), border-color var(--lf-transition);
 }
 
-.lf-tool[data-tool="select"] {
-  --lf-tool-color: var(--lf-selected);
-  color: var(--lf-selected);
-}
-
-.lf-tool[data-tool="hand"] {
-  --lf-tool-color: #94a3b8;
-  color: #94a3b8;
-}
-
-.lf-tool[data-tool="connect"] {
-  --lf-tool-color: var(--lf-flow-out);
-  color: var(--lf-flow-out);
-}
-
-.lf-tool[data-tool="scene"] {
-  --lf-tool-color: var(--lf-scene);
-  color: var(--lf-scene);
-}
-
-.lf-tool[data-tool="audio"] {
-  --lf-tool-color: var(--lf-music);
-  color: var(--lf-music);
-}
-
-.lf-tool[data-tool="note"] {
-  --lf-tool-color: var(--lf-note);
-  color: var(--lf-note);
-}
+.lf-tool[data-tool="select"] { --lf-tool-color: var(--lf-selected); }
+.lf-tool[data-tool="hand"] { --lf-tool-color: #94a3b8; }
+.lf-tool[data-tool="connect"] { --lf-tool-color: var(--lf-flow-out); }
+.lf-tool[data-tool="scene"] { --lf-tool-color: var(--lf-scene); }
+.lf-tool[data-tool="audio"] { --lf-tool-color: var(--lf-music); }
+.lf-tool[data-tool="note"] { --lf-tool-color: var(--lf-note); }
 
 .lf-tool:hover {
-  color: var(--lf-text);
   border-color: var(--lf-muted);
+  background: var(--lf-panel-alt);
 }
 
 .lf-tool.active {
@@ -314,13 +309,21 @@
   border-color: var(--lf-tool-color);
 }
 
+.lf-tool i {
+  font-size: 15px;
+  line-height: 1;
+}
+
 /* ── Viewport / Camera / World ─────────────────────────────────────── */
+/* Vinheta pintada no próprio fundo: não há camada extra cobrindo o editor. */
 .lf-viewport {
   flex: 1 1 auto;
   min-width: 0;
   position: relative;
   overflow: hidden;
-  background: var(--lf-ink);
+  background:
+    radial-gradient(ellipse at center, transparent 62%, #00000080 100%),
+    var(--lf-ink);
   z-index: 1;
   touch-action: none;
   overscroll-behavior: contain;
@@ -336,13 +339,8 @@
   will-change: transform;
 }
 
-.lf-viewport.space-hold {
-  cursor: grab;
-}
-
-.lf-viewport.panning {
-  cursor: grabbing;
-}
+.lf-viewport.space-hold { cursor: grab; }
+.lf-viewport.panning { cursor: grabbing; }
 
 .lf-viewport.drag-over {
   outline: 2px dashed var(--lf-amber);
@@ -365,17 +363,17 @@
 }
 
 .lf-edges .lf-edge-hit:hover {
-  stroke: rgba(255, 255, 255, .08);
+  stroke: #ffffff14;
 }
 
 .lf-edges .lf-ghost {
   pointer-events: none;
 }
 
-/* ── Edge hover / labels ──────────────────────────────────────────── */
+/* ── Edges ─────────────────────────────────────────────────────────── */
 .lf-edge {
   vector-effect: non-scaling-stroke;
-  transition: stroke-width var(--lf-transition), filter var(--lf-transition), opacity var(--lf-transition);
+  transition: stroke-width var(--lf-transition), opacity var(--lf-transition);
 }
 
 .lf-edge-flow {
@@ -391,159 +389,158 @@
   stroke: #ffffff;
 }
 
+/* Sem filter: brightness/blur em SVG força repaint por frame durante pan/hover. */
+.lf-edge:hover {
+  stroke-width: 4px;
+}
+
 .lf-edge-dock {
   pointer-events: none;
   stroke: #101014;
   stroke-width: 1.5px;
 }
 
-.lf-edge-dock-flow {
-  fill: var(--lf-amber);
+.lf-edge-dock-flow { fill: var(--lf-amber); }
+.lf-edge-dock-audio { fill: var(--lf-output); }
+
+.lf-edge-audio-role {
+  pointer-events: none;
+  stroke-width: 8px;
+  opacity: 0.28;
 }
 
-.lf-edge-dock-audio {
-  fill: #ef4444;
-}
+.lf-edge-audio-role-music { stroke: var(--lf-music); }
+.lf-edge-audio-role-sfx { stroke: var(--lf-sfx); }
 
-.lf-edge:hover {
-  stroke-width: 4px;
-  filter: brightness(1.45);
-}
-
+/* O rótulo contra-escala pelo zoom da câmera (--lf-inv-zoom, definida no
+   #applyCamera) para não virar pó quando o grafo está afastado. O teto 1,5
+   segura o crescimento: o SVG fica sob os cards, então um rótulo mais largo
+   que o vão entre dois nós ainda passa por baixo deles. */
 .lf-edge-label {
+  --lf-label-scale: min(var(--lf-inv-zoom, 1), 1.5);
+  font-size: calc(11px * var(--lf-label-scale));
+  stroke-width: calc(3px * var(--lf-label-scale));
   font-weight: 600;
   user-select: none;
 }
 
-/* ── Connect hint ─────────────────────────────────────────────────── */
-.lf-connect-hint {
+/* ── Overlays do viewport ──────────────────────────────────────────── */
+.lf-connect-hint,
+.lf-transitioning {
   position: absolute;
   top: 10px;
   left: 50%;
   transform: translateX(-50%);
   padding: 5px 14px;
-  border: 1px solid var(--lf-amber-dim);
   border-radius: 999px;
   background: #101014f2;
-  color: var(--lf-amber);
   font-family: var(--lf-font-body);
-  font-size: 12px;
+  font-size: var(--lf-fs-sm);
   font-weight: 600;
-  z-index: 8;
   pointer-events: none;
-  animation: lf-fadeIn .18s ease;
+  animation: lf-fadeIn 0.18s ease;
 }
 
+.lf-connect-hint {
+  border: 1px solid var(--lf-amber-dim);
+  color: var(--lf-amber);
+  z-index: 8;
+}
+
+.lf-transitioning {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--lf-teal-dim);
+  color: var(--lf-teal);
+  z-index: 7;
+}
+
+.lf-transitioning .lf-transitioning-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lf-teal);
+  animation: lf-pulse 0.9s ease-in-out infinite;
+}
+
+/* Legenda: frases curtas em caixa de frase, 11px (antes 9px em caixa alta). */
 .lf-audio-legend {
   position: absolute;
   right: 12px;
   bottom: 10px;
   display: flex;
   flex-wrap: wrap;
-  max-width: min(520px, calc(100% - 24px));
-  gap: 9px;
-  padding: 4px 7px;
-  border: 1px solid #ffffff18;
-  border-radius: 4px;
-  background: #101014dd;
+  max-width: min(560px, calc(100% - 24px));
+  gap: 4px 14px;
+  padding: 6px 10px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: 6px;
+  background: #101014e6;
   color: var(--lf-muted);
-  font-size: 9px;
-  letter-spacing: .04em;
-  text-transform: uppercase;
+  font-size: var(--lf-fs-xs);
   pointer-events: none;
   z-index: 8;
 }
 
 .lf-audio-key {
+  --k: var(--lf-muted);
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 
 .lf-audio-key i {
-  width: 15px;
-  height: 2px;
+  width: 14px;
+  height: 4px;
   display: inline-block;
   border-radius: 2px;
+  background: var(--k);
 }
 
-.lf-audio-key-scene i {
-  background: var(--lf-scene);
-  height: 4px;
-}
+.lf-audio-key-scene { --k: var(--lf-scene); }
+.lf-audio-key-music { --k: var(--lf-music); }
+.lf-audio-key-sfx { --k: var(--lf-sfx); }
+.lf-audio-key-note { --k: var(--lf-note); }
+.lf-audio-key-active { --k: var(--lf-active); }
+.lf-audio-key-navigable { --k: var(--lf-navigable); }
+.lf-audio-key-selected { --k: var(--lf-selected); }
+.lf-audio-key-target { --k: var(--lf-target); }
+.lf-audio-key-flow-in { --k: var(--lf-flow-in); }
+.lf-audio-key-flow-out { --k: var(--lf-flow-out); }
+.lf-audio-key-left { --k: var(--lf-input); }
+.lf-audio-key-right { --k: var(--lf-output); }
 
-.lf-audio-key-music i {
-  background: var(--lf-music);
-  height: 4px;
-}
-
-.lf-audio-key-sfx i {
-  background: var(--lf-sfx);
-  height: 4px;
-}
-
-.lf-audio-key-note i {
-  background: var(--lf-note);
-  height: 4px;
-}
-
-.lf-audio-key-active i {
-  background: var(--lf-active);
-  height: 4px;
-}
-
-.lf-audio-key-navigable i {
-  background: var(--lf-navigable);
-  height: 4px;
-}
-
-.lf-audio-key-selected i {
-  background: var(--lf-selected);
-  height: 4px;
-}
-
-.lf-audio-key-target i {
-  background: var(--lf-target);
-  height: 4px;
-}
-
-.lf-audio-key-flow-in i {
-  background: var(--lf-flow-in);
-  height: 4px;
-}
-
-.lf-audio-key-flow-out i {
-  background: var(--lf-flow-out);
-  height: 4px;
-}
-
-.lf-audio-key-left i {
-  background: var(--lf-input);
-}
-
+.lf-audio-key-left i,
 .lf-audio-key-right i {
-  background: var(--lf-output);
+  height: 2px;
 }
 
 /* ── Nodes ─────────────────────────────────────────────────────────── */
 .lf-node {
+  --lf-role: var(--node-color);
   position: absolute;
   display: flex;
   flex-direction: column;
   background: var(--lf-panel);
   border: 2px solid var(--lf-badge-border);
   border-radius: 6px;
-  box-shadow: var(--lf-shadow);
+  /* barra lateral = cor escolhida pelo usuário; o resto empilha por estado */
+  box-shadow: inset 3px 0 var(--node-color), var(--lf-shadow);
+  /* ports ficam fora do card: não recortar */
   overflow: visible;
-  /* ports externos não podem ser recortados */
   z-index: 3;
   cursor: grab;
-  transition: border-color var(--lf-transition), box-shadow var(--lf-transition);
-  box-shadow: inset 3px 0 var(--node-color), var(--lf-shadow);
+  transition: border-color var(--lf-transition);
   user-select: none;
   touch-action: none;
   contain: layout style;
 }
+
+.lf-node-scene { --lf-role: var(--lf-scene); }
+.lf-node-note { --lf-role: var(--lf-note); }
+.lf-node-audio.lf-audio-role-music { --lf-role: var(--lf-music); border-color: #8b5cf680; }
+.lf-node-audio.lf-audio-role-sfx { --lf-role: var(--lf-sfx); border-color: #22d3ee80; }
 
 .lf-node.dragging {
   cursor: grabbing;
@@ -554,6 +551,7 @@
 
 /* Conteúdo interno clippado (thumbnail/título), mantendo o card arredondado. */
 .lf-node-content {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -569,79 +567,22 @@
 .lf-node.selected {
   outline: 2px solid var(--lf-selected);
   outline-offset: 2px;
-  box-shadow: inset 3px 0 var(--node-color), 0 0 0 1px #ffffff40, 0 4px 16px #00000080;
+  box-shadow: inset 3px 0 var(--node-color), 0 0 0 1px #ffffff40, var(--lf-shadow-lift);
 }
 
 .lf-node.target-hi {
   outline: 3px solid var(--lf-target);
   outline-offset: 3px;
-  box-shadow: inset 3px 0 var(--node-color), 0 0 16px #ec489966, 0 4px 16px #00000080;
-}
-
-.lf-node-scene .lf-node-head {
-  background: var(--lf-scene) !important;
-}
-
-.lf-node-note .lf-node-head {
-  background: var(--lf-note) !important;
-}
-
-/* Função do áudio: violeta = música contínua, ciano = efeito sonoro. */
-.lf-node-audio.lf-audio-role-music {
-  border-color: #8b5cf680;
-}
-
-.lf-node-audio.lf-audio-role-music .lf-node-head {
-  background: var(--lf-music) !important;
-}
-
-.lf-node-audio.lf-audio-role-sfx {
-  border-color: #22d3ee80;
-}
-
-.lf-node-audio.lf-audio-role-sfx .lf-node-head {
-  background: var(--lf-sfx) !important;
-}
-
-.lf-audio-role-badge {
-  display: inline-block;
-  margin-right: 5px;
-  padding: 1px 5px;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  font-weight: 700;
-}
-
-.lf-audio-role-music .lf-audio-role-badge {
-  color: #c4b5fd;
-}
-
-.lf-audio-role-sfx .lf-audio-role-badge {
-  color: #67e8f9;
-}
-
-.lf-edge-audio-role {
-  pointer-events: none;
-  stroke-width: 8px;
-  opacity: .32;
-  filter: blur(.3px);
-}
-
-.lf-edge-audio-role-music {
-  stroke: var(--lf-music);
-}
-
-.lf-edge-audio-role-sfx {
-  stroke: var(--lf-sfx);
+  box-shadow: inset 3px 0 var(--node-color), 0 0 16px #ec489966, var(--lf-shadow-lift);
 }
 
 .lf-node.active {
-  box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-active), 0 0 18px #22c55e66, 0 4px 16px #00000080;
+  box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-active), 0 0 18px #22c55e66, var(--lf-shadow-lift);
 }
 
 .lf-node.navigable {
   cursor: pointer;
-  box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-navigable), 0 4px 16px #00000080;
+  box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-navigable), var(--lf-shadow-lift);
 }
 
 .lf-node.active.navigable {
@@ -660,9 +601,9 @@
   outline-offset: 6px;
 }
 
+/* Sem filter: grayscale por nó cria uma camada de composição para cada card. */
 .lf-node.dimmed {
-  opacity: .38;
-  filter: grayscale(.4);
+  opacity: 0.38;
   cursor: default;
 }
 
@@ -672,6 +613,7 @@
 
 .lf-node-head {
   flex: 0 0 6px;
+  background: var(--lf-role);
 }
 
 .lf-node-thumb {
@@ -682,7 +624,6 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-bottom: 1px solid #ffffff0a;
 }
 
 .lf-node-thumb img {
@@ -695,17 +636,19 @@
   user-select: none;
 }
 
+.lf-node-thumb-ph i,
 .lf-node-thumb .lf-node-thumb-ph {
   font-size: 26px;
   color: var(--lf-muted);
-  opacity: .5;
+  opacity: 0.5;
 }
 
 .lf-node-title {
-  padding: 6px 8px 2px;
+  padding: 7px 10px 2px;
   font-family: var(--lf-font-display);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--lf-text);
   white-space: nowrap;
   overflow: hidden;
@@ -714,18 +657,56 @@
 }
 
 .lf-node-tag {
-  padding: 0 8px 6px;
-  font-size: 10px;
+  padding: 0 10px 7px;
+  font-size: var(--lf-fs-xs);
   color: var(--lf-muted);
-  letter-spacing: .02em;
+}
+
+.lf-node-tag i,
+.lf-node-title i {
+  margin-right: 4px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+/* Cena como quadro de filme: o título entra como lower-third sobre a imagem,
+   e a imagem ganha a altura que antes era gasta numa faixa escura. */
+.lf-node-scene .lf-node-thumb::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 58%;
+  background: linear-gradient(to top, #0c0c0ff2 0%, #0c0c0fb8 45%, transparent 100%);
+  pointer-events: none;
+}
+
+.lf-node-scene .lf-node-title,
+.lf-node-scene .lf-node-tag {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+}
+
+.lf-node-scene .lf-node-title {
+  bottom: 22px;
+  padding-bottom: 0;
+  font-size: 17px;
+  color: #fff;
+  text-shadow: 0 1px 3px #000c;
+}
+
+.lf-node-scene .lf-node-tag {
+  bottom: 0;
 }
 
 .lf-node-body {
   flex: 1 1 auto;
-  padding: 2px 8px 6px;
-  font-size: 11px;
+  padding: 2px 10px 6px;
+  font-size: var(--lf-fs-sm);
+  line-height: 1.4;
   color: var(--lf-text);
-  opacity: .85;
+  opacity: 0.88;
   white-space: pre-wrap;
   overflow: hidden;
 }
@@ -735,34 +716,42 @@
   display: flex;
   align-items: center;
   gap: 3px;
-  padding: 4px 8px 8px;
+  padding: 4px 10px 10px;
 }
 
+/* A forma de onda herda a cor da função: violeta = música, ciano = efeito. */
 .lf-node-wave i {
   flex: 1;
   height: 26px;
-  background: linear-gradient(var(--lf-teal), var(--lf-teal-dim));
+  background: var(--lf-role);
   border-radius: 2px;
-  opacity: .7;
-  transform: scaleY(.5);
+  opacity: 0.55;
+  transform: scaleY(0.5);
 }
 
-.lf-node-wave i:nth-child(even) {
-  transform: scaleY(.85);
+.lf-node-wave i:nth-child(even) { transform: scaleY(0.85); }
+.lf-node-wave i:nth-child(3n) { transform: scaleY(0.3); }
+
+.lf-audio-role-badge {
+  display: inline-block;
+  margin-right: 5px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-weight: 700;
 }
 
-.lf-node-wave i:nth-child(3n) {
-  transform: scaleY(.3);
-}
+.lf-audio-role-music .lf-audio-role-badge { color: #c4b5fd; }
+.lf-audio-role-sfx .lf-audio-role-badge { color: #67e8f9; }
 
 .lf-badge-live {
   display: inline-block;
-  margin-right: 4px;
-  padding: 1px 5px;
+  margin-right: 5px;
+  padding: 1px 6px;
   border: 1px solid var(--lf-amber-dim);
   border-radius: 3px;
   color: var(--lf-amber);
-  font-size: 9px;
+  font-size: var(--lf-fs-xs);
 }
 
 /* ── Ports ─────────────────────────────────────────────────────────── */
@@ -782,9 +771,9 @@
   box-sizing: border-box;
   pointer-events: auto;
   cursor: crosshair;
-  opacity: .35;
+  opacity: 0.35;
   z-index: 5;
-  transition: opacity var(--lf-transition), border-color var(--lf-transition), box-shadow var(--lf-transition), transform var(--lf-transition);
+  transition: opacity var(--lf-transition), box-shadow var(--lf-transition), transform var(--lf-transition);
 }
 
 /* Hit area expandida (mín. ~24px) sem inflar o círculo visual. */
@@ -796,10 +785,7 @@
 }
 
 /* Em Edição os ports ficam visíveis: FLOW amarelo/laranja, AUDIO branco/vermelho. */
-.lumenn-frame.graph-editor.editing .lf-port {
-  opacity: 1;
-}
-
+.lumenn-frame.graph-editor.editing .lf-port,
 .lf-node:hover .lf-port,
 .lf-node.selected .lf-port,
 .lf-viewport.connect-mode .lf-port {
@@ -817,15 +803,8 @@
   color: var(--lf-amber);
 }
 
-.lf-port-flow-in {
-  border-color: var(--lf-flow-in);
-  color: var(--lf-flow-in);
-}
-
-.lf-port-flow-out {
-  border-color: var(--lf-flow-out);
-  color: var(--lf-flow-out);
-}
+.lf-port-flow-in { border-color: var(--lf-flow-in); color: var(--lf-flow-in); }
+.lf-port-flow-out { border-color: var(--lf-flow-out); color: var(--lf-flow-out); }
 
 .lf-port-audio {
   border-color: var(--lf-input);
@@ -852,34 +831,15 @@
   box-shadow: 0 0 0 4px currentColor, 0 0 12px currentColor;
 }
 
-.lf-port-in {
-  left: -7px;
-  top: 30%;
-}
+.lf-port-in { left: -7px; top: 30%; }
+.lf-port-out { right: -7px; top: 30%; }
+.lf-node-audio .lf-port-out { left: auto; right: -7px; top: 62%; }
+.lf-port-audio { left: -7px; top: 62%; }
 
-.lf-port-out {
-  right: -7px;
-  top: 30%;
-}
-
-.lf-node-audio .lf-port-out {
-  left: auto;
-  right: -7px;
-  top: 62%;
-}
-
-.lf-port-audio {
-  left: -7px;
-  top: 62%;
-}
-
-/* ── Empty state / transition overlay ──────────────────────────────── */
+/* ── Empty state ───────────────────────────────────────────────────── */
 .lf-empty-state {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -891,52 +851,24 @@
   z-index: 5;
 }
 
-.lf-empty-state .lf-empty-icon {
+.lf-empty-state .lf-empty-icon,
+.lf-empty-icon i {
   font-size: 32px;
-  opacity: .3;
+  opacity: 0.3;
 }
 
 .lf-empty-state .lf-empty-title {
   font-family: var(--lf-font-display);
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--lf-text);
-  opacity: .7;
+  opacity: 0.8;
 }
 
 .lf-empty-state .lf-empty-hint {
-  font-size: 12px;
-  max-width: 320px;
-  line-height: 1.4;
-}
-
-.lf-transitioning {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 14px;
-  border: 1px solid var(--lf-teal-dim);
-  border-radius: 999px;
-  background: #101014f2;
-  color: var(--lf-teal);
-  font-family: var(--lf-font-body);
-  font-size: 11.5px;
-  font-weight: 600;
-  z-index: 7;
-  pointer-events: none;
-  animation: lf-fadeIn .18s ease;
-}
-
-.lf-transitioning .lf-transitioning-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--lf-teal);
-  animation: lf-pulse .9s ease-in-out infinite;
+  font-size: var(--lf-fs-md);
+  max-width: 340px;
+  line-height: 1.45;
 }
 
 /* ── Inspector ─────────────────────────────────────────────────────── */
@@ -945,110 +877,109 @@
   width: 340px;
   min-width: 320px;
   min-height: 0;
-  padding: 10px;
+  padding: 12px;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--lf-badge-border) transparent;
   background: var(--lf-panel);
-  border-left: 1px solid #ffffff0a;
+  border-left: 1px solid var(--lf-hairline);
   z-index: 60;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-@media (max-width: 1100px) {
-  .lf-inspector {
-    flex-basis: 320px;
-    width: 320px;
-    min-width: 300px;
-  }
-
-  .lf-topbar {
-    gap: 6px;
-    padding: 8px 12px;
-  }
-
-  .lf-toolbar-left {
-    width: 48px;
-    flex-basis: 48px;
-  }
-
-  .lf-tool {
-    width: 38px;
-    height: 38px;
-    font-size: 17px;
-  }
-}
-
 .lf-insp-title {
   font-family: var(--lf-font-display);
-  font-size: 13px;
+  font-size: 18px;
   font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--lf-amber);
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  margin: 2px 0 4px;
-  padding-bottom: 5px;
-  border-bottom: 1px solid #ffffff0a;
+  margin: 4px 0 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--lf-hairline);
+}
+
+/* Cada título depois do primeiro abre uma seção nova com respiro. */
+.lf-insp-title:not(:first-child) {
+  margin-top: 14px;
 }
 
 .lf-insp-label {
-  font-size: 10.5px;
-  font-weight: 600;
+  margin-top: 6px;
+  font-size: var(--lf-fs-sm);
+  font-weight: 500;
   color: var(--lf-muted);
-  text-transform: uppercase;
-  letter-spacing: .03em;
-  margin-top: 2px;
 }
 
 .lf-insp-label.lf-insp-check {
   display: flex;
   align-items: center;
-  gap: 6px;
-  text-transform: none;
+  gap: 7px;
   color: var(--lf-text);
-  font-size: 11.5px;
+  font-size: var(--lf-fs-md);
 }
 
-.lf-inspector select,
-.lf-inspector input[type="text"],
-.lf-inspector input[type="number"],
-.lf-inspector textarea {
+.lf-inspector :is(select, input[type="text"], input[type="number"], textarea) {
   width: 100%;
-  padding: 4px 7px;
+  min-height: var(--lf-control-h);
+  padding: 4px 8px;
   border: 1px solid var(--lf-badge-border);
   border-radius: var(--lf-radius);
   background: var(--lf-badge);
   color: var(--lf-text);
   font-family: var(--lf-font-body);
-  font-size: 11px;
+  font-size: var(--lf-fs-md);
   box-sizing: border-box;
+  transition: border-color var(--lf-transition);
+}
+
+.lf-inspector :is(select, input, textarea):hover {
+  border-color: var(--lf-muted);
+}
+
+.lf-inspector :is(select, input, textarea):focus {
+  border-color: var(--lf-amber);
+}
+
+.lf-inspector input[type="color"] {
+  width: 100%;
+  height: var(--lf-control-h);
+  padding: 2px;
+  border: 1px solid var(--lf-badge-border);
+  border-radius: var(--lf-radius);
+  background: var(--lf-badge);
+  cursor: pointer;
+}
+
+.lf-inspector input[type="range"],
+.lf-inspector input[type="checkbox"] {
+  accent-color: var(--lf-amber);
 }
 
 .lf-inspector input[type="range"] {
   width: 100%;
 }
 
-.lf-inspector select:focus,
-.lf-inspector input:focus,
-.lf-inspector textarea:focus {
-  outline: none;
-  border-color: var(--lf-amber);
+.lf-inspector :disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .lf-insp-p {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--lf-fs-md);
   color: var(--lf-text);
-  opacity: .85;
-  line-height: 1.4;
+  opacity: 0.88;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
 .lf-audio-routing-note {
-  border-left: 2px solid #ef4444;
-  padding-left: 7px;
+  border-left: 2px solid var(--lf-output);
+  padding-left: 8px;
   color: #f3f4f6;
 }
 
@@ -1059,7 +990,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  max-height: 140px;
+  max-height: 160px;
   overflow-y: auto;
 }
 
@@ -1067,12 +998,13 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  min-height: 26px;
+  font-size: var(--lf-fs-sm);
   color: var(--lf-text);
   background: var(--lf-badge);
   border: 1px solid var(--lf-badge-border);
   border-radius: 3px;
-  padding: 3px 5px;
+  padding: 2px 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1111,11 +1043,12 @@
 .lf-insp-x {
   flex: 0 0 auto;
   margin-left: auto;
+  padding: 2px 4px;
   border: none;
   background: transparent;
   color: var(--lf-muted);
   cursor: pointer;
-  font-size: 10px;
+  font-size: var(--lf-fs-xs);
   line-height: 1;
 }
 
@@ -1126,12 +1059,12 @@
 .lf-swatches {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
 }
 
 .lf-swatch {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 4px;
   border: 2px solid transparent;
   cursor: pointer;
@@ -1143,43 +1076,56 @@
   border-color: #ffffff80;
 }
 
+/* Hierarquia dos botões: ação única = âmbar cheio; ação ao lado de outra =
+   contorno; destrutiva = vermelho. Antes tudo era âmbar cheio. */
 .lf-insp-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .lf-insp-actions button {
   flex: 1 1 auto;
+  min-height: 30px;
   font-family: var(--lf-font-body);
-  font-size: 11.5px;
+  font-size: var(--lf-fs-sm);
   font-weight: 600;
-  padding: 5px 10px;
+  padding: 4px 12px;
   border: 1px solid var(--lf-amber-dim);
   border-radius: var(--lf-radius);
-  background: var(--lf-amber);
-  color: var(--lf-ink);
+  background: transparent;
+  color: var(--lf-amber);
   cursor: pointer;
   white-space: nowrap;
+  transition: background var(--lf-transition), color var(--lf-transition);
 }
 
 .lf-insp-actions button:hover {
+  background: #f0a32126;
+}
+
+.lf-insp-actions button:only-child {
+  background: var(--lf-amber);
+  color: var(--lf-ink);
+}
+
+.lf-insp-actions button:only-child:hover {
   background: #d9931e;
 }
 
 .lf-insp-actions button.danger {
-  background: var(--lf-danger);
-  border-color: var(--lf-danger);
+  background: var(--lf-danger-solid);
+  border-color: var(--lf-danger-solid);
   color: #fff;
 }
 
 .lf-insp-actions button.danger:hover {
-  background: #c33;
+  background: #a8353e;
 }
 
 .lf-insp-actions button:disabled {
-  opacity: .5;
+  opacity: 0.5;
   cursor: default;
 }
 
@@ -1195,82 +1141,60 @@
   color: var(--lf-teal);
 }
 
-/* Badge native / fallback de transição */
+/* Selo native / fallback de transição */
 .lf-insp-native {
   float: right;
-  font-size: 9px;
+  margin-top: 4px;
+  font-family: var(--lf-font-body);
+  font-size: var(--lf-fs-xs);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .04em;
+  letter-spacing: 0;
   color: var(--lf-teal);
   border: 1px solid var(--lf-teal-dim);
   border-radius: 3px;
-  padding: 1px 5px;
+  padding: 1px 6px;
 }
 
-/* Ícones Font Awesome nos tools/nodes */
-.lf-tool i {
-  font-size: 15px;
-  line-height: 1;
+/* ── Responsivo ────────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .lf-inspector {
+    flex-basis: 320px;
+    width: 320px;
+    min-width: 300px;
+  }
+
+  .lf-toolbar-left {
+    width: 48px;
+    flex-basis: 48px;
+  }
+
+  .lf-tool {
+    width: 38px;
+    height: 38px;
+    font-size: 17px;
+  }
 }
 
-.lf-node-tag i,
-.lf-node-title i {
-  margin-right: 4px;
-  font-size: 10px;
-  opacity: .8;
-}
-
-.lf-node-title i {
-  font-size: 11px;
-}
-
-.lf-empty-icon i {
-  font-size: 32px;
-}
-
-.lf-node-thumb-ph i {
-  font-size: 26px;
-  color: var(--lf-muted);
-  opacity: .5;
-}
-
-/* ── Animations / scrollbar ────────────────────────────────────────── */
+/* ── Animações / scrollbar ─────────────────────────────────────────── */
 @keyframes lf-fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 @keyframes lf-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.7); }
+}
 
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
+@media (prefers-reduced-motion: reduce) {
+  .lumenn-frame *,
+  .lumenn-frame *::before,
+  .lumenn-frame *::after {
+    animation: none !important;
+    transition: none !important;
   }
-
-  50% {
-    opacity: .35;
-    transform: scale(.7);
-  }
 }
 
-.lf-inspector::-webkit-scrollbar {
-  width: 6px;
-}
-
-.lf-inspector::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.lf-inspector::-webkit-scrollbar-thumb {
-  background: var(--lf-badge-border);
-  border-radius: 3px;
-}
+.lf-inspector::-webkit-scrollbar { width: 6px; }
+.lf-inspector::-webkit-scrollbar-track { background: transparent; }
+.lf-inspector::-webkit-scrollbar-thumb { background: var(--lf-badge-border); border-radius: 3px; }

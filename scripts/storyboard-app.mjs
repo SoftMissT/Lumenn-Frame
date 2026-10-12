@@ -2,6 +2,7 @@ import { LumennGraphStore } from "./graph-store.mjs";
 import { LumennTransitionController } from "./transition-controller.mjs";
 import { LumennCompat } from "./foundry-compat.mjs";
 import { LumennSettings } from "./settings.mjs";
+import { formatEdgeLabel } from "./edge-label.mjs";
 import {
   clampGraphZoom,
   directionalRectAnchor,
@@ -399,8 +400,16 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   #applyCamera(root = this.element) {
     const camEl = root.querySelector(".lf-camera");
-    if (camEl)
+    if (camEl) {
       camEl.style.transform = `translate3d(${this.#camera.panX}px, ${this.#camera.panY}px, 0) scale(${this.#camera.zoom})`;
+      // Rótulos das edges contra-escalam por esta variável para continuar
+      // legíveis em zoom baixo. Só muda com o zoom (pan não invalida estilo).
+      const zoom = String(this.#camera.zoom);
+      if (camEl.dataset.lfZoom !== zoom) {
+        camEl.dataset.lfZoom = zoom;
+        camEl.style.setProperty("--lf-inv-zoom", String(1 / this.#camera.zoom));
+      }
+    }
     const pct = root.querySelector("[data-camera-percent]");
     if (pct) pct.textContent = `${Math.round(this.#camera.zoom * 100)}%`;
   }
@@ -1412,30 +1421,18 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if (ghost) ghost.setAttribute("d", this.#ghostPath());
   }
 
-  /** Texto do label central da FLOW edge: "Fade 1.0s · Auto 3.0s". */
+  /** Texto do label central da FLOW edge: "Dissolver 1.0s · Auto 3.0s". */
   #edgeLabelText(e) {
     const t = e.transition;
     if (!t) return null;
     const L = (k) => game.i18n.localize(k);
-    const sec = (v) => `${((v ?? 0) / 1000).toFixed(1)}s`;
-    const sceneLbl =
-      t.scene?.type === "fade"
-        ? L("LUMENN_FRAME.Edge.Fade")
-        : L("LUMENN_FRAME.Edge.Cut");
-    const modeKey = {
-      auto: "LUMENN_FRAME.Edge.Auto",
-      keep: "LUMENN_FRAME.Edge.Keep",
-      crossfade: "LUMENN_FRAME.Edge.Crossfade",
-      fadeout: "LUMENN_FRAME.Edge.FadeOut",
-      fadein: "LUMENN_FRAME.Edge.FadeIn",
-      cut: "LUMENN_FRAME.Edge.Cut",
-    }[t.audio?.mode ?? "auto"];
-    const scopeKey = {
-      audio: "LUMENN_FRAME.Inspector.AudioOnly",
-      scene: "LUMENN_FRAME.Inspector.SceneOnly",
-      both: "LUMENN_FRAME.Inspector.BeatBoth",
-    }[t.scope ?? "both"];
-    return `${L(scopeKey)} · ${sceneLbl} ${sec(t.scene?.duration)} · ${L(modeKey)} ${sec(t.audio?.crossfadeDuration)}`;
+    const type = t.scene?.type ?? "cut";
+    const sceneName =
+      type === "cut"
+        ? L("LUMENN_FRAME.Edge.Cut")
+        : (LumennCompat.getSceneTransitions().find((d) => d.id === type)
+            ?.label ?? type);
+    return formatEdgeLabel(t, { L, sceneName });
   }
 
   /* -- Connect (port ? port) ---------------------------------------- */

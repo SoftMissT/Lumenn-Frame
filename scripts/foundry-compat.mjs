@@ -74,10 +74,52 @@ export const LumennCompat = {
    *      explícita que todo cliente usa ao desenhar a Scene (vence a da Scene).
    * V13: `Scene#activate()` sem opções (argumento ignorado).
    * Fonte: Research-Lumenn-Frame (doc oficial) + foundry.mjs 14.367 (Scene#activate).
+   *
+   * `suppressScenePlaylist`: no instante da ativação o Foundry chama
+   * `PlaylistCollection#_onChangeScene`, que para a faixa da Scene anterior e
+   * inicia a da nova com `update({playing})`, usando o `fade` de cada faixa
+   * (tipicamente ~0 ms): vira um corte por cima do crossfade do Lumenn. Com a
+   * opção, esse hook interno é suspenso somente durante a ativação (o storyboard
+   * é quem conduz o áudio). Sem o método (outra versão), nada é suspenso.
    */
-  async activateScene(scene, viewOptions) {
+  async activateScene(scene, viewOptions, { suppressScenePlaylist = false } = {}) {
     if (!scene?.activate) return null;
-    return viewOptions ? scene.activate({ viewOptions }) : scene.activate();
+    const playlists = game.playlists;
+    const suppress =
+      suppressScenePlaylist && typeof playlists?._onChangeScene === "function";
+    const hadOwn = suppress && Object.hasOwn(playlists, "_onChangeScene");
+    const original = suppress ? playlists._onChangeScene : null;
+    if (suppress) playlists._onChangeScene = async () => {};
+    try {
+      return viewOptions
+        ? await scene.activate({ viewOptions })
+        : await scene.activate();
+    } finally {
+      if (suppress) {
+        if (hadOwn) playlists._onChangeScene = original;
+        else delete playlists._onChangeScene;
+      }
+    }
+  },
+
+  /**
+   * Resolve a fonte de áudio do storyboard ({type, id}) para o documento.
+   * track: UUID completo ou id embutido; playlist: id. Inválida = null.
+   */
+  resolveAudioDoc(source) {
+    try {
+      if (source?.type === "playlist") return game.playlists?.get(source.id) ?? null;
+      if (source?.type === "track" && source.id) {
+        if (source.id.includes(".")) return fromUuidSync(source.id) ?? null;
+        for (const playlist of game.playlists ?? []) {
+          const sound = playlist.sounds?.get(source.id);
+          if (sound) return sound;
+        }
+      }
+    } catch {
+      return null;
+    }
+    return null;
   },
 
   /** Pré-carrega uma Scene. V14: `Scene#preload()`. V13: idêntico. Fallback: no-op. */
@@ -214,14 +256,51 @@ export const LumennCompat = {
     );
   },
 
+  /** true se `type` é uma transição registrada nesta build (nativa ou do Lumenn). */
+  hasSceneTransition(type) {
+    const registry = CONFIG.Canvas?.sceneTransitions ?? {};
+    return (
+      !!type &&
+      (!!registry[type] ||
+        Object.values(registry).some((d) => (d.id ?? d.transitionType) === type))
+    );
+  },
+
   /**
-   * Executa a transição de Scene.
-   * V14: `canvas.transition.run({nextScene, activate, duration, transitionType})`
-   *      usando o registry nativo (feature-detected).
-   * V13/fallback: retorna "cut" | "fallback" o chamador aplica o fade Lumenn
-   *      (fade/dip-to-color) via overlay. Nunca finge transição que o fallback
-   *      não implementa.
-   * @returns {Promise<"native"|"cut"|"fallback"|null>}
+   * Aguarda a animação de transição do canvas desta Scene terminar.
+   * O `Canvas#draw` inicia a animação DEPOIS de `canvasReady` e sem aguardá-la:
+   * nem `Scene#view()` nem `Scene#activate()` esperam o efeito acabar. Espera a
+   * Scene ficar pronta, dá uma janela curta para a animação começar e então
+   * aguarda `canvas.transition.promise`. Sem animação, volta logo.
+   */
+  async waitForSceneTransition(scene, { timeout = 10000, startWindow = 600 } = {}) {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const t0 = performance.now();
+    const ready = () =>
+      canvas.scene?.id === scene?.id && canvas.ready && !canvas.loading;
+    while (!ready() && performance.now() - t0 < timeout) await sleep(30);
+    const t1 = performance.now();
+    while (!canvas.transition?.isRunning && performance.now() - t1 < startWindow)
+      await sleep(16);
+    if (canvas.transition?.isRunning) await canvas.transition.promise;
+  },
+
+  /**
+   * Troca de Scene com a transição escolhida na edge.
+   *
+   * V14: o efeito é pedido pelo caminho canônico do core, `viewOptions.transition`
+   *      em `Scene#view()` / `Scene#activate()`; o `Canvas#draw` captura e anima.
+   *      NÃO usa `canvas.transition.run({nextScene})`: no 14.367 o `#animateTransition`
+   *      do draw chama `transition._reset()` enquanto o run mantém o lock e destrói
+   *      a captura dele (medido no Foundry real: o run terminava ~14 ms depois do
+   *      `_play`, sem animar; `view({transition})` animou os 1000 ms).
+   * Ativação (GM): `activate({viewOptions})` leva o mesmo efeito a TODOS os
+   *      clientes. Com `playersTransition: false` o GM vê o efeito em `view()` e a
+   *      ativação sai com `type: null` (jogadores trocam sem efeito).
+   *      A playlist da Scene do Foundry é suspensa na ativação (ver `activateScene`).
+   * V13/fallback: retorna "cut" | "fallback"; o chamador aplica o fade Lumenn
+   *      (overlay). Nunca finge transição que o fallback não implementa.
+   * @returns {Promise<"native"|"cut"|"fallback">}
    */
   async runSceneTransition({
     scene,
@@ -229,44 +308,38 @@ export const LumennCompat = {
     duration = 1000,
     color = "#000000",
     activate = true,
+    playersTransition = true,
   }) {
     const tr = type ?? "cut";
-    const native =
-      CONFIG.Canvas?.sceneTransitions?.[tr] ??
-      Object.values(CONFIG.Canvas?.sceneTransitions ?? {}).find(
-        (d) => (d.id ?? d.transitionType) === tr,
-      );
-    // Scene#activate() resolve no update; o Canvas#draw dela roda depois, já com o
-    // lock do canvas.transition liberado: zera a captura do run e aplica a
-    // transição configurada na própria Scene, não a da edge. Por isso o run só
-    // visualiza (view aguarda o draw) e a ativação vem depois, com a transição
-    // explícita para os clientes que ainda não estão na Scene.
-    if (native && canvas.transition?.run && scene && canvas.app?.renderer) {
-      let ran = false;
+    const cutOptions = { transition: { type: null } };
+    const canActivate = () => activate && this.isGM() && !!scene && !scene.active;
+    const keep = { suppressScenePlaylist: true };
+
+    if (scene && tr !== "cut" && this.hasSceneTransition(tr) && scene.view) {
+      const options = { transition: { type: tr, duration } };
       try {
         await this.preloadScene(scene);
-        await canvas.transition.run({
-          nextScene: scene,
-          activate: false,
-          duration,
-          transitionType: tr,
-          ...(tr === "dip" ? { color } : {}),
-        });
-        ran = true;
+        if (canActivate() && !playersTransition) {
+          await scene.view(options);
+          await this.waitForSceneTransition(scene);
+          await this.activateScene(scene, cutOptions, keep);
+        } else if (canActivate()) {
+          await this.activateScene(scene, options, keep);
+          await this.waitForSceneTransition(scene);
+        } else {
+          await scene.view(options);
+          await this.waitForSceneTransition(scene);
+        }
+        return "native";
       } catch (error) {
         console.error("Lumenn Frame: falha na transição nativa; usando fallback.", error);
-      }
-      if (ran) {
-        if (activate && this.isGM() && !scene.active)
-          await this.activateScene(scene, { transition: { type: tr, duration } });
-        return "native";
       }
     }
     if (tr === "cut") {
       if (scene) {
         // `type: null` desliga a transição própria da Scene: cut é corte seco.
-        if (activate) await this.activateScene(scene, { transition: { type: null } });
-        else if (scene.view) await scene.view();
+        if (canActivate()) await this.activateScene(scene, cutOptions, keep);
+        else if (scene.view) await scene.view(cutOptions);
       }
       return "cut";
     }
@@ -296,7 +369,7 @@ export const LumennCompat = {
       return result;
     } finally {
       if (previous?.id && canvas.scene?.id !== previous.id && previous.view) {
-        await previous.view();
+        await previous.view({ transition: { type: null } });
       }
     }
   },

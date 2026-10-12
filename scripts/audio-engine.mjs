@@ -35,6 +35,7 @@ export class LumennInvalidAudioSourceError extends Error {
 export class LumennAudioEngine {
   #transitioning = false;
   #savedFades = new Map();
+  #restoreTimer = null;
 
   get isTransitioning() {
     return this.#transitioning;
@@ -76,7 +77,7 @@ export class LumennAudioEngine {
       return "crossfaded";
     } finally {
       this.#transitioning = false;
-      await this.#restoreFades();
+      this.#scheduleRestore(crossfadeDuration);
     }
   }
 
@@ -115,6 +116,77 @@ export class LumennAudioEngine {
     if (!doc?.uuid || this.#savedFades.has(doc.uuid)) return;
     // Lê o campo persistido (`fade`); `fadeDuration` é accessor equivalente.
     this.#savedFades.set(doc.uuid, doc.fade ?? doc.fadeDuration ?? 0);
+  }
+
+  /**
+   * Restaura o `fade` do usuário SÓ depois que o fade da transição acabou.
+   * Todo `update()` de PlaylistSound chama `sync()` no Foundry: restaurar durante
+   * o fade transforma o fade-out em `stop({fade: 0})` (corte seco) e encurta o
+   * fade-in para 500 ms. As promessas de start/stop resolvem no update, não no fim
+   * do fade, então o prazo é a duração + uma folga. Uma nova transição reagenda.
+   */
+  #scheduleRestore(duration = 0) {
+    clearTimeout(this.#restoreTimer);
+    const ms = Math.max(0, Number(duration) || 0);
+    this.#restoreTimer = setTimeout(() => this.#restoreWhenSettled(ms, 0), ms + 500);
+  }
+
+  /**
+   * Faixa que ainda está carregando ou ainda dentro do fade-in não pode ter o
+   * `fade` restaurado: o `sync()` do update encurtaria a entrada para 500 ms
+   * (medido no Foundry real: volume 0,13 pulando para 0,5). Espera até 20 s.
+   */
+  #restoreWhenSettled(duration, waited) {
+    const stillFadingIn = [...this.#savedFades.keys()].some((uuid) => {
+      const doc = fromUuidSync(uuid);
+      const sound = doc?.sound;
+      if (!doc?.playing || !sound) return false;
+      return !(sound.playing && (sound.currentTime ?? Infinity) * 1000 >= duration);
+    });
+    if (stillFadingIn && waited < 20000) {
+      this.#restoreTimer = setTimeout(
+        () => this.#restoreWhenSettled(duration, waited + 250),
+        250,
+      );
+      return;
+    }
+    this.#restoreTimer = null;
+    this.#restoreFades().catch((error) =>
+      console.error("lumenn-frame: falha ao restaurar o fade", error),
+    );
+  }
+
+  /**
+   * Carrega os alvos neste cliente antes de iniciar. Sem isso o fade-in só
+   * começa depois do decode da faixa e abre um silêncio no meio do crossfade
+   * (medido: ~2,5 s). Limitado por `timeout` para nunca travar a navegação.
+   */
+  async #preload(entries, timeout = 4000) {
+    const loads = entries
+      .map(({ doc }) => {
+        const sound =
+          doc.documentName === "PlaylistSound"
+            ? doc
+            : (doc.sounds?.find?.((entry) => entry.playing) ??
+              doc.sounds?.contents?.[0] ??
+              null);
+        return typeof sound?.load === "function"
+          ? Promise.resolve(sound.load()).catch(() => {})
+          : null;
+      })
+      .filter(Boolean);
+    if (!loads.length) return;
+    let timer;
+    try {
+      await Promise.race([
+        Promise.all(loads),
+        new Promise((resolve) => {
+          timer = setTimeout(resolve, timeout);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async #restoreFades() {
@@ -271,6 +343,8 @@ export class LumennAudioEngine {
         }
       };
 
+      if (mode !== "fadeout" && targets.length) await this.#preload(targets);
+
       switch (mode) {
         case "keep": {
           const keeper =
@@ -327,7 +401,7 @@ export class LumennAudioEngine {
       return "error";
     } finally {
       this.#transitioning = false;
-      await this.#restoreFades();
+      this.#scheduleRestore(duration);
     }
   }
 }

@@ -138,6 +138,17 @@
   cursor: pointer;
 }
 
+/* O core do Foundry dá width:100% aos button; sem isto o + e o Expandir viravam
+   barras de largura total e o rótulo "Ao Vivo" quebrava em duas linhas (só "Ao"
+   aparecia). Medido no Foundry 14.367. */
+.lf-top-btn,
+.lf-mode-toggle button,
+.lf-camera-controls button {
+  width: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .lf-top-btn {
   height: var(--lf-control-h);
   font-family: var(--lf-font-body);
@@ -583,6 +594,25 @@
 .lf-node.navigable {
   cursor: pointer;
   box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-navigable), var(--lf-shadow-lift);
+}
+
+/* Ao Vivo: nó de áudio acionável (clique = crossfade da música / dispara SFX;
+   clicar de novo em um que toca = fade out). O aro usa a cor da função. */
+.lf-node.playable {
+  cursor: pointer;
+  box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-role), var(--lf-shadow-lift);
+}
+
+.lf-node.playable:hover {
+  border-color: var(--lf-role);
+}
+
+.lf-node.playing {
+  box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-role), 0 0 18px color-mix(in srgb, var(--lf-role) 55%, transparent), var(--lf-shadow-lift);
+}
+
+.lf-node.playing .lf-node-wave i {
+  opacity: 0.95;
 }
 
 .lf-node.active.navigable {

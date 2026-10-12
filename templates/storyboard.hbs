@@ -49,7 +49,7 @@
       <div class="lf-camera">
         <svg class="lf-edges"></svg>
         {{#each nodes}}
-        <div class="lf-node lf-node-{{this.type}}{{#if (lumenn-eq this.type 'audio')}} lf-audio-role-{{this.audioRole}}{{/if}}{{#if this.isActive}} active{{/if}}{{#if this.isNavigable}} navigable{{/if}}{{#if this.isDimmed}} dimmed{{/if}}{{#if this.selected}} selected{{/if}}{{#if this.targetHi}} target-hi{{/if}}"
+        <div class="lf-node lf-node-{{this.type}}{{#if (lumenn-eq this.type 'audio')}} lf-audio-role-{{this.audioRole}}{{/if}}{{#if this.isActive}} active{{/if}}{{#if this.isNavigable}} navigable{{/if}}{{#if this.isPlayable}} playable{{/if}}{{#if this.isPlaying}} playing{{/if}}{{#if this.isDimmed}} dimmed{{/if}}{{#if this.selected}} selected{{/if}}{{#if this.targetHi}} target-hi{{/if}}"
              data-id="{{this.id}}"
              style="left:{{this.position.x}}px;top:{{this.position.y}}px;width:{{this.width}}px;height:{{this.height}}px;--node-color:{{this.color}};">
           <div class="lf-node-content">

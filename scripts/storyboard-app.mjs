@@ -68,6 +68,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function lumennClientSceneFade(sceneId, sceneTrans = {}) {
   const type = sceneTrans?.type ?? "fade";
   const scene = sceneId ? game.scenes.get(sceneId) : null;
+  // V14: a ativação feita pelo GM já leva `viewOptions.transition` a todos os
+  // clientes; rodar o efeito de novo aqui duplicaria a troca.
+  if (
+    !LumennCompat.isGM() &&
+    LumennCompat.hasNativeSceneTransitions() &&
+    (type === "cut" || LumennCompat.hasSceneTransition(type))
+  )
+    return "native";
   const nativeResult = await LumennCompat.runSceneTransition({
     scene,
     type,
@@ -83,7 +91,10 @@ export async function lumennClientSceneFade(sceneId, sceneTrans = {}) {
   el.style.opacity = "1";
   await sleep(duration);
   if (sceneId) {
-    if (LumennCompat.isGM()) await LumennCompat.activateScene(scene);
+    if (LumennCompat.isGM())
+      await LumennCompat.activateScene(scene, undefined, {
+        suppressScenePlaylist: true,
+      });
     else if (scene?.view) await scene.view();
   }
   await sleep(40);
@@ -500,6 +511,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const defaultColors = LumennGraphStore.getDefaultColors();
     const nodes = (activeGraph?.nodes ?? []).map((n) => {
       const [w, h] = nodeSize(n.type, n.size);
+      // No Ao Vivo o GM aciona a música/SFX direto pelo nó de áudio.
+      const audioSource = this.#audioSourceOf(n);
+      const playable =
+        this.#mode === "live" && LumennCompat.isGM() && !!audioSource;
       const out = {
         ...n,
         color: normalizeHexColor(n.color, defaultColors[n.type] ?? "#73707c"),
@@ -507,11 +522,14 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         height: h,
         isActive: n.id === activeGraph.activeNodeId,
         isNavigable: this.#mode === "live" && navigable.has(n.id),
+        isPlayable: playable,
+        isPlaying: !!audioSource && this.#isAudioPlaying(audioSource),
         isDimmed:
           this.#mode === "live" &&
           LumennSettings.get("dimUnreachable") &&
           n.id !== activeGraph.activeNodeId &&
-          !navigable.has(n.id),
+          !navigable.has(n.id) &&
+          !playable,
         selected: this.#selected.kind === "node" && this.#selected.id === n.id,
         targetHi: this.#connectState?.targetHi === n.id,
       };
@@ -867,8 +885,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       return;
     }
     if (this.#mode === "live") {
-      if (nodeEl.dataset.id && this.#isNavigable(nodeEl.dataset.id))
-        this.#navigateTo(nodeEl.dataset.id);
+      const id = nodeEl.dataset.id;
+      if (id && this.#isNavigable(id)) this.#navigateTo(id);
+      else if (id && nodeEl.classList.contains("playable"))
+        this.#playAudioNode(id);
       return;
     }
     if (this.#tool === "connect") return;
@@ -1930,6 +1950,79 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     return [...(music ? [music] : []), ...sfx];
   }
 
+  /** Fonte de áudio ({type,id,role}) de um Audio Node, ou null se incompleto. */
+  #audioSourceOf(node) {
+    if (node?.type !== "audio" || !node.data?.audioType || !node.data?.audioId)
+      return null;
+    return {
+      type: node.data.audioType === "playlist" ? "playlist" : "track",
+      id: node.data.audioId,
+      role: node.data.audioRole === "sfx" ? "sfx" : "music",
+    };
+  }
+
+  #isAudioPlaying(source) {
+    return !!LumennCompat.resolveAudioDoc(source)?.playing;
+  }
+
+  /**
+   * Ao Vivo: aciona o Audio Node clicado, sem trocar de cena.
+   * Música: crossfade a partir da música que estiver tocando (segue o modo e a
+   * duração da associação AUDIO deste nó com a cena ativa; sem associação, os
+   * padrões). SFX: dispara por cima, sem mexer na música. Se já está tocando,
+   * o clique faz fade out.
+   */
+  async #playAudioNode(id) {
+    if (this.#transitioning || !LumennCompat.isGM()) return;
+    const graph = LumennGraphStore.getGraph(this.#graphId);
+    const node = graph?.nodes?.find((n) => n.id === id);
+    const source = this.#audioSourceOf(node);
+    if (!source) return;
+    if (!LumennCompat.resolveAudioDoc(source)) {
+      ui.notifications.warn(
+        game.i18n.localize("LUMENN_FRAME.WarnInvalidAudioSource"),
+      );
+      return;
+    }
+    const fallbackDuration = LumennGraphStore.getDefaultCrossfadeDuration();
+    const edges = (graph.edges ?? []).filter(
+      (e) => e.type === "audio" && e.from === id,
+    );
+    const edge = edges.find((e) => e.to === graph.activeNodeId) ?? edges[0];
+    const cfg = { curve: "linear", ...(edge?.transition?.audio ?? {}) };
+    const isSfx = source.role === "sfx";
+    const crossfade = cfg.crossfadeDuration ?? fallbackDuration;
+    const duration = isSfx ? (cfg.fadeInDuration ?? 0) : crossfade;
+    const playing = this.#isAudioPlaying(source);
+    let audioTrans;
+    let current;
+    if (playing) {
+      audioTrans = { mode: "fadeout", crossfadeDuration: duration, curve: cfg.curve };
+      current = [source];
+    } else {
+      // "auto"/"keep" não fazem sentido para um acionamento manual: crossfade.
+      const mode = cfg.mode === "cut" || cfg.mode === "fadein" ? cfg.mode : "crossfade";
+      audioTrans = { mode, crossfadeDuration: duration, curve: cfg.curve };
+      current = isSfx
+        ? []
+        : this.#allAudioSources(graph).filter(
+            (s) => s.role === "music" && !(s.type === source.type && s.id === source.id),
+          );
+    }
+    const result = await this.#controller.goToAudio(
+      current,
+      playing ? [] : [source],
+      audioTrans,
+      fallbackDuration,
+      cfg.curve,
+    );
+    if (result === "invalid-source")
+      ui.notifications.warn(
+        game.i18n.localize("LUMENN_FRAME.WarnInvalidAudioSource"),
+      );
+    await this.render();
+  }
+
   #allAudioSources(graph) {
     const sources = [];
     const seen = new Set();
@@ -2012,37 +2105,54 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         audioTrans,
         scope,
       });
-      if (scope === "scene" || scope === "both") {
-        // Scene transition: V14 nativa quando disponível; fallback Lumenn fade/dip.
-        const sameScene = scene?.id && canvas.scene?.id === scene.id;
-        if (!sameScene && scene) {
-          const scResult = await LumennCompat.runSceneTransition({
-            scene,
-            type: sceneTrans.type ?? "cut",
-            duration: sceneTrans.duration ?? 1000,
-            color: normalizeHexColor(sceneTrans.color, "#000000"),
-          });
-          if (scResult === "fallback") {
-            ui.notifications.warn(
-              game.i18n.localize("LUMENN_FRAME.WarnSceneTransitionFallback"),
-            );
-            await lumennClientSceneFade(scene.id, sceneTrans);
-          }
-        }
-      }
-      if (scope === "audio" || scope === "both") {
-        const result = await this.#controller.goToAudio(
-          currentSources,
-          targetSources,
-          audioTrans,
-          LumennGraphStore.getDefaultCrossfadeDuration(),
-          audioTrans?.curve ?? "linear",
+      // Cena e áudio andam JUNTOS (música acompanha a troca de cena), e a
+      // playlist da Scene do Foundry fica suspensa na ativação para não cortar
+      // o crossfade (ver LumennCompat.activateScene).
+      const sameScene = scene?.id && canvas.scene?.id === scene.id;
+      const sceneTask =
+        (scope === "scene" || scope === "both") && scene
+          ? (async () => {
+              if (sameScene) {
+                // Já visualizada: só garante que é a Scene ativa do mundo.
+                if (LumennCompat.isGM() && !scene.active)
+                  await LumennCompat.activateScene(
+                    scene,
+                    { transition: { type: null } },
+                    { suppressScenePlaylist: true },
+                  );
+                return;
+              }
+              // V14: efeito via viewOptions; fallback Lumenn fade/dip nas demais.
+              const scResult = await LumennCompat.runSceneTransition({
+                scene,
+                type: sceneTrans.type ?? "cut",
+                duration: sceneTrans.duration ?? 1000,
+                color: normalizeHexColor(sceneTrans.color, "#000000"),
+                playersTransition: LumennSettings.get("playerSceneFade"),
+              });
+              if (scResult === "fallback") {
+                ui.notifications.warn(
+                  game.i18n.localize("LUMENN_FRAME.WarnSceneTransitionFallback"),
+                );
+                await lumennClientSceneFade(scene.id, sceneTrans);
+              }
+            })()
+          : null;
+      const audioTask =
+        scope === "audio" || scope === "both"
+          ? this.#controller.goToAudio(
+              currentSources,
+              targetSources,
+              audioTrans,
+              LumennGraphStore.getDefaultCrossfadeDuration(),
+              audioTrans?.curve ?? "linear",
+            )
+          : null;
+      const [, audioResult] = await Promise.all([sceneTask, audioTask]);
+      if (audioResult === "invalid-source")
+        ui.notifications.warn(
+          game.i18n.localize("LUMENN_FRAME.WarnInvalidAudioSource"),
         );
-        if (result === "invalid-source")
-          ui.notifications.warn(
-            game.i18n.localize("LUMENN_FRAME.WarnInvalidAudioSource"),
-          );
-      }
       await LumennGraphStore.setActiveNode(this.#graphId, id);
       LumennCompat.socketEmit({ type: "transition:end" });
     } finally {

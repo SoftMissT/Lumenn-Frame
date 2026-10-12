@@ -2,6 +2,42 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.29] - 2026-10-12 transição da edge aplicada, redesign e documentação
+
+### Fixed
+
+- A transição configurada na edge agora é a aplicada na troca de Scene no modo Ao Vivo. Antes, `Scene#activate()` rodava dentro de `canvas.transition.run`: ele resolve no update, o `Canvas#draw` da Scene começa depois, zera a captura do `run` e aplica a transição da própria Scene, ignorando a da edge.
+- A Scene passa a ser visualizada dentro do `run` (que aguarda o draw) e só depois ativada, com `viewOptions.transition` explícito para os clientes que ainda não estão nela.
+- Edge `cut` agora é corte seco: a ativação desliga a transição própria da Scene (`viewOptions.transition.type = null`).
+- Scene já ativa não é reativada após a transição.
+- O rótulo da edge só conhecia "Fade" e "Corte": qualquer outra transição (Ondas, Zoom Lumenn…) aparecia escrita como **Corte**. Agora mostra o nome real; escopo "cena + áudio" fica sem prefixo ("Dissolver 1.0s · Auto 3.0s"), corte e áudio Manter/Corte não mostram segundos.
+- A animação de entrada do aviso de conexão/transição perdia o `translateX(-50%)` e o pill pulava de lado por 180 ms.
+
+### Added
+
+- `SECURITY.md` (PT/EN): versões com suporte, relato privado de vulnerabilidades, o que o módulo faz e não faz, e limitações conhecidas (dados do mundo legíveis por jogadores; mensagens de socket sem autenticação).
+- `scripts/edge-label.mjs` e `tests/edge-label.test.mjs`: formatação do rótulo da edge como função pura testável.
+
+### Changed
+
+- `README.md` reescrito em PT-BR e inglês: conceito em linguagem simples, passo a passo do primeiro storyboard, glossário, transições explicadas, FAQ, nota de privacidade e setas corrompidas (`?`) corrigidas.
+- Redesign do editor (`styles/lumenn-frame.css`), mantendo todos os nomes de classe e variáveis: cena vira quadro de filme com título em lower-third sobre a imagem; forma de onda do áudio herda a cor da função (violeta música, ciano SFX); botões do Inspector com hierarquia (ação única cheia, ação ao lado de outra em contorno, destrutiva vermelha); seções do Inspector com respiro; campo de cor no tamanho dos demais inputs; brand do topo removido (o título da janela já o mostra).
+- Acessibilidade: `--lf-muted` passou de #73707c (3,46:1) para #9a97a6 (5,87:1); botão destrutivo com texto branco 5,06:1 (antes 3,64:1); anel de foco visível em todos os controles; `prefers-reduced-motion` respeitado; piso de texto de 11px (a legenda tinha 9px em caixa alta).
+- Fonte do corpo passou a Signika, que o Foundry embute, em vez de Montserrat com fallback que dependia da máquina; o fallback de títulos deixou de ser `serif`.
+- Rótulos das edges contra-escalam pelo zoom (`--lf-inv-zoom`, definida em `#applyCamera` só quando o zoom muda), com teto 1,5.
+
+### Performance
+
+- Removidas as camadas de overlay de grão (invisível: ~0,1% de opacidade efetiva) e de vinheta que cobriam o editor inteiro; a vinheta agora é o fundo do viewport.
+- Removidos `filter` por nó dimmed, `filter: brightness` no hover das edges e `blur` nos halos de áudio (forçavam camada de composição/repaint extra). Ganho de fluidez não medido: sem Foundry real não há medição de FPS.
+- CSS de 1276 para 1200 linhas: 12 regras de legenda viraram uma variável `--k`; `!important` de 4 para 2 (ambos só em `prefers-reduced-motion`).
+
+### Runtime Validation Pending
+
+- Validar no Foundry 14.367 com GM + jogador: `fade`, um efeito Lumenn e `cut` entre duas Scenes, com `playerSceneFade` ligado e desligado.
+- Conferir o visual no Foundry real (a verificação foi num harness estático com as fontes e ícones do Foundry, sem o JS do módulo).
+- Limite conhecido: o SVG das edges fica sob os cards, então um rótulo mais largo que o vão entre dois nós ainda passa por baixo deles. Corrigir exige uma camada de rótulos acima dos nós (3 pontos no `storyboard-app.mjs`).
+
 ## [0.0.28] - 2026-10-12
 
 ### Fixed

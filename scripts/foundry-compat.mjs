@@ -70,11 +70,14 @@ export const LumennCompat = {
 
   /**
    * Ativa uma Scene (GM only).
-   * V14: `Scene#activate()`. V13: idêntico. Fonte: Research-Lumenn-Frame (doc oficial).
+   * V14: `Scene#activate({viewOptions})`; `viewOptions.transition` é a transição
+   *      explícita que todo cliente usa ao desenhar a Scene (vence a da Scene).
+   * V13: `Scene#activate()` sem opções (argumento ignorado).
+   * Fonte: Research-Lumenn-Frame (doc oficial) + foundry.mjs 14.367 (Scene#activate).
    */
-  async activateScene(scene) {
+  async activateScene(scene, viewOptions) {
     if (!scene?.activate) return null;
-    return scene.activate();
+    return viewOptions ? scene.activate({ viewOptions }) : scene.activate();
   },
 
   /** Pré-carrega uma Scene. V14: `Scene#preload()`. V13: idêntico. Fallback: no-op. */
@@ -233,24 +236,36 @@ export const LumennCompat = {
       Object.values(CONFIG.Canvas?.sceneTransitions ?? {}).find(
         (d) => (d.id ?? d.transitionType) === tr,
       );
+    // Scene#activate() resolve no update; o Canvas#draw dela roda depois, já com o
+    // lock do canvas.transition liberado: zera a captura do run e aplica a
+    // transição configurada na própria Scene, não a da edge. Por isso o run só
+    // visualiza (view aguarda o draw) e a ativação vem depois, com a transição
+    // explícita para os clientes que ainda não estão na Scene.
     if (native && canvas.transition?.run && scene && canvas.app?.renderer) {
+      let ran = false;
       try {
         await this.preloadScene(scene);
         await canvas.transition.run({
           nextScene: scene,
-          activate,
+          activate: false,
           duration,
           transitionType: tr,
           ...(tr === "dip" ? { color } : {}),
         });
-        return "native";
+        ran = true;
       } catch (error) {
         console.error("Lumenn Frame: falha na transição nativa; usando fallback.", error);
+      }
+      if (ran) {
+        if (activate && this.isGM() && !scene.active)
+          await this.activateScene(scene, { transition: { type: tr, duration } });
+        return "native";
       }
     }
     if (tr === "cut") {
       if (scene) {
-        if (activate) await this.activateScene(scene);
+        // `type: null` desliga a transição própria da Scene: cut é corte seco.
+        if (activate) await this.activateScene(scene, { transition: { type: null } });
         else if (scene.view) await scene.view();
       }
       return "cut";

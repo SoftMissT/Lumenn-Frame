@@ -2,6 +2,34 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.30] - 2026-10-12 transição de cena e crossfade de música corrigidos no Foundry real
+
+> A 0.0.29 anunciava a transição corrigida, mas só havia sido validada em testes estáticos. Medida no Foundry 14.367 (mundo real, GM assistente), a animação continuava sem rodar e a música continuava cortando. Esta versão foi validada em runtime.
+
+### Fixed
+
+- **Transição de cena.** O `canvas.transition.run({ nextScene })` terminava ~14 ms depois de `_play`, sem animar: no 14.367 o `Canvas#draw` chama `transition._reset()` enquanto o `run` mantém o lock e destrói a captura dele. O efeito agora sai pelo caminho canônico do core, `viewOptions.transition` em `Scene#view()`/`Scene#activate()`, e o módulo espera `canvas.transition.promise`. Medido: animação ativa por ~1 s.
+- **Música cortada na troca de cena.** Ao ativar a Scene o Foundry chama `PlaylistCollection#_onChangeScene`, que para a faixa da Scene anterior e inicia a da nova com o `fade` de cada faixa (aqui ~0 ms), por cima do crossfade. O hook passa a ser suspenso somente durante a ativação feita pelo storyboard (e restaurado em `finally`).
+- **Crossfade encurtado.** Todo `update()` de PlaylistSound chama `sync()`; restaurar o `fade` do usuário logo após iniciar a transição encurtava o fade-in (volume 0,13 pulando para 0,5). Agora o `fade` só volta depois que a faixa terminou de entrar.
+- **Silêncio no meio do crossfade.** O alvo é pré-carregado antes de iniciar (a faixa levava ~2,5 s para decodificar e o fade-in começava tarde). Fade-out e fade-in agora começam juntos.
+- Cena e música rodam em paralelo na navegação ao vivo; com **Fade de cena para jogadores** desligado o GM vê o efeito e os jogadores trocam sem efeito.
+- Topo do editor no Foundry real: o core dá `width: 100%` aos `button` (o `+` e o `Expandir` viravam barras de largura total) e o rótulo "Ao Vivo" quebrava em duas linhas, aparecendo só "Ao".
+
+### Added
+
+- **Ao Vivo: nós de Áudio acionáveis.** Antes, os 10 nós de áudio do grafo ficavam esmaecidos e sem clique. Agora a música faz crossfade (modo e duração da linha AUDIO do nó com a cena ativa), o SFX toca por cima e clicar em um que toca faz fade out. O nó que toca fica com brilho.
+- Testes: 21 (cena com `viewOptions`, suspensão/restauração do hook de playlist, espera da animação, restauração do fade só depois do fim, pré-carregamento).
+
+### Changed
+
+- No Foundry 14 o cliente do jogador não executa mais a troca de Scene a partir do socket (a troca vem pela ativação do GM). `SECURITY.md` atualizado.
+- README: Modo Ao Vivo e FAQ atualizados.
+
+### Runtime Validation
+
+- Validado no Foundry 14.367 como GM: crossfade C73→C72 (volumes das duas faixas medidos a cada 250 ms), animação de cena ativa de ~0,28 s a ~1,1 s, nenhuma execução do `_onChangeScene` do Foundry, clique em nó de Áudio com crossfade real, `fade` original das faixas restaurado.
+- **Ainda não validado:** cliente de jogador (segundo cliente), Foundry 13.350.
+
 ## [0.0.29] - 2026-10-12 transição da edge aplicada, redesign e documentação
 
 ### Fixed

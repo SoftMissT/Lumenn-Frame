@@ -177,6 +177,22 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     return this.#mode === "edit" && LumennCompat.isGM();
   }
 
+  #canEditLiveAudio() {
+    if (this.#mode !== "live" || !LumennCompat.isGM()) return false;
+    if (this.#selected.kind !== "edge") return false;
+    const edge = LumennGraphStore.getEdge(this.#graphId, this.#selected.id);
+    return edge?.type === "flow" || edge?.type === "audio";
+  }
+
+  #canEditInspectorPath(path) {
+    if (typeof path !== "string" || !path) return false;
+    if (this.#editable()) return true;
+    return (
+      this.#canEditLiveAudio() &&
+      (path === "transition.scope" || path.startsWith("transition.audio."))
+    );
+  }
+
   /* -- Drag/Drop wiring --------------------------------------------- */
 
   #createDragDropHandlers() {
@@ -532,6 +548,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       tool: this.#tool,
       isGM: LumennCompat.isGM(),
       editable: this.#editable(),
+      liveAudioEditing: this.#canEditLiveAudio(),
       selectedKind: this.#selected.kind,
       connecting: !!this.#connectState,
       showConnectHint: !!connectHint,
@@ -601,6 +618,8 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         createGraph: L("LUMENN_FRAME.Toolbar.CreateStoryboard"),
         renameGraph: L("LUMENN_FRAME.Toolbar.RenameStoryboard"),
         deleteGraph: L("LUMENN_FRAME.Toolbar.DeleteStoryboard"),
+        sortGraphs: L("LUMENN_FRAME.Toolbar.SortStoryboards"),
+        liveAudioEditing: L("LUMENN_FRAME.Inspector.LiveAudioEditing"),
         transition: L("LUMENN_FRAME.Transitioning"),
         from: L("LUMENN_FRAME.Edge.From"),
         to: L("LUMENN_FRAME.Edge.To"),
@@ -851,7 +870,16 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
   #edgeClick(e) {
     const hit = e.target.closest?.(".lf-edge-hit");
     if (!hit?.dataset?.edgeId) return;
-    if (this.#mode === "live") return;
+    if (this.#mode === "live") {
+      if (!LumennCompat.isGM()) return;
+      const edge = LumennGraphStore.getEdge(this.#graphId, hit.dataset.edgeId);
+      if (!edge) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.#selected = { kind: "edge", id: edge.id };
+      this.render();
+      return;
+    }
     // O SVG vive dentro do viewport. Sem interromper o evento, o mesmo clique
     // seleciona a edge aqui e logo depois o viewport a interpreta como fundo,
     // limpando a seleção antes que o Inspector permaneça aberto.
@@ -1567,6 +1595,41 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const g = await LumennGraphStore.createGraph(name);
       this.#graphId = g?.id ?? this.#graphId;
       this.render();
+    } else if (action === "sort-graphs") {
+      await LumennGraphStore.sortGraphsByName();
+      this.render();
+    } else if (action === "rename-graph") {
+      const graph = LumennGraphStore.getGraph(this.#graphId);
+      const raw = await foundry.applications.api.DialogV2.prompt({
+        window: {
+          title: game.i18n.localize("LUMENN_FRAME.Toolbar.RenameStoryboard"),
+        },
+        content: `<input type="text" name="name" value="${String(graph?.name ?? "").replace(/"/g, "&quot;")}" autofocus>`,
+        ok: {
+          label: game.i18n.localize("LUMENN_FRAME.Config.Save"),
+          callback: (ev, btn) => btn.form.elements.name.value,
+        },
+      });
+      const name = (typeof raw === "string" ? raw : (raw?.name ?? ""))
+        .toString()
+        .trim();
+      if (name) {
+        await LumennGraphStore.renameGraph(this.#graphId, name);
+        this.render();
+      }
+    } else if (action === "delete-graph") {
+      const ok = await foundry.applications.api.DialogV2.confirm({
+        title: game.i18n.localize("LUMENN_FRAME.Toolbar.DeleteStoryboard"),
+        content: game.i18n.localize("LUMENN_FRAME.ConfirmDeleteStoryboard"),
+        yes: { label: game.i18n.localize("LUMENN_FRAME.Beat.Delete") },
+        no: { label: game.i18n.localize("LUMENN_FRAME.Config.Cancel") },
+      });
+      if (ok) {
+        await LumennGraphStore.deleteGraph(this.#graphId);
+        this.#graphId = null;
+        this.#selected = { kind: null, id: null };
+        this.render();
+      }
     }
   }
 
@@ -1606,6 +1669,13 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   #inspectorChange(e) {
     const path = e.currentTarget.dataset.insp;
+    if (!this.#canEditInspectorPath(path)) return;
+    if (
+      this.#mode === "live" &&
+      path !== "transition.scope" &&
+      !path.startsWith("transition.audio.")
+    )
+      return;
     let val =
       e.currentTarget.type === "checkbox"
         ? e.currentTarget.checked
@@ -1664,7 +1734,9 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const kind = this.#selected.kind;
     const id = this.#selected.id;
     this._inspTimer = setTimeout(() => {
-      if (!path || !kind || !id) return;
+      if (!path || !kind || !id || !this.#canEditInspectorPath(path)) return;
+      if (this.#mode === "live" && !path.startsWith("transition.audio."))
+        return;
       if (kind === "node") {
         const node = LumennGraphStore.getNode(this.#graphId, id);
         const patch = {};
@@ -1687,9 +1759,16 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   async #inspectorAction(e) {
-    if (!this.#editable()) return;
     const action = e.currentTarget.dataset.inspAction;
     const root = this.element;
+    if (action === "select-edge") {
+      const edgeId = e.currentTarget.dataset.inspEdge;
+      if (!edgeId) return;
+      this.#selected = { kind: "edge", id: edgeId };
+      this.render();
+      return;
+    }
+    if (!this.#editable()) return;
     if (action === "focus-node") {
       const nodeId = e.currentTarget.dataset.inspNode;
       const node = LumennGraphStore.getNode(this.#graphId, nodeId);
@@ -1703,11 +1782,6 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       this.#camera.panY =
         viewport.clientHeight / 2 -
         (node.position.y + height / 2) * this.#camera.zoom;
-      this.render();
-    } else if (action === "select-edge") {
-      const edgeId = e.currentTarget.dataset.inspEdge;
-      if (!edgeId) return;
-      this.#selected = { kind: "edge", id: edgeId };
       this.render();
     } else if (action === "set-initial") {
       LumennGraphStore.setActiveNode(this.#graphId, this.#selected.id).then(
@@ -1785,7 +1859,9 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
           });
         } catch (error) {
           console.error("Lumenn Frame: preview da transição falhou.", error);
-          ui.notifications.warn(game.i18n.localize("LUMENN_FRAME.WarnTransitionPreview"));
+          ui.notifications.warn(
+            game.i18n.localize("LUMENN_FRAME.WarnTransitionPreview"),
+          );
         } finally {
           this.#previewing = false;
           this.element?.classList.remove("lf-previewing");
@@ -1796,40 +1872,6 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
       LumennGraphStore.addReturn(this.#graphId, this.#selected.id).then(() =>
         this.render(),
       );
-    } else if (action === "rename-graph") {
-      const graph = LumennGraphStore.getGraph(this.#graphId);
-      foundry.applications.api.DialogV2.prompt({
-        window: {
-          title: game.i18n.localize("LUMENN_FRAME.Toolbar.RenameStoryboard"),
-        },
-        content: `<input type="text" name="name" value="${String(graph?.name ?? "").replace(/"/g, "&quot;")}" autofocus>`,
-        ok: {
-          label: game.i18n.localize("LUMENN_FRAME.Config.Save"),
-          callback: (ev, btn) => btn.form.elements.name.value,
-        },
-      }).then((raw) => {
-        const name = (typeof raw === "string" ? raw : (raw?.name ?? ""))
-          .toString()
-          .trim();
-        if (name)
-          LumennGraphStore.renameGraph(this.#graphId, name).then(() =>
-            this.render(),
-          );
-      });
-    } else if (action === "delete-graph") {
-      foundry.applications.api.DialogV2.confirm({
-        title: game.i18n.localize("LUMENN_FRAME.Toolbar.DeleteStoryboard"),
-        content: game.i18n.localize("LUMENN_FRAME.ConfirmDeleteStoryboard"),
-        yes: { label: game.i18n.localize("LUMENN_FRAME.Beat.Delete") },
-        no: { label: game.i18n.localize("LUMENN_FRAME.Config.Cancel") },
-      }).then((ok) => {
-        if (ok)
-          LumennGraphStore.deleteGraph(this.#graphId).then(() => {
-            this.#graphId = null;
-            this.#selected = { kind: null, id: null };
-            this.render();
-          });
-      });
     }
   }
 
@@ -2027,6 +2069,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const base = {
       colors: COLORS,
       sizes: SIZES,
+      liveAudioEditing: this.#canEditLiveAudio(),
       scenes: [...game.scenes.values()].map((s) => ({
         id: s.id,
         name: s.name,

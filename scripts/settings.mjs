@@ -1,23 +1,25 @@
 const MODULE_ID = "lumenn-frame";
 
 /**
- * LumennSettings — registro central e acesso a configurações do módulo.
+ * LumennSettings registro central e acesso a configurações do módulo.
  *
  * REGRA: Settings = DEFAULTS para NOVOS nodes/edges. A FLOW edge é a
  * configuração REAL da transição; alterar um setting global NUNCA sobrescreve
  * edges já configuradas.
  *
- * Nada de `game.settings.get()` espalhado pelo app — use estes getters.
+ * Nada de `game.settings.get()` espalhado pelo app use estes getters.
  */
 export class LumennSettings {
   static register() {
     const L = (k) => game.i18n.localize(k);
 
-    /* ── Transitions ── */
+    /* -- Transitions -- */
     game.settings.register(MODULE_ID, "defaultSceneTransitionType", {
       name: L("LUMENN_FRAME.Settings.SceneTransitionType.Name"),
       hint: L("LUMENN_FRAME.Settings.SceneTransitionType.Hint"),
-      scope: "world", config: true, type: String,
+      scope: "world",
+      config: true,
+      type: String,
       choices: {
         cut: L("LUMENN_FRAME.Edge.Cut"),
         fade: L("LUMENN_FRAME.Edge.Fade"),
@@ -28,18 +30,26 @@ export class LumennSettings {
     game.settings.register(MODULE_ID, "defaultDipColor", {
       name: L("LUMENN_FRAME.Settings.DipColor.Name"),
       hint: L("LUMENN_FRAME.Settings.DipColor.Hint"),
-      scope: "world", config: true, type: String, default: "#000000",
+      scope: "world",
+      config: true,
+      type: String,
+      default: "#000000",
     });
     game.settings.register(MODULE_ID, "defaultSceneFadeDuration", {
       name: L("LUMENN_FRAME.Settings.SceneFadeDuration.Name"),
       hint: L("LUMENN_FRAME.Settings.SceneFadeDuration.Hint"),
-      scope: "world", config: true, type: Number,
-      range: { min: 100, max: 10000, step: 100 }, default: 1000,
+      scope: "world",
+      config: true,
+      type: Number,
+      range: { min: 100, max: 10000, step: 100 },
+      default: 1000,
     });
     game.settings.register(MODULE_ID, "defaultAudioMode", {
       name: L("LUMENN_FRAME.Settings.AudioMode.Name"),
       hint: L("LUMENN_FRAME.Settings.AudioMode.Hint"),
-      scope: "world", config: true, type: String,
+      scope: "world",
+      config: true,
+      type: String,
       choices: {
         auto: L("LUMENN_FRAME.Edge.Auto"),
         keep: L("LUMENN_FRAME.Edge.Keep"),
@@ -51,119 +61,187 @@ export class LumennSettings {
     game.settings.register(MODULE_ID, "defaultCrossfadeDuration", {
       name: L("LUMENN_FRAME.Settings.CrossfadeDuration.Name"),
       hint: L("LUMENN_FRAME.Settings.CrossfadeDuration.Hint"),
-      scope: "world", config: true, type: Number,
-      range: { min: 500, max: 10000, step: 250 }, default: 3000,
+      scope: "world",
+      config: true,
+      type: Number,
+      range: { min: 500, max: 10000, step: 250 },
+      default: 3000,
     });
     game.settings.register(MODULE_ID, "defaultAudioFadeIn", {
       name: L("LUMENN_FRAME.Settings.AudioFadeIn.Name"),
       hint: L("LUMENN_FRAME.Settings.AudioFadeIn.Hint"),
-      scope: "world", config: true, type: Number,
-      range: { min: 0, max: 10000, step: 100 }, default: 1000,
+      scope: "world",
+      config: true,
+      type: Number,
+      range: { min: 0, max: 10000, step: 100 },
+      default: 1000,
     });
     game.settings.register(MODULE_ID, "defaultAudioFadeOut", {
       name: L("LUMENN_FRAME.Settings.AudioFadeOut.Name"),
       hint: L("LUMENN_FRAME.Settings.AudioFadeOut.Hint"),
-      scope: "world", config: true, type: Number,
-      range: { min: 0, max: 10000, step: 100 }, default: 1000,
+      scope: "world",
+      config: true,
+      type: Number,
+      range: { min: 0, max: 10000, step: 100 },
+      default: 1000,
     });
     game.settings.register(MODULE_ID, "defaultCrossfadeCurve", {
       name: L("LUMENN_FRAME.Settings.CrossfadeCurve.Name"),
       hint: L("LUMENN_FRAME.Settings.CrossfadeCurve.Hint"),
-      scope: "world", config: true, type: String,
+      scope: "world",
+      config: true,
+      type: String,
       choices: { linear: "Linear", "equal-power": "Equal Power (PARTIAL)" },
       default: "linear",
     });
 
-    /* ── Graph Editor ── */
+    /* -- Graph Editor -- */
     game.settings.register(MODULE_ID, "defaultSceneNodeSize", {
       name: L("LUMENN_FRAME.Settings.SceneNodeSize.Name"),
-      scope: "world", config: true, type: String,
-      choices: { compact: "compact", normal: "normal", large: "large" }, default: "normal",
+      scope: "world",
+      config: true,
+      type: String,
+      choices: { compact: "compact", normal: "normal", large: "large" },
+      default: "normal",
     });
     game.settings.register(MODULE_ID, "defaultAudioNodeSize", {
       name: L("LUMENN_FRAME.Settings.AudioNodeSize.Name"),
-      scope: "world", config: true, type: String,
-      choices: { compact: "compact", normal: "normal", large: "large" }, default: "normal",
+      scope: "world",
+      config: true,
+      type: String,
+      choices: { compact: "compact", normal: "normal", large: "large" },
+      default: "normal",
     });
     game.settings.register(MODULE_ID, "defaultNoteNodeSize", {
       name: L("LUMENN_FRAME.Settings.NoteNodeSize.Name"),
-      scope: "world", config: true, type: String,
-      choices: { compact: "compact", normal: "normal", large: "large" }, default: "normal",
+      scope: "world",
+      config: true,
+      type: String,
+      choices: { compact: "compact", normal: "normal", large: "large" },
+      default: "normal",
     });
     game.settings.register(MODULE_ID, "defaultSceneColor", {
       name: L("LUMENN_FRAME.Settings.SceneColor.Name"),
-      scope: "world", config: true, type: String, default: "#f0a321",
+      scope: "world",
+      config: true,
+      type: String,
+      default: "#f0a321",
     });
     game.settings.register(MODULE_ID, "defaultAudioColor", {
       name: L("LUMENN_FRAME.Settings.AudioColor.Name"),
-      scope: "world", config: true, type: String, default: "#2dd4bf",
+      scope: "world",
+      config: true,
+      type: String,
+      default: "#2dd4bf",
     });
     game.settings.register(MODULE_ID, "defaultNoteColor", {
       name: L("LUMENN_FRAME.Settings.NoteColor.Name"),
-      scope: "world", config: true, type: String, default: "#73707c",
+      scope: "world",
+      config: true,
+      type: String,
+      default: "#73707c",
     });
     game.settings.register(MODULE_ID, "initialZoom", {
       name: L("LUMENN_FRAME.Settings.InitialZoom.Name"),
-      scope: "world", config: true, type: Number,
-      range: { min: 25, max: 200, step: 5 }, default: 100,
+      scope: "world",
+      config: true,
+      type: Number,
+      range: { min: 25, max: 200, step: 5 },
+      default: 100,
     });
     game.settings.register(MODULE_ID, "zoomSpeed", {
       name: L("LUMENN_FRAME.Settings.ZoomSpeed.Name"),
-      scope: "world", config: true, type: Number,
-      range: { min: 5, max: 30, step: 1 }, default: 10,
+      scope: "world",
+      config: true,
+      type: Number,
+      range: { min: 5, max: 30, step: 1 },
+      default: 10,
     });
     game.settings.register(MODULE_ID, "openInWorkspace", {
       name: L("LUMENN_FRAME.Settings.OpenInWorkspace.Name"),
-      scope: "world", config: true, type: Boolean, default: false,
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: false,
     });
 
-    /* ── Live Mode ── */
+    /* -- Live Mode -- */
     game.settings.register(MODULE_ID, "dimUnreachable", {
       name: L("LUMENN_FRAME.Settings.DimUnreachable.Name"),
-      scope: "world", config: true, type: Boolean, default: true,
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: true,
     });
     game.settings.register(MODULE_ID, "showTransitionLabels", {
       name: L("LUMENN_FRAME.Settings.ShowTransitionLabels.Name"),
-      scope: "world", config: true, type: Boolean, default: true,
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: true,
     });
     game.settings.register(MODULE_ID, "confirmSceneTransition", {
       name: L("LUMENN_FRAME.Settings.ConfirmTransition.Name"),
-      scope: "world", config: true, type: Boolean, default: false,
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: false,
     });
     game.settings.register(MODULE_ID, "playerSceneFade", {
       name: L("LUMENN_FRAME.Settings.PlayerSceneFade.Name"),
-      scope: "world", config: true, type: Boolean, default: true,
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: true,
     });
     game.settings.register(MODULE_ID, "playerAudioSync", {
       name: L("LUMENN_FRAME.Settings.PlayerAudioSync.Name"),
-      scope: "world", config: true, type: Boolean, default: true,
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: true,
     });
 
-    /* ── Import ── */
+    /* -- Import -- */
     game.settings.register(MODULE_ID, "recursiveFolderImport", {
       name: L("LUMENN_FRAME.Settings.RecursiveFolder.Name"),
       hint: L("LUMENN_FRAME.Settings.RecursiveFolder.Hint"),
-      scope: "world", config: true, type: Boolean, default: true,
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: true,
     });
     game.settings.register(MODULE_ID, "importPlaylistTracksAsNodes", {
       name: L("LUMENN_FRAME.Settings.ImportTracksAsNodes.Name"),
       hint: L("LUMENN_FRAME.Settings.ImportTracksAsNodes.Hint"),
-      scope: "world", config: true, type: Boolean, default: false,
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: false,
     });
     game.settings.register(MODULE_ID, "folderLayoutColumns", {
       name: L("LUMENN_FRAME.Settings.FolderColumns.Name"),
-      scope: "world", config: true, type: Number,
-      range: { min: 1, max: 10, step: 1 }, default: 3,
+      scope: "world",
+      config: true,
+      type: Number,
+      range: { min: 1, max: 10, step: 1 },
+      default: 3,
     });
     game.settings.register(MODULE_ID, "folderLayoutGap", {
       name: L("LUMENN_FRAME.Settings.FolderGap.Name"),
-      scope: "world", config: true, type: Number,
-      range: { min: 10, max: 200, step: 5 }, default: 40,
+      scope: "world",
+      config: true,
+      type: Number,
+      range: { min: 10, max: 200, step: 5 },
+      default: 40,
     });
     game.settings.register(MODULE_ID, "autoConnectImportedScenes", {
       name: L("LUMENN_FRAME.Settings.AutoConnectScenes.Name"),
       hint: L("LUMENN_FRAME.Settings.AutoConnectScenes.Hint"),
-      scope: "world", config: true, type: Boolean, default: false,
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: false,
     });
   }
 
@@ -203,7 +281,10 @@ export class LumennSettings {
   }
 
   static getCameraDefaults() {
-    return { zoom: this.get("initialZoom") / 100, speed: this.get("zoomSpeed") };
+    return {
+      zoom: this.get("initialZoom") / 100,
+      speed: this.get("zoomSpeed"),
+    };
   }
 
   static getLiveDefaults() {

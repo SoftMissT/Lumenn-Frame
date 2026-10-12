@@ -6,7 +6,7 @@ import { LumennSettings } from "./settings.mjs";
 const DEFAULT_COLORS = { scene: "#f0a321", audio: "#2dd4bf", note: "#73707c" };
 
 /**
- * LumennGraphStore — CRUD de Graphs (Schema v2: nodes[] + edges[]) sobre
+ * LumennGraphStore CRUD de Graphs (Schema v2: nodes[] + edges[]) sobre
  * game.settings (escopo world), com migração não-destrutiva do schema v1
  * (Beats) e backup obrigatório. Todas as escritas são assíncronas (await).
  */
@@ -32,8 +32,10 @@ export class LumennGraphStore {
     });
   }
 
-static getAll() {
-    const data = foundry.utils.duplicate(game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY));
+  static getAll() {
+    const data = foundry.utils.duplicate(
+      game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY),
+    );
     return data?.graphs ?? [];
   }
 
@@ -61,11 +63,13 @@ static getAll() {
     };
   }
 
-  /* ── CRUD de Graphs ─────────────────────────────────────────────── */
+  /* -- CRUD de Graphs ----------------------------------------------- */
 
   static async createGraph(name = "Novo Storyboard") {
     if (!game.user.isGM) return null;
-    const data = foundry.utils.duplicate(game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY));
+    const data = foundry.utils.duplicate(
+      game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY),
+    );
     const graph = {
       id: `graph_${foundry.utils.randomID(16)}`,
       name,
@@ -80,7 +84,9 @@ static getAll() {
 
   static async renameGraph(graphId, name) {
     if (!game.user.isGM) return false;
-    const data = foundry.utils.duplicate(game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY));
+    const data = foundry.utils.duplicate(
+      game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY),
+    );
     const graph = data.graphs.find((g) => g.id === graphId);
     if (!graph) return false;
     graph.name = name;
@@ -88,19 +94,38 @@ static getAll() {
     return true;
   }
 
+  static async sortGraphsByName() {
+    if (!game.user.isGM) return false;
+    const data = foundry.utils.duplicate(
+      game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY),
+    );
+    data.graphs.sort((a, b) =>
+      String(a.name ?? "").localeCompare(String(b.name ?? ""), game.i18n?.lang, {
+        sensitivity: "base",
+        numeric: true,
+      }),
+    );
+    await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
+    return true;
+  }
+
   static async deleteGraph(graphId) {
     if (!game.user.isGM) return false;
-    const data = foundry.utils.duplicate(game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY));
+    const data = foundry.utils.duplicate(
+      game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY),
+    );
     data.graphs = data.graphs.filter((g) => g.id !== graphId);
     await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
     return true;
   }
 
-  /* ── CRUD de Nodes ──────────────────────────────────────────────── */
+  /* -- CRUD de Nodes ------------------------------------------------ */
 
   static async addNode(graphId, node) {
     if (!game.user.isGM) return null;
-    const data = foundry.utils.duplicate(game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY));
+    const data = foundry.utils.duplicate(
+      game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY),
+    );
     const graph = data.graphs.find((g) => g.id === graphId);
     if (!graph) return null;
     // Defaults das Settings aplicados quando o caller não os define.
@@ -112,7 +137,19 @@ static getAll() {
       color: node.color ?? d.color,
       size: node.size ?? d.size,
       notes: node.notes ?? "",
-      data: node.data ?? (node.type === "audio" ? { audioRole: "music", audioType: null, audioId: null, volume: 0.75, loop: true, fadeIn: null, fadeOut: null } : {}),
+      data:
+        node.data ??
+        (node.type === "audio"
+          ? {
+              audioRole: "music",
+              audioType: null,
+              audioId: null,
+              volume: 0.75,
+              loop: true,
+              fadeIn: null,
+              fadeOut: null,
+            }
+          : {}),
     };
     graph.nodes.push(n);
     await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
@@ -121,7 +158,9 @@ static getAll() {
 
   static async updateNode(graphId, nodeId, patch) {
     if (!game.user.isGM) return null;
-    const data = foundry.utils.duplicate(game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY));
+    const data = foundry.utils.duplicate(
+      game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY),
+    );
     const graph = data.graphs.find((g) => g.id === graphId);
     const node = graph?.nodes?.find((n) => n.id === nodeId);
     if (!node) return null;
@@ -132,7 +171,9 @@ static getAll() {
 
   static async deleteNode(graphId, nodeId) {
     if (!game.user.isGM) return false;
-    const data = foundry.utils.duplicate(game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY));
+    const data = foundry.utils.duplicate(
+      game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY),
+    );
     const graph = data.graphs.find((g) => g.id === graphId);
     if (!graph) return false;
     graph.nodes = graph.nodes.filter((n) => n.id !== nodeId);
@@ -146,29 +187,37 @@ static getAll() {
 
   static async setActiveNode(graphId, nodeId) {
     if (!game.user.isGM) return;
-    const data = foundry.utils.duplicate(game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY));
+    const data = foundry.utils.duplicate(
+      game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY),
+    );
     const graph = data.graphs.find((g) => g.id === graphId);
     if (!graph) return;
     graph.activeNodeId = nodeId;
     await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
   }
 
-  /* ── CRUD de Edges ──────────────────────────────────────────────── */
+  /* -- CRUD de Edges ------------------------------------------------ */
 
   static async addEdge(graphId, edge) {
     if (!game.user.isGM) return null;
-    const data = foundry.utils.duplicate(game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY));
+    const data = foundry.utils.duplicate(
+      game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY),
+    );
     const graph = data.graphs.find((g) => g.id === graphId);
     if (!graph) return null;
     const dup = graph.edges.some(
       (e) => e.type === edge.type && e.from === edge.from && e.to === edge.to,
     );
     if (dup || edge.from === edge.to) return null;
-if (edge.type === "flow" && !edge.transition) {
+    if (edge.type === "flow" && !edge.transition) {
       const t = LumennSettings.getTransitionDefaults();
       edge.transition = {
         scope: "both",
-        scene: { type: t.sceneType, duration: t.sceneDuration, color: t.dipColor },
+        scene: {
+          type: t.sceneType,
+          duration: t.sceneDuration,
+          color: t.dipColor,
+        },
         audio: {
           mode: t.audioMode,
           crossfadeDuration: t.crossfade,
@@ -185,7 +234,9 @@ if (edge.type === "flow" && !edge.transition) {
 
   static async updateEdge(graphId, edgeId, patch) {
     if (!game.user.isGM) return null;
-    const data = foundry.utils.duplicate(game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY));
+    const data = foundry.utils.duplicate(
+      game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY),
+    );
     const graph = data.graphs.find((g) => g.id === graphId);
     const edge = graph?.edges?.find((e) => e.id === edgeId);
     if (!edge) return null;
@@ -196,7 +247,9 @@ if (edge.type === "flow" && !edge.transition) {
 
   static async deleteEdge(graphId, edgeId) {
     if (!game.user.isGM) return false;
-    const data = foundry.utils.duplicate(game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY));
+    const data = foundry.utils.duplicate(
+      game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY),
+    );
     const graph = data.graphs.find((g) => g.id === graphId);
     if (!graph) return false;
     graph.edges = graph.edges.filter((e) => e.id !== edgeId);
@@ -206,7 +259,9 @@ if (edge.type === "flow" && !edge.transition) {
 
   /** Cria a aresta recíproca B->A a partir de uma FLOW edge A->B (se não existir). */
   static async addReturn(graphId, edgeId) {
-    const data = foundry.utils.duplicate(game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY));
+    const data = foundry.utils.duplicate(
+      game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY),
+    );
     const graph = data.graphs.find((g) => g.id === graphId);
     const edge = graph?.edges?.find((e) => e.id === edgeId);
     if (!edge || edge.type !== "flow") return null;
@@ -226,7 +281,7 @@ if (edge.type === "flow" && !edge.transition) {
     return created;
   }
 
-  /* ── Migração Schema v1 (Beats) → v2 (Graphs) ───────────────────── */
+  /* -- Migração Schema v1 (Beats) ? v2 (Graphs) --------------------- */
 
   /**
    * Migra o setting legado `storyboards` (schema v1) para `graphs` (v2),
@@ -234,7 +289,9 @@ if (edge.type === "flow" && !edge.transition) {
    * schemaVersion 2, não faz nada.
    */
   static async migrate() {
-    const data = foundry.utils.duplicate(game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY));
+    const data = foundry.utils.duplicate(
+      game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY),
+    );
     if (data?.schemaVersion === SCHEMA_VERSION) return { migrated: false };
 
     const legacy =

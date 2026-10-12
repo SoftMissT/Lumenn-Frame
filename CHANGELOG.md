@@ -2,6 +2,14 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [0.0.28] - 2026-10-12
+
+### Fixed
+
+- Ações de renomear, excluir e organizar storyboards agora ficam no topo do editor.
+- O modo Ao Vivo permite editar somente transições de áudio em edges selecionadas.
+- Adicionada ordenação alfabética natural dos storyboards.
+
 ## [0.0.27] - 2026-09-23 captura robusta e preview isolado
 
 ### Fixed

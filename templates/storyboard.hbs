@@ -10,6 +10,13 @@
     {{/if}}
     {{#if isGM}}
     <button class="lf-top-btn" data-action="create-graph" title="{{label.createGraph}}">+</button>
+    {{#if editable}}
+      <div class="lf-top-actions" aria-label="{{label.graph}}">
+        <button class="lf-top-btn" data-action="sort-graphs" title="{{label.sortGraphs}}"><i class="fa-solid fa-arrow-down-a-z"></i> A–Z</button>
+        <button class="lf-top-btn" data-action="rename-graph" title="{{label.renameGraph}}"><i class="fa-solid fa-pen"></i></button>
+        <button class="lf-top-btn lf-top-btn-danger" data-action="delete-graph" title="{{label.deleteGraph}}"><i class="fa-solid fa-trash"></i></button>
+      </div>
+    {{/if}}
     {{/if}}
     <div class="lf-mode-toggle">
       <button class="{{#if (lumenn-eq mode 'edit')}}active{{/if}}" data-action="toggle-mode">{{label.editMode}}</button>
@@ -224,6 +231,7 @@
       {{/if}}
 
       {{#if (lumenn-eq inspector.kind 'edge')}}
+        {{#if inspector.liveAudioEditing}}<p class="lf-insp-p lf-live-edit-note"><i class="fa-solid fa-wave-square"></i> {{label.liveAudioEditing}}</p>{{/if}}
         {{#if (lumenn-eq inspector.edgeType 'flow')}}
         <h3 class="lf-insp-title">{{label.flowEdge}} <span class="lf-insp-native">{{#if inspector.hasNativeTransitions}}{{label.v14Native}}{{else}}{{label.fallbackMode}}{{/if}}</span></h3>
         <p class="lf-insp-p">{{label.from}}: {{inspector.fromLabel}} &rarr; {{label.to}}: {{inspector.toLabel}}</p>
@@ -234,16 +242,16 @@
           <option value="both" {{#if (lumenn-eq inspector.transitionScope 'both')}}selected{{/if}}>{{label.beatBoth}}</option>
         </select>
         <label class="lf-insp-label">{{label.sceneTrans}}</label>
-        <select data-insp="transition.scene.type">
+        <select data-insp="transition.scene.type" {{#if inspector.liveAudioEditing}}disabled{{/if}}>
           <option value="cut" {{#if (lumenn-eq inspector.edge.transition.scene.type 'cut')}}selected{{/if}}>{{label.cut}}</option>
           {{#each inspector.sceneTransitions}}
           <option value="{{this.id}}" {{#if (lumenn-eq this.id ../inspector.edge.transition.scene.type)}}selected{{/if}}>{{this.label}}</option>
           {{/each}}
         </select>
         <label class="lf-insp-label">{{label.duration}} (ms)</label>
-        <input type="number" min="0" step="100" data-insp="transition.scene.duration" value="{{inspector.edge.transition.scene.duration}}">
+        <input type="number" min="0" step="100" data-insp="transition.scene.duration" value="{{inspector.edge.transition.scene.duration}}" {{#if inspector.liveAudioEditing}}disabled{{/if}}>
         <label class="lf-insp-label">{{label.color}}</label>
-        <input type="color" data-insp="transition.scene.color" value="{{inspector.sceneColor}}">
+        <input type="color" data-insp="transition.scene.color" value="{{inspector.sceneColor}}" {{#if inspector.liveAudioEditing}}disabled{{/if}}>
         <label class="lf-insp-label">{{label.audioTrans}}</label>
         <select data-insp="transition.audio.mode">
           <option value="auto" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'auto')}}selected{{/if}}>{{label.auto}}</option>
@@ -326,12 +334,6 @@
         </li>
         {{/each}}
       </ul>
-      {{/if}}
-      {{#if editable}}
-      <div class="lf-insp-actions">
-        <button data-insp-action="rename-graph">{{label.renameGraph}}</button>
-        <button class="danger" data-insp-action="delete-graph">{{label.deleteGraph}}</button>
-      </div>
       {{/if}}
       {{/if}}
     </div>

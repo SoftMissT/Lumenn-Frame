@@ -4,7 +4,7 @@ import {
 } from "./audio-engine.mjs";
 
 /**
- * LumennTransitionController — peça que conhece o motor de áudio.
+ * LumennTransitionController peça que conhece o motor de áudio.
  * No Graph Editor 2.0, o fluxo (Scene) é conduzido pelo app; este controller
  * concentra apenas a decisão/execução de áudio dirigida por modo, sem conhecer
  * Scenes nem UI. Validação de permissão/modo vive no app e no socket.

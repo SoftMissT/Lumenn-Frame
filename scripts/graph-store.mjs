@@ -1,7 +1,7 @@
 const MODULE_ID = 'lumenn-frame';
 const SCHEMA_VERSION = 2;
 import { LumennSettings } from './settings.mjs';
-import { GROUP_COLOR } from './graph-groups.mjs';
+import { childrenOf, GROUP_COLOR } from './graph-groups.mjs';
 const DEFAULT_COLORS = {
     scene: '#f0a321',
     audio: '#2dd4bf',
@@ -16,6 +16,7 @@ export class LumennGraphStore {
     static #GRAPHS_KEY = 'graphs';
     static #LEGACY_KEY = 'storyboards';
     static #LEGACY_BACKUP_KEY = 'legacyBackup';
+    static #GRAPHS_BACKUP_KEY = 'graphsBackup';
     static registerSettings() {
         game.settings.register(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, {
             name: 'Graphs',
@@ -29,6 +30,13 @@ export class LumennGraphStore {
         });
         game.settings.register(MODULE_ID, LumennGraphStore.#LEGACY_BACKUP_KEY, {
             name: 'Legacy Backup (v1)',
+            scope: 'world',
+            config: false,
+            type: String,
+            default: '',
+        });
+        game.settings.register(MODULE_ID, LumennGraphStore.#GRAPHS_BACKUP_KEY, {
+            name: 'Graphs Backup (pre-migration)',
             scope: 'world',
             config: false,
             type: String,
@@ -157,6 +165,20 @@ export class LumennGraphStore {
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
         return n;
     }
+    static #sanitizePatch(node, graph, patch) {
+        const clean = { ...(patch ?? {}) };
+        delete clean.id;
+        delete clean.type;
+        if (Object.prototype.hasOwnProperty.call(clean, 'parentId')) {
+            const parentId = clean.parentId;
+            const parent = parentId ? graph.nodes.find((n) => n.id === parentId) : null;
+            const valid =
+                parentId === null ||
+                (node.type !== 'group' && parent?.type === 'group' && parent.id !== node.id);
+            if (!valid) delete clean.parentId;
+        }
+        return clean;
+    }
     static async updateNode(graphId, nodeId, patch) {
         if (!game.user.isGM) return null;
         const data = foundry.utils.duplicate(
@@ -165,7 +187,7 @@ export class LumennGraphStore {
         const graph = data.graphs.find((g) => g.id === graphId);
         const node = graph?.nodes?.find((n) => n.id === nodeId);
         if (!node) return null;
-        Object.assign(node, patch);
+        Object.assign(node, LumennGraphStore.#sanitizePatch(node, graph, patch));
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
         return node;
     }
@@ -182,8 +204,7 @@ export class LumennGraphStore {
         for (const patch of patches) {
             const node = graph.nodes.find((n) => n.id === patch?.id);
             if (!node) continue;
-            const { id, ...rest } = patch;
-            Object.assign(node, rest);
+            Object.assign(node, LumennGraphStore.#sanitizePatch(node, graph, patch));
             updated.push(node);
         }
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
@@ -200,9 +221,7 @@ export class LumennGraphStore {
         if (!node) return false;
         // Apagar grupo = desagrupar: filhos e edges internas ficam.
         if (node.type === 'group') {
-            for (const child of graph.nodes) {
-                if (child.parentId === nodeId) child.parentId = null;
-            }
+            for (const child of childrenOf(graph.nodes, nodeId)) child.parentId = null;
         }
         graph.nodes = graph.nodes.filter((n) => n.id !== nodeId);
         graph.edges = graph.edges.filter((e) => e.from !== nodeId && e.to !== nodeId);
@@ -279,6 +298,7 @@ export class LumennGraphStore {
     }
     /** Cria a aresta recíproca B->A a partir de uma FLOW edge A->B (se não existir). */
     static async addReturn(graphId, edgeId) {
+        if (!game.user.isGM) return null;
         const data = foundry.utils.duplicate(
             game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
         );
@@ -307,19 +327,24 @@ export class LumennGraphStore {
      * schemaVersion 2, não faz nada.
      */
     static async migrate() {
+        if (!game.user.isGM) return { migrated: false, gm: false };
         const data = foundry.utils.duplicate(
             game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
         );
-        if (data?.schemaVersion === SCHEMA_VERSION)
-            return {
-                migrated: false,
-            };
+        const version = Number(data?.schemaVersion ?? 0);
+        if (!Number.isFinite(version)) return { migrated: false, unreadable: true };
+        if (version === SCHEMA_VERSION) return { migrated: false };
         // Versão futura não é legado: migrar às cegas apagaria os grafos.
-        if ((data?.schemaVersion ?? 0) > SCHEMA_VERSION)
-            return {
-                migrated: false,
-                future: true,
-            };
+        if (version > SCHEMA_VERSION) return { migrated: false, future: true };
+        // Grafos já existentes nunca são sobrescritos sem backup explícito.
+        if (data?.graphs?.length) {
+            await game.settings.set(
+                MODULE_ID,
+                LumennGraphStore.#GRAPHS_BACKUP_KEY,
+                JSON.stringify(data)
+            );
+            return { migrated: false, blocked: true };
+        }
         const legacy = game.settings.get(MODULE_ID, LumennGraphStore.#LEGACY_KEY) ?? [];
         const next = {
             schemaVersion: SCHEMA_VERSION,

@@ -4,9 +4,6 @@
  */
 export const GROUP_COLOR = "#7aa2f7";
 export const GROUP_PADDING = 40;
-export function isGroupNode(node) {
-  return node?.type === "group";
-}
 export function childrenOf(nodes, groupId) {
   return (nodes ?? []).filter((node) => node?.parentId === groupId);
 }
@@ -80,7 +77,4 @@ export function movePositions(children, delta) {
       y: Math.round((child.position?.y ?? 0) + delta.y),
     },
   }));
-}
-export function ungroupIds(nodes, groupId) {
-  return childrenOf(nodes, groupId).map((child) => child.id);
 }

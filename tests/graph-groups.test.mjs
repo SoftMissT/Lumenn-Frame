@@ -6,10 +6,8 @@ import {
   effectiveEndpoint,
   groupBounds,
   groupOpenFor,
-  isGroupNode,
   movePositions,
   parentMap,
-  ungroupIds,
 } from "../scripts/graph-groups.mjs";
 
 const sizeOf = (type) => (type === "group" ? [360, 240] : [200, 100]);
@@ -22,12 +20,6 @@ const graph = {
     { id: "s3", type: "scene", position: { x: 900, y: 900 } },
   ],
 };
-
-test("isGroupNode só aceita type group", () => {
-  assert.equal(isGroupNode({ type: "group" }), true);
-  assert.equal(isGroupNode({ type: "scene" }), false);
-  assert.equal(isGroupNode(null), false);
-});
 
 test("childrenOf devolve só os filhos diretos", () => {
   assert.deepEqual(
@@ -88,8 +80,4 @@ test("movePositions aplica o mesmo delta e arredonda", () => {
       { id: "s2", position: { x: 410, y: 244 } },
     ],
   );
-});
-
-test("ungroupIds lista os filhos para limpar parentId", () => {
-  assert.deepEqual(ungroupIds(graph.nodes, "g1"), ["s1", "s2"]);
 });

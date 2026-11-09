@@ -64,7 +64,9 @@
               {{#if (lumenn-eq ../mode 'edit')}}
               <button type="button" class="lf-group-toggle" data-group-toggle="{{this.id}}" title="{{../label.groupToggle}}"><i class="fa-solid fa-chevron-{{#if this.groupOpen}}up{{else}}down{{/if}}"></i></button>
               {{else}}
+              {{#if ../isGM}}
               <button type="button" class="lf-group-toggle{{#if this.groupLocked}} active{{/if}}" data-group-lock="{{this.id}}" title="{{#if this.groupLocked}}{{../label.groupUnlock}}{{else}}{{../label.groupLock}}{{/if}}"><i class="fa-solid fa-lock{{#if this.groupLocked}}-open{{/if}}"></i></button>
+              {{/if}}
               {{/if}}
             </div>
             {{/if}}
@@ -184,7 +186,7 @@
         <label class="lf-insp-label">{{label.groupAdd}}</label>
         <select data-insp-pick="groupTarget">
           <option value="">{{label.none}}</option>
-          {{#each inspector.groups}}<option value="{{this.id}}">{{this.name}}</option>{{/each}}
+          {{#each inspector.groups}}<option value="{{this.id}}" {{#if (lumenn-eq this.id ../inspector.node.parentId)}}selected{{/if}}>{{this.name}}</option>{{/each}}
         </select>
         <div class="lf-insp-actions">
           <button data-insp-action="group-add">{{label.groupAdd}}</button>
@@ -240,13 +242,13 @@
         <label class="lf-insp-label">{{label.title}}</label>
         <input type="text" data-insp-input="data.title" value="{{inspector.node.data.title}}">
         <p class="lf-insp-p">{{inspector.groupCount}} {{label.groupRooms}}</p>
+        {{#if editable}}
         <label class="lf-insp-label">{{label.groupRooms}}</label>
         <div class="lf-insp-rooms">
           {{#each inspector.groupScenes}}
           <label class="lf-insp-check"><input type="checkbox" data-insp-room="{{this.id}}" {{#if this.inGroup}}checked{{/if}}> {{this.name}}</label>
           {{/each}}
         </div>
-        {{#if editable}}
         <div class="lf-insp-actions"><button data-insp-action="group-apply-rooms">{{label.groupApplyRooms}}</button></div>
         {{/if}}
         {{/if}}

@@ -698,6 +698,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 	}
 	async _onRender(context, options) {
 		await super._onRender(context, options);
+		this.#groupDragOverrides = null;
 		this.#dragDrop.forEach(d => d.bind(this.element));
 		const root = this.element;
 		root.querySelectorAll("[data-action]").forEach(el => el.addEventListener("click", e => this.#action(e)));
@@ -864,6 +865,10 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				this.#pendingEdgeNodes.clear();
 				this.#edgeGraphSnapshot = null;
 				if (isGroup) {
+					if (!moved) {
+						this.#groupDragOverrides = null;
+						return
+					}
 					const patches = movePositions(groupChildren, {
 						x: next.x - base.x,
 						y: next.y - base.y
@@ -1139,12 +1144,12 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		}
 		return set
 	}
-	#effectiveEdgeIds(edge, graph, collapsed = null) {
+	#effectiveEdgeIds(edge, graph, collapsed = null, parents = null) {
 		const closed = collapsed ?? this.#collapsedSet(graph);
-		const parents = parentMap(graph?.nodes ?? []);
+		const map = parents ?? parentMap(graph?.nodes ?? []);
 		return {
-			from: effectiveEndpoint(edge.from, parents, closed),
-			to: effectiveEndpoint(edge.to, parents, closed)
+			from: effectiveEndpoint(edge.from, map, closed),
+			to: effectiveEndpoint(edge.to, map, closed)
 		}
 	}
 	#portAnchor(nodeId, port, positionOverride = null, graph = null) {
@@ -1176,10 +1181,10 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			y: y + h * .62
 		}
 	}
-	#edgeGeometry(edge, graph, positionOverrides = null, collapsed = null) {
+	#edgeGeometry(edge, graph, positionOverrides = null, collapsed = null, parents = null) {
 		const fromPosition = positionOverrides?.get(edge.from) ?? null;
 		const toPosition = positionOverrides?.get(edge.to) ?? null;
-		const ids = this.#effectiveEdgeIds(edge, graph, collapsed);
+		const ids = this.#effectiveEdgeIds(edge, graph, collapsed, parents);
 		const fromBounds = this.#nodeBounds(ids.from, fromPosition, graph);
 		const toBounds = this.#nodeBounds(ids.to, toPosition, graph);
 		if (!fromBounds || !toBounds) return {
@@ -1238,11 +1243,12 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		if (!svg) return;
 		svg.innerHTML = "";
 		const collapsed = this.#collapsedSet(graph);
+		const parents = parentMap(graph?.nodes ?? []);
 		for (const e of graph?.edges ?? []) {
 			const from = graph.nodes.find(node => node.id === e.from);
 			const to = graph.nodes.find(node => node.id === e.to);
 			if (!from || !to) continue;
-			const ids = this.#effectiveEdgeIds(e, graph, collapsed);
+			const ids = this.#effectiveEdgeIds(e, graph, collapsed, parents);
 			if (ids.from === ids.to) continue;
 			const {
 				d,
@@ -1252,7 +1258,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				ny,
 				start: edgeStart,
 				end: edgeEnd
-			} = this.#edgeGeometry(e, graph, null, collapsed);
+			} = this.#edgeGeometry(e, graph, null, collapsed, parents);
 			if (e.type === "audio") {
 				const role = from.data?.audioRole === "sfx" ? "sfx" : "music";
 				const rolePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -1368,11 +1374,12 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		if (!svg || !graph) return;
 		const dirtyNodes = new Set(positionOverrides.keys());
 		const collapsed = this.#collapsedSet(graph);
+		const parents = parentMap(graph?.nodes ?? []);
 		for (const edge of graph.edges ?? []) {
 			if (!dirtyNodes.has(edge.from) && !dirtyNodes.has(edge.to)) continue;
-			const ids = this.#effectiveEdgeIds(edge, graph, collapsed);
+			const ids = this.#effectiveEdgeIds(edge, graph, collapsed, parents);
 			if (ids.from === ids.to) continue;
-			const geometry = this.#edgeGeometry(edge, graph, positionOverrides, collapsed);
+			const geometry = this.#edgeGeometry(edge, graph, positionOverrides, collapsed, parents);
 			const elements = svg.querySelectorAll(`[data-edge-id="${edge.id}"]`);
 			for (const element of elements) {
 				if (element.tagName.toLowerCase() === "text") {
@@ -1785,14 +1792,19 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		} else if (action === "group-apply-rooms") {
 			const groupId = this.#selected.id;
 			const graph = LumennGraphStore.getGraph(this.#graphId);
+			const group = graph?.nodes?.find(n => n.id === groupId);
+			if (!group || group.type !== "group") return;
 			const checks = new Map([...root.querySelectorAll("[data-insp-room]")].map(el => [el.dataset.inspRoom, el.checked]));
-			const patches = (graph?.nodes ?? []).filter(n => n.type === "scene").map(n => {
-				const checked = !!checks.get(n.id);
-				return {
-					id: n.id,
-					parentId: checked ? groupId : n.parentId === groupId ? null : n.parentId ?? null
-				}
-			});
+			const patches = [];
+			for (const node of (graph.nodes ?? []).filter(n => n.type === "scene")) {
+				const checked = !!checks.get(node.id);
+				const parentId = checked ? groupId : node.parentId === groupId ? null : node.parentId ?? null;
+				if ((node.parentId ?? null) !== parentId) patches.push({
+					id: node.id,
+					parentId
+				})
+			}
+			if (!patches.length) return;
 			await LumennGraphStore.updateNodes(this.#graphId, patches);
 			this.render()
 		} else if (action === "delete-node") {

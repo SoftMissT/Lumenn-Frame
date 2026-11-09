@@ -48,6 +48,7 @@ test("updateNodes grava uma vez para vários nós", async () => {
     nodes: [
       { id: "a", type: "scene", position: { x: 0, y: 0 }, data: {} },
       { id: "b", type: "scene", position: { x: 0, y: 0 }, data: {} },
+      { id: "group", type: "group", position: { x: 0, y: 0 }, data: {} },
     ],
     edges: [],
   });
@@ -64,11 +65,11 @@ test("updateNodes grava uma vez para vários nós", async () => {
   assert.equal(settings.graphs.graphs[0].nodes[1].parentId, "group");
 });
 
-test("deleteNode de grupo desagrupa e preserva salas e edges internas", async () => {
+test("deleteNode de grupo desagrupa, preserva salas e limpa o nó ativo", async () => {
   seed({
     id: "g",
     name: "G",
-    activeNodeId: null,
+    activeNodeId: "group",
     nodes: [
       { id: "group", type: "group", position: { x: 0, y: 0 }, data: {} },
       {
@@ -98,6 +99,7 @@ test("deleteNode de grupo desagrupa e preserva salas e edges internas", async ()
   assert.equal(graph.nodes[0].parentId, null);
   assert.equal(graph.nodes[1].parentId, null);
   assert.equal(graph.edges.length, 1);
+  assert.equal(graph.activeNodeId, null);
 });
 
 test("migrate ignora schemaVersion futura em vez de apagar os grafos", async () => {
@@ -109,4 +111,61 @@ test("migrate ignora schemaVersion futura em vez de apagar os grafos", async () 
   assert.equal(result.migrated, false);
   assert.equal(result.future, true);
   assert.equal(settings.graphs.graphs.length, 1);
+});
+
+test("migrate bloqueia v1 com grafos existentes e grava backup", async () => {
+  seed({
+    id: "g",
+    name: "G",
+    activeNodeId: null,
+    nodes: [{ id: "a", type: "scene", position: { x: 0, y: 0 }, data: {} }],
+    edges: [],
+  });
+  settings.graphs.schemaVersion = 1;
+  const result = await LumennGraphStore.migrate();
+  assert.equal(result.blocked, true);
+  assert.equal(settings.graphs.graphs[0].nodes.length, 1);
+  assert.match(settings.graphsBackup, /"schemaVersion":1/);
+});
+
+test("updateNode ignora id, type e parentId inválido", async () => {
+  seed({
+    id: "g",
+    name: "G",
+    activeNodeId: null,
+    nodes: [
+      { id: "group", type: "group", position: { x: 0, y: 0 }, data: {} },
+      { id: "a", type: "scene", position: { x: 0, y: 0 }, data: {} },
+    ],
+    edges: [],
+  });
+  const node = await LumennGraphStore.updateNode("g", "a", {
+    id: "x",
+    type: "group",
+    parentId: "missing",
+  });
+  assert.equal(node.id, "a");
+  assert.equal(node.type, "scene");
+  assert.equal(node.parentId, undefined);
+  await LumennGraphStore.updateNode("g", "a", { parentId: "group" });
+  assert.equal(settings.graphs.graphs[0].nodes[1].parentId, "group");
+  await LumennGraphStore.updateNode("g", "group", { parentId: "group" });
+  assert.equal(settings.graphs.graphs[0].nodes[0].parentId, undefined);
+});
+
+test("updateNodes não escreve para jogador", async () => {
+  seed({
+    id: "g",
+    name: "G",
+    activeNodeId: null,
+    nodes: [{ id: "a", type: "scene", position: { x: 0, y: 0 }, data: {} }],
+    edges: [],
+  });
+  game.user.isGM = false;
+  const updated = await LumennGraphStore.updateNodes("g", [
+    { id: "a", position: { x: 9, y: 9 } },
+  ]);
+  game.user.isGM = true;
+  assert.deepEqual(updated, []);
+  assert.equal(writes, 0);
 });

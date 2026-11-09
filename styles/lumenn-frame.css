@@ -130,6 +130,14 @@
     background: var(--lf-panel-alt);
     border-color: var(--lf-muted);
 }
+.lf-guide-btn {
+    border-color: var(--lf-amber-dim);
+    color: var(--lf-amber);
+}
+.lf-guide-btn:hover {
+    border-color: var(--lf-amber);
+    color: var(--lf-focus);
+}
 .lf-top-actions {
     align-items: center;
     border-left: 1px solid var(--lf-badge-border);

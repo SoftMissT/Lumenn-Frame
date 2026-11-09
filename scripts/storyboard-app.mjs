@@ -16,9 +16,11 @@ import {
 import {
 	clampGraphZoom,
 	directionalRectAnchor,
+	focusCameraOnBounds,
 	GRAPH_ZOOM_STEP,
 	wheelPanDelta
 } from "./graph-viewport.mjs";
+import { openLumennGuide } from "./guide-journal.mjs";
 import {
 	childrenOf,
 	effectiveEndpoint,
@@ -580,6 +582,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			label: {
 				editMode: L("LUMENN_FRAME.Toolbar.EditMode"),
 				liveMode: L("LUMENN_FRAME.Toolbar.LiveMode"),
+				guide: L("LUMENN_FRAME.Toolbar.Guide"),
 				expand: L("LUMENN_FRAME.Workspace.Expand"),
 				restore: L("LUMENN_FRAME.Workspace.Restore"),
 				emptyState: L("LUMENN_FRAME.EmptyState"),
@@ -931,11 +934,20 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			else if (id && nodeEl.classList.contains("playable")) this.#playAudioNode(id);
 			return
 		}
-		if (this.#tool === "connect") return;
-		this.#selected = {
-			kind: "node",
-			id: nodeEl.dataset.id
-		};
+		if (this.#tool === "connect" || this.#tool === "hand") return;
+		this.#focusNode(nodeEl.dataset.id, true)
+	}
+	#focusNode(nodeId, boostZoom = false) {
+		const viewport = this.element.querySelector(".lf-viewport");
+		const graph = LumennGraphStore.getGraph(this.#graphId);
+		const bounds = this.#nodeBounds(nodeId, null, graph);
+		if (!viewport || !bounds) return;
+		const targetZoom = boostZoom ? Math.max(this.#camera.zoom, 1.25) : this.#camera.zoom;
+		this.#camera = focusCameraOnBounds(this.#camera, {
+			width: viewport.clientWidth,
+			height: viewport.clientHeight
+		}, bounds, targetZoom);
+		this.#selected = { kind: "node", id: nodeId };
 		this.render()
 	}
 	#edgeClick(e) {
@@ -1571,6 +1583,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			return this.render()
 		}
 		if (action === "workspace-toggle") return this.#toggleWorkspace(root);
+		if (action === "open-guide") return openLumennGuide();
 		if (!LumennCompat.isGM() || this.#mode !== "edit") return;
 		if (action === "create-graph") {
 			const raw = await foundry.applications.api.DialogV2.prompt({
@@ -1742,17 +1755,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		if (!this.#editable()) return;
 		if (action === "focus-node") {
 			const nodeId = e.currentTarget.dataset.inspNode;
-			const node = LumennGraphStore.getNode(this.#graphId, nodeId);
-			const viewport = root.querySelector(".lf-viewport");
-			if (!node || !viewport) return;
-			const [width, height] = nodeSize(node.type, node.size);
-			this.#selected = {
-				kind: "node",
-				id: nodeId
-			};
-			this.#camera.panX = viewport.clientWidth / 2 - (node.position.x + width / 2) * this.#camera.zoom;
-			this.#camera.panY = viewport.clientHeight / 2 - (node.position.y + height / 2) * this.#camera.zoom;
-			this.render()
+			this.#focusNode(nodeId)
 		} else if (action === "set-initial") {
 			LumennGraphStore.setActiveNode(this.#graphId, this.#selected.id).then(() => this.render())
 		} else if (action === "group-create") {

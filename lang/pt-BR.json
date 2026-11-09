@@ -9,6 +9,8 @@
     "LUMENN_FRAME.Toolbar.SortStoryboards": "Organizar storyboards por nome",
     "LUMENN_FRAME.Toolbar.EditMode": "Edição",
     "LUMENN_FRAME.Toolbar.LiveMode": "Ao Vivo",
+    "LUMENN_FRAME.Toolbar.Guide": "Guia",
+    "LUMENN_FRAME.GuideUnavailable": "O Guia ainda não existe. Peça ao GM para criá-lo.",
     "LUMENN_FRAME.Toolbar.NeedsStartBeat": "Defina o Beat inicial (\"Início\") antes de navegar.",
     "LUMENN_FRAME.Beat.Go": "Ir",
     "LUMENN_FRAME.Beat.Edit": "Editar",

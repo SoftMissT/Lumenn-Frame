@@ -3,13 +3,26 @@ import assert from 'node:assert/strict';
 import {
     clampGraphZoom,
     directionalRectAnchor,
+    focusCameraOnBounds,
     wheelPanDelta,
 } from '../scripts/graph-viewport.mjs';
 const rect = { x: 100, y: 100, width: 200, height: 100 };
-test('zoom reaches 20% and remains capped at 200%', () => {
+test('zoom reaches 20% and remains capped at 300%', () => {
     assert.equal(clampGraphZoom(0.05), 0.2);
     assert.equal(clampGraphZoom(0.4), 0.4);
-    assert.equal(clampGraphZoom(3), 2);
+    assert.equal(clampGraphZoom(3), 3);
+    assert.equal(clampGraphZoom(4), 3);
+});
+test('foco centraliza os bounds e conserva o alvo no zoom solicitado', () => {
+    assert.deepEqual(
+        focusCameraOnBounds(
+            { panX: 0, panY: 0, zoom: 1 },
+            { width: 800, height: 600 },
+            { x: 100, y: 50, width: 200, height: 100 },
+            1.5,
+        ),
+        { panX: 100, panY: 150, zoom: 1.5 },
+    );
 });
 test('connection follows the relative direction around the node perimeter', () => {
     assert.deepEqual(directionalRectAnchor(rect, { x: 200, y: 400 }), { x: 200, y: 200 });

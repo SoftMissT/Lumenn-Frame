@@ -2,10 +2,21 @@ const MODULE_ID = 'lumenn-frame';
 const SCHEMA_VERSION = 2;
 import { LumennSettings } from './settings.mjs';
 import { childrenOf, GROUP_COLOR } from './graph-groups.mjs';
+import { detectHiveCycles } from './hive-runtime.mjs';
 const DEFAULT_COLORS = {
     scene: '#f0a321',
     audio: '#2dd4bf',
     note: '#73707c',
+};
+const HIVE_NODE_DEFAULTS = {
+    'hive-ref': {
+        color: '#8b5cf6',
+        size: 'normal',
+    },
+    encounter: {
+        color: '#f43f5e',
+        size: 'normal',
+    },
 };
 /**
  * LumennGraphStore CRUD de Graphs (Schema v2: nodes[] + edges[]) sobre
@@ -51,6 +62,40 @@ export class LumennGraphStore {
     }
     static getGraph(graphId) {
         return this.getAll().find((g) => g.id === graphId) ?? null;
+    }
+    static getHives() {
+        return this.getAll().filter((graph) => graph.isHive === true);
+    }
+    static getHiveUsages(graphId) {
+        return this.getAll().flatMap((graph) =>
+            (graph.nodes ?? [])
+                .filter((node) => node.type === 'hive-ref' && node.data?.graphId === graphId)
+                .map((node) => ({
+                    graphId: graph.id,
+                    graphName: graph.name,
+                    nodeId: node.id,
+                }))
+        );
+    }
+    static #wouldCreateHiveCycle(graphs, ownerGraphId, targetGraphId, replacingNodeId = null) {
+        if (!targetGraphId || targetGraphId === ownerGraphId) return true;
+        if (!graphs.some((candidate) => candidate.id === targetGraphId && candidate.isHive))
+            return true;
+        const references = graphs.map((candidate) => ({
+            id: candidate.id,
+            references: (candidate.nodes ?? [])
+                .filter(
+                    (node) =>
+                        node.type === 'hive-ref' &&
+                        !(candidate.id === ownerGraphId && node.id === replacingNodeId)
+                )
+                .map((node) => node.data?.graphId)
+                .filter(Boolean),
+        }));
+        references
+            .find((candidate) => candidate.id === ownerGraphId)
+            ?.references.push(targetGraphId);
+        return detectHiveCycles(references).length > 0;
     }
     static getNode(graphId, nodeId) {
         return this.getGraph(graphId)?.nodes?.find((n) => n.id === nodeId) ?? null;
@@ -112,12 +157,29 @@ export class LumennGraphStore {
     }
     static async deleteGraph(graphId) {
         if (!game.user.isGM) return false;
+        if (this.getGraph(graphId)?.isHive && this.getHiveUsages(graphId).length) return false;
         const data = foundry.utils.duplicate(
             game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
         );
         data.graphs = data.graphs.filter((g) => g.id !== graphId);
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
         return true;
+    }
+    static async markHive(graphId, patch = {}) {
+        if (!game.user.isGM) return null;
+        const data = foundry.utils.duplicate(
+            game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
+        );
+        const graph = data.graphs.find((g) => g.id === graphId);
+        if (!graph) return null;
+        graph.isHive = true;
+        graph.hive = {
+            ...(graph.hive ?? {}),
+            ports: Array.isArray(graph.hive?.ports) ? graph.hive.ports : [],
+            ...patch,
+        };
+        await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
+        return graph;
     }
     /* -- CRUD de Nodes ------------------------------------------------ */
     static async addNode(graphId, node) {
@@ -127,6 +189,11 @@ export class LumennGraphStore {
         );
         const graph = data.graphs.find((g) => g.id === graphId);
         if (!graph) return null;
+        if (node.type === 'encounter' && graph.isHive !== true) return null;
+        if (node.type === 'hive-ref') {
+            const targetGraphId = node.data?.graphId;
+            if (this.#wouldCreateHiveCycle(data.graphs, graphId, targetGraphId)) return null;
+        }
         // Defaults das Settings aplicados quando o caller não os define.
         // Grupo não tem setting próprio (evita erro de chave não registrada).
         const d =
@@ -135,7 +202,7 @@ export class LumennGraphStore {
                       color: GROUP_COLOR,
                       size: 'normal',
                   }
-                : LumennSettings.getNodeDefaults(node.type);
+                : (HIVE_NODE_DEFAULTS[node.type] ?? LumennSettings.getNodeDefaults(node.type));
         const n = {
             id: node.id ?? `node_${foundry.utils.randomID(16)}`,
             type: node.type,
@@ -159,14 +226,26 @@ export class LumennGraphStore {
                           fadeIn: null,
                           fadeOut: null,
                       }
-                    : {}),
+                    : node.type === 'hive-ref'
+                      ? {
+                            graphId: node.data?.graphId ?? null,
+                            portId: node.data?.portId ?? null,
+                        }
+                      : node.type === 'encounter'
+                        ? {
+                              encounterType: node.data?.encounterType ?? 'event',
+                              audioId: node.data?.audioId ?? null,
+                          }
+                        : {}),
         };
         graph.nodes.push(n);
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
         return n;
     }
     static #sanitizePatch(node, graph, patch) {
-        const clean = { ...(patch ?? {}) };
+        const clean = {
+            ...(patch ?? {}),
+        };
         delete clean.id;
         delete clean.type;
         if (Object.prototype.hasOwnProperty.call(clean, 'parentId')) {
@@ -187,6 +266,12 @@ export class LumennGraphStore {
         const graph = data.graphs.find((g) => g.id === graphId);
         const node = graph?.nodes?.find((n) => n.id === nodeId);
         if (!node) return null;
+        if (
+            node.type === 'hive-ref' &&
+            Object.prototype.hasOwnProperty.call(patch?.data ?? {}, 'graphId') &&
+            this.#wouldCreateHiveCycle(data.graphs, graphId, patch.data.graphId, nodeId)
+        )
+            return null;
         Object.assign(node, LumennGraphStore.#sanitizePatch(node, graph, patch));
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
         return node;
@@ -204,6 +289,12 @@ export class LumennGraphStore {
         for (const patch of patches) {
             const node = graph.nodes.find((n) => n.id === patch?.id);
             if (!node) continue;
+            if (
+                node.type === 'hive-ref' &&
+                Object.prototype.hasOwnProperty.call(patch?.data ?? {}, 'graphId') &&
+                this.#wouldCreateHiveCycle(data.graphs, graphId, patch.data.graphId, node.id)
+            )
+                continue;
             Object.assign(node, LumennGraphStore.#sanitizePatch(node, graph, patch));
             updated.push(node);
         }
@@ -327,15 +418,30 @@ export class LumennGraphStore {
      * schemaVersion 2, não faz nada.
      */
     static async migrate() {
-        if (!game.user.isGM) return { migrated: false, gm: false };
+        if (!game.user.isGM)
+            return {
+                migrated: false,
+                gm: false,
+            };
         const data = foundry.utils.duplicate(
             game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
         );
         const version = Number(data?.schemaVersion ?? 0);
-        if (!Number.isFinite(version)) return { migrated: false, unreadable: true };
-        if (version === SCHEMA_VERSION) return { migrated: false };
+        if (!Number.isFinite(version))
+            return {
+                migrated: false,
+                unreadable: true,
+            };
+        if (version === SCHEMA_VERSION)
+            return {
+                migrated: false,
+            };
         // Versão futura não é legado: migrar às cegas apagaria os grafos.
-        if (version > SCHEMA_VERSION) return { migrated: false, future: true };
+        if (version > SCHEMA_VERSION)
+            return {
+                migrated: false,
+                future: true,
+            };
         // Grafos já existentes nunca são sobrescritos sem backup explícito.
         if (data?.graphs?.length) {
             const existing = game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_BACKUP_KEY);
@@ -345,7 +451,10 @@ export class LumennGraphStore {
                     LumennGraphStore.#GRAPHS_BACKUP_KEY,
                     JSON.stringify(data)
                 );
-            return { migrated: false, blocked: true };
+            return {
+                migrated: false,
+                blocked: true,
+            };
         }
         const legacy = game.settings.get(MODULE_ID, LumennGraphStore.#LEGACY_KEY) ?? [];
         const next = {

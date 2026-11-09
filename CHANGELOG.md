@@ -2,6 +2,14 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [Unreleased]
+
+### Added
+
+- Núcleo puro da Hive v3: ciclos, portas, trilha de navegação, casamento de recursos por nome e validação de exportação (`scripts/hive-runtime.mjs`), com 5 testes Node.
+- Store compatível: marcação de Hive, biblioteca, tipos `hive-ref`/`encounter` com defaults constantes, bloqueio de exclusão em uso e rejeição de ciclos na criação/edição; `SCHEMA_VERSION` permanece 2.
+- UX: zoom máximo de 300%, foco e centralização no primeiro clique esquerdo em Edição, botão Guia e Journal idempotente com passo a passo de montagem e Ao Vivo.
+
 ## [0.0.31] - 2026-11-08
 
 > Fase 1 dos Grupos Hive. Gates estáticos verdes (37 testes em Node). **Sem validação de runtime no Foundry** até esta publicação; o teste com GM e jogador continua aberto.

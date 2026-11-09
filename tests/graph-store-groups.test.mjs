@@ -206,3 +206,104 @@ test("updateNodes não escreve para jogador", async () => {
   assert.deepEqual(updated, []);
   assert.equal(writes, 0);
 });
+
+test("markHive cria metadados aditivos e a biblioteca retorna só Hives", async () => {
+  seed({ id: "parent", name: "Parent", activeNodeId: null, nodes: [], edges: [] });
+  const hive = await LumennGraphStore.markHive("parent", { cover: "cover.webp" });
+  assert.equal(hive.isHive, true);
+  assert.deepEqual(hive.hive.ports, []);
+  assert.equal(hive.hive.cover, "cover.webp");
+  assert.equal(settings.graphs.schemaVersion, 2);
+  assert.deepEqual(LumennGraphStore.getHives().map((graph) => graph.id), ["parent"]);
+});
+
+test("hive-ref usa defaults constantes e rejeita referência que cria ciclo", async () => {
+  seed({
+    id: "parent",
+    name: "Parent",
+    activeNodeId: null,
+    isHive: true,
+    nodes: [],
+    edges: [],
+  });
+  settings.graphs.graphs.push({
+    id: "child",
+    name: "Child",
+    activeNodeId: null,
+    isHive: true,
+    nodes: [],
+    edges: [],
+  });
+  const ref = await LumennGraphStore.addNode("parent", {
+    type: "hive-ref",
+    data: { graphId: "child" },
+  });
+  assert.equal(ref.color, "#8b5cf6");
+  assert.equal(ref.data.graphId, "child");
+  const rejected = await LumennGraphStore.addNode("child", {
+    type: "hive-ref",
+    data: { graphId: "parent" },
+  });
+  assert.equal(rejected, null);
+});
+
+test("updateNode também rejeita ciclo criado ao editar data.graphId", async () => {
+  seed({
+    id: "parent",
+    name: "Parent",
+    activeNodeId: null,
+    isHive: true,
+    nodes: [{ id: "ref", type: "hive-ref", data: { graphId: "child" } }],
+    edges: [],
+  });
+  settings.graphs.graphs.push({
+    id: "child",
+    name: "Child",
+    activeNodeId: null,
+    isHive: true,
+    nodes: [],
+    edges: [],
+  });
+  const updated = await LumennGraphStore.updateNode("parent", "ref", {
+    data: { graphId: "parent" },
+  });
+  assert.equal(updated, null);
+  assert.equal(settings.graphs.graphs[0].nodes[0].data.graphId, "child");
+});
+
+test("encounter usa defaults constantes sem consultar setting novo", async () => {
+  seed({ id: "hive", name: "Hive", activeNodeId: null, isHive: true, nodes: [], edges: [] });
+  settings.graphs.graphs.push({ id: "outside", name: "Outside", activeNodeId: null, nodes: [], edges: [] });
+  const encounter = await LumennGraphStore.addNode("hive", {
+    type: "encounter",
+    data: { encounterType: "combat", audioId: "audio-1" },
+  });
+  assert.equal(encounter.color, "#f43f5e");
+  assert.deepEqual(encounter.data, { encounterType: "combat", audioId: "audio-1" });
+  assert.equal(
+    await LumennGraphStore.addNode("outside", { type: "encounter" }),
+    null,
+  );
+});
+
+test("deleteGraph bloqueia Hive referenciada e expõe os usos", async () => {
+  seed({
+    id: "parent",
+    name: "Parent",
+    activeNodeId: null,
+    isHive: true,
+    nodes: [],
+    edges: [],
+  });
+  settings.graphs.graphs.push({
+    id: "owner",
+    name: "Owner",
+    activeNodeId: null,
+    nodes: [{ id: "ref", type: "hive-ref", data: { graphId: "parent" } }],
+    edges: [],
+  });
+  assert.equal(await LumennGraphStore.deleteGraph("parent"), false);
+  assert.deepEqual(LumennGraphStore.getHiveUsages("parent"), [
+    { graphId: "owner", graphName: "Owner", nodeId: "ref" },
+  ]);
+});

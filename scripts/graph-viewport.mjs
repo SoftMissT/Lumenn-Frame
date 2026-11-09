@@ -1,8 +1,18 @@
 export const MIN_GRAPH_ZOOM = 0.2;
-export const MAX_GRAPH_ZOOM = 2;
+export const MAX_GRAPH_ZOOM = 3;
 export const GRAPH_ZOOM_STEP = 1.25;
 export function clampGraphZoom(value) {
     return Math.max(MIN_GRAPH_ZOOM, Math.min(MAX_GRAPH_ZOOM, value));
+}
+export function focusCameraOnBounds(camera, viewport, bounds, zoom = camera?.zoom ?? 1) {
+    if (!camera || !viewport || !bounds) return camera;
+    const nextZoom = clampGraphZoom(zoom);
+    return {
+        ...camera,
+        zoom: nextZoom,
+        panX: viewport.width / 2 - (bounds.x + bounds.width / 2) * nextZoom,
+        panY: viewport.height / 2 - (bounds.y + bounds.height / 2) * nextZoom,
+    };
 }
 export function wheelPanDelta(event, viewportHeight = 800) {
     const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewportHeight : 1;

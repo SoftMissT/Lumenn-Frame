@@ -26,6 +26,7 @@ const { LumennGraphStore } = await import("../scripts/graph-store.mjs");
 
 function seed(graph) {
   settings.graphs = { schemaVersion: 2, graphs: [graph] };
+  settings.graphsBackup = "";
   writes = 0;
 }
 
@@ -136,6 +137,7 @@ test("updateNode ignora id, type e parentId inválido", async () => {
     nodes: [
       { id: "group", type: "group", position: { x: 0, y: 0 }, data: {} },
       { id: "a", type: "scene", position: { x: 0, y: 0 }, data: {} },
+      { id: "b", type: "scene", position: { x: 0, y: 0 }, data: {} },
     ],
     edges: [],
   });
@@ -151,6 +153,41 @@ test("updateNode ignora id, type e parentId inválido", async () => {
   assert.equal(settings.graphs.graphs[0].nodes[1].parentId, "group");
   await LumennGraphStore.updateNode("g", "group", { parentId: "group" });
   assert.equal(settings.graphs.graphs[0].nodes[0].parentId, undefined);
+  await LumennGraphStore.updateNode("g", "a", { parentId: "b" });
+  assert.equal(settings.graphs.graphs[0].nodes[1].parentId, "group");});
+
+test("updateNodes também remove id e type do patch", async () => {
+  seed({
+    id: "g",
+    name: "G",
+    activeNodeId: null,
+    nodes: [{ id: "a", type: "scene", position: { x: 0, y: 0 }, data: {} }],
+    edges: [],
+  });
+  await LumennGraphStore.updateNodes("g", [
+    { id: "a", type: "group", notes: "ok" },
+  ]);
+  const node = settings.graphs.graphs[0].nodes[0];
+  assert.equal(node.id, "a");
+  assert.equal(node.type, "scene");
+  assert.equal(node.notes, "ok");
+});
+
+test("migrate não roda para jogador", async () => {
+  seed({
+    id: "g",
+    name: "G",
+    activeNodeId: null,
+    nodes: [],
+    edges: [],
+  });
+  settings.graphs.schemaVersion = 1;
+  game.user.isGM = false;
+  const result = await LumennGraphStore.migrate();
+  game.user.isGM = true;
+  assert.equal(result.gm, false);
+  assert.equal(writes, 0);
+  assert.equal(settings.graphs.schemaVersion, 1);
 });
 
 test("updateNodes não escreve para jogador", async () => {

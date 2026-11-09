@@ -49,8 +49,10 @@ Hooks.once('init', () => {
 });
 Hooks.once('ready', () => {
     if (game.user?.isGM) {
-        LumennGraphStore.migrate().then(({ migrated }) => {
-            if (migrated) ui.notifications.info(game.i18n.localize('LUMENN_FRAME.Migrated'));
+        LumennGraphStore.migrate().then((result) => {
+            if (result?.migrated) ui.notifications.info(game.i18n.localize('LUMENN_FRAME.Migrated'));
+            else if (result?.blocked) ui.notifications.warn(game.i18n.localize('LUMENN_FRAME.WarnMigrationBlocked'));
+            else if (result?.unreadable) ui.notifications.warn(game.i18n.localize('LUMENN_FRAME.WarnMigrationUnreadable'));
         });
     }
     LumennCompat.socketOn((payload) => {

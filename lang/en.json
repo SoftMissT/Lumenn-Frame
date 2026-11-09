@@ -112,6 +112,8 @@
     "LUMENN_FRAME.Edge.From": "From",
     "LUMENN_FRAME.Edge.To": "To",
     "LUMENN_FRAME.Migrated": "Lumenn Frame: legacy storyboards migrated to the graph editor (schema v2).",
+    "LUMENN_FRAME.WarnMigrationBlocked": "Lumenn Frame: graphs exist with an old schema; migration was blocked and a backup was saved. Nothing was changed.",
+    "LUMENN_FRAME.WarnMigrationUnreadable": "Lumenn Frame: the graphs setting has an unreadable schema version; migration was blocked. Nothing was changed.",
     "LUMENN_FRAME.Connect.HintIdle": "Connect: drag from an OUT port to an IN port of another node",
     "LUMENN_FRAME.Connect.HintFlowDrag": "Connect: release over the FLOW IN port of another Scene",
     "LUMENN_FRAME.Connect.HintAudioDrag": "Audio: release over the AUDIO IN port of a Scene",

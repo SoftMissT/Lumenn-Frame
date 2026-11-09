@@ -1793,7 +1793,10 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			const groupId = this.#selected.id;
 			const graph = LumennGraphStore.getGraph(this.#graphId);
 			const group = graph?.nodes?.find(n => n.id === groupId);
-			if (!group || group.type !== "group") return;
+			if (!group || group.type !== "group") {
+				this.render();
+				return
+			}
 			const checks = new Map([...root.querySelectorAll("[data-insp-room]")].map(el => [el.dataset.inspRoom, el.checked]));
 			const patches = [];
 			for (const node of (graph.nodes ?? []).filter(n => n.type === "scene")) {

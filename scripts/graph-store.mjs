@@ -338,11 +338,13 @@ export class LumennGraphStore {
         if (version > SCHEMA_VERSION) return { migrated: false, future: true };
         // Grafos já existentes nunca são sobrescritos sem backup explícito.
         if (data?.graphs?.length) {
-            await game.settings.set(
-                MODULE_ID,
-                LumennGraphStore.#GRAPHS_BACKUP_KEY,
-                JSON.stringify(data)
-            );
+            const existing = game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_BACKUP_KEY);
+            if (!existing)
+                await game.settings.set(
+                    MODULE_ID,
+                    LumennGraphStore.#GRAPHS_BACKUP_KEY,
+                    JSON.stringify(data)
+                );
             return { migrated: false, blocked: true };
         }
         const legacy = game.settings.get(MODULE_ID, LumennGraphStore.#LEGACY_KEY) ?? [];

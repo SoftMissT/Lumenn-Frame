@@ -2,17 +2,23 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
-## [Unreleased]
+## [0.0.31] - 2026-11-08
+
+> Fase 1 dos Grupos Hive. Gates estáticos verdes (37 testes em Node). **Sem validação de runtime no Foundry** até esta publicação; o teste com GM e jogador continua aberto.
 
 ### Added
 
 - **Grupos Hive (Fase 1).** Um conjunto de cenas vira uma caixa com nome e contagem. Fechado no Ao Vivo, o grupo abre sozinho quando contém a cena ativa ou uma cena navegável; a trava local mantém aberto. Arrastar a caixa move os filhos com **uma** escrita no setting (`updateNodes`). Desagrupar remove só o grupo: salas e conexões internas ficam. Inspector permite criar grupo com a cena, mover para um grupo, adicionar salas por caixa de seleção e desagrupar.
-- `scripts/graph-groups.mjs` (limites derivados dos filhos, ponta efetiva de edge, regra de abertura, movimento e desagrupamento) com 9 testes em Node.
+- `scripts/graph-groups.mjs` (limites derivados dos filhos, ponta efetiva de edge, regra de abertura, movimento) com 7 testes; mais 9 testes de store para grupo, migração e sanitização.
 - `parentId` opcional no nó; ausente = raiz, sem regressão para dados existentes.
 
 ### Fixed
 
-- `migrate()` não trata mais uma `schemaVersion` futura como legado: antes, subir a versão e abrir o mundo apagaria todos os storyboards. Agora uma versão maior é ignorada.
+- `migrate()` não trata mais versão futura, ilegível ou antiga com grafos populados como legado. Antes, subir a versão e abrir o mundo apagaria todos os storyboards. Agora normaliza a versão, bloqueia os casos destrutivos, grava `graphsBackup` uma vez e avisa o GM.
+- Arrastar um grupo só grava depois de movimento real; clique de seleção não reescreve os filhos nem arredonda coordenadas.
+- O override provisório do arrasto é limpo a cada render, sem bounds congeladas de um gesto interrompido.
+- `updateNode`/`updateNodes` descartam `id`, `type` e `parentId` inválido (grupo inexistente, cena ou ciclo).
+- Guard de GM em `addReturn` e `migrate`, além das escritas já protegidas.
 
 ## [0.0.30] - 2026-10-12 transição de cena e crossfade de música corrigidos no Foundry real
 

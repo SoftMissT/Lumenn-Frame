@@ -502,6 +502,67 @@
     user-select: none;
     z-index: 3;
 }
+.lf-node-group {
+    --lf-role: var(--node-color);
+    background: var(--lf-panel);
+    border: 2px dashed var(--node-color);
+    box-shadow: none;
+    z-index: 1;
+}
+.lf-node-group.lf-group-open {
+    background: color-mix(in srgb, var(--node-color) 4%, transparent);
+}
+.lf-node-group .lf-node-content {
+    height: 100%;
+    padding: 10px 12px;
+}
+.lf-group-head {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+}
+.lf-group-title {
+    align-items: center;
+    display: flex;
+    flex: 1 1 auto;
+    font-weight: 600;
+    gap: 6px;
+    min-width: 0;
+}
+.lf-group-title i {
+    color: var(--node-color);
+}
+.lf-group-count {
+    color: var(--lf-muted);
+    font-size: 12px;
+    white-space: nowrap;
+}
+.lf-group-toggle {
+    align-items: center;
+    background: transparent;
+    border: 1px solid var(--lf-badge-border);
+    border-radius: 4px;
+    color: var(--lf-text);
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 auto;
+    height: 22px;
+    justify-content: center;
+    padding: 0;
+    width: 24px;
+}
+.lf-group-toggle:hover,
+.lf-group-toggle.active {
+    border-color: var(--node-color);
+    color: var(--node-color);
+}
+.lf-insp-rooms {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 180px;
+    overflow: auto;
+}
 .lf-node-scene {
     --lf-role: var(--lf-scene);
 }

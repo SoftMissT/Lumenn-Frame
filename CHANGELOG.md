@@ -2,6 +2,18 @@
 
 As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver: 0.0.x até a primeira validação; então 0.1.0.
 
+## [Unreleased]
+
+### Added
+
+- **Grupos Hive (Fase 1).** Um conjunto de cenas vira uma caixa com nome e contagem. Fechado no Ao Vivo, o grupo abre sozinho quando contém a cena ativa ou uma cena navegável; a trava local mantém aberto. Arrastar a caixa move os filhos com **uma** escrita no setting (`updateNodes`). Desagrupar remove só o grupo: salas e conexões internas ficam. Inspector permite criar grupo com a cena, mover para um grupo, adicionar salas por caixa de seleção e desagrupar.
+- `scripts/graph-groups.mjs` (limites derivados dos filhos, ponta efetiva de edge, regra de abertura, movimento e desagrupamento) com 9 testes em Node.
+- `parentId` opcional no nó; ausente = raiz, sem regressão para dados existentes.
+
+### Fixed
+
+- `migrate()` não trata mais uma `schemaVersion` futura como legado: antes, subir a versão e abrir o mundo apagaria todos os storyboards. Agora uma versão maior é ignorada.
+
 ## [0.0.30] - 2026-10-12 transição de cena e crossfade de música corrigidos no Foundry real
 
 > A 0.0.29 anunciava a transição corrigida, mas só havia sido validada em testes estáticos. Medida no Foundry 14.367 (mundo real, GM assistente), a animação continuava sem rodar e a música continuava cortando. Esta versão foi validada em runtime.

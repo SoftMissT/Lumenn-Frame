@@ -42,6 +42,7 @@
       <button class="lf-tool{{#if (lumenn-eq tool 'scene')}} active{{/if}}" data-tool="scene" title="{{label.addScene}}"><i class="fa-solid fa-image"></i></button>
       <button class="lf-tool{{#if (lumenn-eq tool 'audio')}} active{{/if}}" data-tool="audio" title="{{label.addAudio}}"><i class="fa-solid fa-music"></i></button>
       <button class="lf-tool{{#if (lumenn-eq tool 'note')}} active{{/if}}" data-tool="note" title="{{label.addNote}}"><i class="fa-solid fa-note-sticky"></i></button>
+      <button class="lf-tool{{#if (lumenn-eq tool 'group')}} active{{/if}}" data-tool="group" title="{{label.addGroup}}"><i class="fa-solid fa-object-group"></i></button>
       {{/if}}
     </div>
 
@@ -49,11 +50,24 @@
       <div class="lf-camera">
         <svg class="lf-edges"></svg>
         {{#each nodes}}
-        <div class="lf-node lf-node-{{this.type}}{{#if (lumenn-eq this.type 'audio')}} lf-audio-role-{{this.audioRole}}{{/if}}{{#if this.isActive}} active{{/if}}{{#if this.isNavigable}} navigable{{/if}}{{#if this.isPlayable}} playable{{/if}}{{#if this.isPlaying}} playing{{/if}}{{#if this.isDimmed}} dimmed{{/if}}{{#if this.selected}} selected{{/if}}{{#if this.targetHi}} target-hi{{/if}}"
+        <div class="lf-node lf-node-{{this.type}}{{#if (lumenn-eq this.type 'group')}} lf-group-{{#if this.groupOpen}}open{{else}}closed{{/if}}{{/if}}{{#if (lumenn-eq this.type 'audio')}} lf-audio-role-{{this.audioRole}}{{/if}}{{#if this.isActive}} active{{/if}}{{#if this.isNavigable}} navigable{{/if}}{{#if this.isPlayable}} playable{{/if}}{{#if this.isPlaying}} playing{{/if}}{{#if this.isDimmed}} dimmed{{/if}}{{#if this.selected}} selected{{/if}}{{#if this.targetHi}} target-hi{{/if}}"
              data-id="{{this.id}}"
+             data-type="{{this.type}}"
+             data-parent-id="{{this.parentId}}"
              style="left:{{this.position.x}}px;top:{{this.position.y}}px;width:{{this.width}}px;height:{{this.height}}px;--node-color:{{this.color}};">
           <div class="lf-node-content">
             <div class="lf-node-head"></div>
+            {{#if (lumenn-eq this.type 'group')}}
+            <div class="lf-group-head">
+              <span class="lf-group-title"><i class="fa-solid fa-object-group"></i> {{this.groupLabel}}</span>
+              <span class="lf-group-count">{{this.groupCount}} {{../label.groupRooms}}</span>
+              {{#if (lumenn-eq ../mode 'edit')}}
+              <button type="button" class="lf-group-toggle" data-group-toggle="{{this.id}}" title="{{../label.groupToggle}}"><i class="fa-solid fa-chevron-{{#if this.groupOpen}}up{{else}}down{{/if}}"></i></button>
+              {{else}}
+              <button type="button" class="lf-group-toggle{{#if this.groupLocked}} active{{/if}}" data-group-lock="{{this.id}}" title="{{#if this.groupLocked}}{{../label.groupUnlock}}{{else}}{{../label.groupLock}}{{/if}}"><i class="fa-solid fa-lock{{#if this.groupLocked}}-open{{/if}}"></i></button>
+              {{/if}}
+            </div>
+            {{/if}}
             {{#if (lumenn-eq this.type 'scene')}}
             <div class="lf-node-thumb">
               {{#if this.sceneThumb}}<img src="{{this.sceneThumb}}" alt="{{this.sceneName}}" loading="lazy" draggable="false">{{else}}<span class="lf-node-thumb-ph"><i class="fa-solid fa-image"></i></span>{{/if}}
@@ -165,6 +179,19 @@
           {{/each}}
         </ul>
         {{/if}}
+        {{#if editable}}
+        <h3 class="lf-insp-title">{{label.group}}</h3>
+        <label class="lf-insp-label">{{label.groupAdd}}</label>
+        <select data-insp-pick="groupTarget">
+          <option value="">{{label.none}}</option>
+          {{#each inspector.groups}}<option value="{{this.id}}">{{this.name}}</option>{{/each}}
+        </select>
+        <div class="lf-insp-actions">
+          <button data-insp-action="group-add">{{label.groupAdd}}</button>
+          <button data-insp-action="group-create">{{label.groupCreate}}</button>
+          {{#if inspector.node.parentId}}<button data-insp-action="group-remove">{{label.groupRemove}}</button>{{/if}}
+        </div>
+        {{/if}}
         {{/if}}
         {{#if (lumenn-eq inspector.nodeType 'audio')}}
         <h3 class="lf-insp-title">{{label.audio}}</h3>
@@ -208,24 +235,41 @@
         <label class="lf-insp-label">{{label.body}}</label>
         <textarea data-insp-input="data.body" rows="4">{{inspector.node.data.body}}</textarea>
         {{/if}}
+        {{#if (lumenn-eq inspector.nodeType 'group')}}
+        <h3 class="lf-insp-title">{{label.group}}</h3>
+        <label class="lf-insp-label">{{label.title}}</label>
+        <input type="text" data-insp-input="data.title" value="{{inspector.node.data.title}}">
+        <p class="lf-insp-p">{{inspector.groupCount}} {{label.groupRooms}}</p>
+        <label class="lf-insp-label">{{label.groupRooms}}</label>
+        <div class="lf-insp-rooms">
+          {{#each inspector.groupScenes}}
+          <label class="lf-insp-check"><input type="checkbox" data-insp-room="{{this.id}}" {{#if this.inGroup}}checked{{/if}}> {{this.name}}</label>
+          {{/each}}
+        </div>
+        {{#if editable}}
+        <div class="lf-insp-actions"><button data-insp-action="group-apply-rooms">{{label.groupApplyRooms}}</button></div>
+        {{/if}}
+        {{/if}}
         <label class="lf-insp-label">{{label.color}}</label>
         <div class="lf-swatches">
           {{#each inspector.colors}}
           <span class="lf-swatch" data-insp-swatch data-color="{{this}}" style="background:{{this}}"></span>
           {{/each}}
         </div>
+        {{#unless (lumenn-eq inspector.nodeType 'group')}}
         <label class="lf-insp-label">{{label.size}}</label>
         <select data-insp="size">
           {{#each inspector.sizes}}
           <option value="{{this}}" {{#if (lumenn-eq this ../inspector.node.size)}}selected{{/if}}>{{this}}</option>
           {{/each}}
         </select>
+        {{/unless}}
         <label class="lf-insp-label">{{label.notes}}</label>
         <textarea data-insp-input="notes" rows="3">{{inspector.node.notes}}</textarea>
         {{#if editable}}
         <div class="lf-insp-actions">
-          <button data-insp-action="set-initial">{{label.setInitial}}</button>
-          <button class="danger" data-insp-action="delete-node">{{label.delete}}</button>
+          {{#unless (lumenn-eq inspector.nodeType 'group')}}<button data-insp-action="set-initial">{{label.setInitial}}</button>{{/unless}}
+          <button class="danger" data-insp-action="delete-node">{{#if (lumenn-eq inspector.nodeType 'group')}}{{label.groupUngroup}}{{else}}{{label.delete}}{{/if}}</button>
         </div>
         {{/if}}
       {{/if}}

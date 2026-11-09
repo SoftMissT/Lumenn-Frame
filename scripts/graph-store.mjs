@@ -1,6 +1,7 @@
 const MODULE_ID = 'lumenn-frame';
 const SCHEMA_VERSION = 2;
 import { LumennSettings } from './settings.mjs';
+import { GROUP_COLOR } from './graph-groups.mjs';
 const DEFAULT_COLORS = {
     scene: '#f0a321',
     audio: '#2dd4bf',
@@ -119,10 +120,18 @@ export class LumennGraphStore {
         const graph = data.graphs.find((g) => g.id === graphId);
         if (!graph) return null;
         // Defaults das Settings aplicados quando o caller não os define.
-        const d = LumennSettings.getNodeDefaults(node.type);
+        // Grupo não tem setting próprio (evita erro de chave não registrada).
+        const d =
+            node.type === 'group'
+                ? {
+                      color: GROUP_COLOR,
+                      size: 'normal',
+                  }
+                : LumennSettings.getNodeDefaults(node.type);
         const n = {
             id: node.id ?? `node_${foundry.utils.randomID(16)}`,
             type: node.type,
+            parentId: node.parentId ?? null,
             position: node.position ?? {
                 x: 80,
                 y: 80,
@@ -160,6 +169,26 @@ export class LumennGraphStore {
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
         return node;
     }
+    /** Atualiza vários nós com uma única escrita do setting (arrasto de grupo). */
+    static async updateNodes(graphId, patches) {
+        if (!game.user.isGM) return [];
+        if (!Array.isArray(patches) || !patches.length) return [];
+        const data = foundry.utils.duplicate(
+            game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
+        );
+        const graph = data.graphs.find((g) => g.id === graphId);
+        if (!graph) return [];
+        const updated = [];
+        for (const patch of patches) {
+            const node = graph.nodes.find((n) => n.id === patch?.id);
+            if (!node) continue;
+            const { id, ...rest } = patch;
+            Object.assign(node, rest);
+            updated.push(node);
+        }
+        await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
+        return updated;
+    }
     static async deleteNode(graphId, nodeId) {
         if (!game.user.isGM) return false;
         const data = foundry.utils.duplicate(
@@ -167,6 +196,14 @@ export class LumennGraphStore {
         );
         const graph = data.graphs.find((g) => g.id === graphId);
         if (!graph) return false;
+        const node = graph.nodes.find((n) => n.id === nodeId);
+        if (!node) return false;
+        // Apagar grupo = desagrupar: filhos e edges internas ficam.
+        if (node.type === 'group') {
+            for (const child of graph.nodes) {
+                if (child.parentId === nodeId) child.parentId = null;
+            }
+        }
         graph.nodes = graph.nodes.filter((n) => n.id !== nodeId);
         graph.edges = graph.edges.filter((e) => e.from !== nodeId && e.to !== nodeId);
         if (graph.activeNodeId === nodeId) graph.activeNodeId = null;
@@ -276,6 +313,12 @@ export class LumennGraphStore {
         if (data?.schemaVersion === SCHEMA_VERSION)
             return {
                 migrated: false,
+            };
+        // Versão futura não é legado: migrar às cegas apagaria os grafos.
+        if ((data?.schemaVersion ?? 0) > SCHEMA_VERSION)
+            return {
+                migrated: false,
+                future: true,
             };
         const legacy = game.settings.get(MODULE_ID, LumennGraphStore.#LEGACY_KEY) ?? [];
         const next = {

@@ -19,6 +19,15 @@ import {
 	GRAPH_ZOOM_STEP,
 	wheelPanDelta
 } from "./graph-viewport.mjs";
+import {
+	childrenOf,
+	effectiveEndpoint,
+	GROUP_PADDING,
+	groupBounds,
+	groupOpenFor,
+	movePositions,
+	parentMap
+} from "./graph-groups.mjs";
 const {
 	ApplicationV2,
 	HandlebarsApplicationMixin
@@ -42,6 +51,11 @@ const NODE_SIZES = {
 		compact: [200, 130],
 		normal: [260, 170],
 		large: [340, 220]
+	},
+	group: {
+		compact: [280, 180],
+		normal: [360, 240],
+		large: [460, 300]
 	}
 };
 const COLORS = ["#f0a321", "#2dd4bf", "#e45656", "#7aa2f7", "#bb9af7", "#9ece6a", "#73707c", "#ffffff"];
@@ -105,6 +119,9 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 	#graphId = null;
 	#mode = "edit";
 	#tool = "select";
+	#collapsedGroups = new Set();
+	#lockedGroups = new Set();
+	#groupDragOverrides = null;
 	#camera = {
 		panX: 0,
 		panY: 0,
@@ -279,6 +296,10 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 	#attachDrop(nodeId, doc) {
 		const node = LumennGraphStore.getNode(this.#graphId, nodeId);
 		if (!node) return;
+		if (node.type === "group") {
+			ui.notifications.warn(game.i18n.localize("LUMENN_FRAME.Group.DropUnsupported"));
+			return
+		}
 		if (node.type === "scene" && doc.documentName === "Scene") {
 			LumennGraphStore.updateNode(this.#graphId, nodeId, {
 				data: {
@@ -444,11 +465,12 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			maxX = -Infinity,
 			maxY = -Infinity;
 		for (const n of nodes) {
-			const [w, h] = nodeSize(n.type, n.size);
-			minX = Math.min(minX, n.position.x);
-			minY = Math.min(minY, n.position.y);
-			maxX = Math.max(maxX, n.position.x + w);
-			maxY = Math.max(maxY, n.position.y + h)
+			const bounds = this.#nodeBounds(n.id, null, graph);
+			if (!bounds) continue;
+			minX = Math.min(minX, bounds.x);
+			minY = Math.min(minY, bounds.y);
+			maxX = Math.max(maxX, bounds.x + bounds.width);
+			maxY = Math.max(maxY, bounds.y + bounds.height)
 		}
 		const contentW = Math.max(1, maxX - minX);
 		const contentH = Math.max(1, maxY - minY);
@@ -480,31 +502,44 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		const activeGraph = graphs.find(g => g.id === this.#graphId) ?? graphs[0] ?? null;
 		if (activeGraph) this.#graphId = activeGraph.id;
 		const L = k => game.i18n.localize(k);
-		const navigable = new Set;
-		if (this.#mode === "live" && activeGraph?.activeNodeId) {
-			for (const e of activeGraph.edges ?? []) {
-				if ((e.type === "flow" || e.type === "audio") && e.from === activeGraph.activeNodeId) navigable.add(e.to)
-			}
-		}
+		const navigable = this.#navigableSet(activeGraph);
 		const defaultColors = LumennGraphStore.getDefaultColors();
-		const nodes = (activeGraph?.nodes ?? []).map(n => {
-			const [w, h] = nodeSize(n.type, n.size);
+		const allNodes = activeGraph?.nodes ?? [];
+		const collapsed = this.#collapsedSet(activeGraph);
+		const visible = allNodes.filter(n => !(n.parentId && collapsed.has(n.parentId)));
+		visible.sort((a, b) => (a.type === "group" ? 0 : 1) - (b.type === "group" ? 0 : 1));
+		const nodes = visible.map(n => {
+			const kids = n.type === "group" ? childrenOf(allNodes, n.id) : [];
+			const bounds = n.type === "group" ? groupBounds(allNodes, n.id, nodeSize, GROUP_PADDING) : null;
+			const [w, h] = bounds ? [bounds.width, bounds.height] : nodeSize(n.type, n.size);
+			const position = bounds ? {
+				x: bounds.x,
+				y: bounds.y
+			} : n.position;
 			const audioSource = this.#audioSourceOf(n);
-			const playable = this.#mode === "live" && LumennCompat.isGM() && !!audioSource;
+			const playable = n.type !== "group" && this.#mode === "live" && LumennCompat.isGM() && !!audioSource;
+			const groupActive = kids.some(k => k.id === activeGraph.activeNodeId);
+			const groupNavigable = kids.some(k => navigable.has(k.id));
 			const out = {
 				...n,
+				position,
 				color: normalizeHexColor(n.color, defaultColors[n.type] ?? "#73707c"),
 				width: w,
 				height: h,
-				isActive: n.id === activeGraph.activeNodeId,
-				isNavigable: this.#mode === "live" && navigable.has(n.id),
+				isActive: n.type === "group" ? groupActive : n.id === activeGraph.activeNodeId,
+				isNavigable: n.type === "group" ? this.#mode === "live" && groupNavigable : this.#mode === "live" && navigable.has(n.id),
 				isPlayable: playable,
-				isPlaying: !!audioSource && this.#isAudioPlaying(audioSource),
-				isDimmed: this.#mode === "live" && LumennSettings.get("dimUnreachable") && n.id !== activeGraph.activeNodeId && !navigable.has(n.id) && !playable,
+				isPlaying: n.type !== "group" && !!audioSource && this.#isAudioPlaying(audioSource),
+				isDimmed: this.#mode === "live" && LumennSettings.get("dimUnreachable") && !(n.type === "group" ? groupActive || groupNavigable : n.id === activeGraph.activeNodeId || navigable.has(n.id) || playable),
 				selected: this.#selected.kind === "node" && this.#selected.id === n.id,
 				targetHi: this.#connectState?.targetHi === n.id
 			};
-			if (n.type === "scene") {
+			if (n.type === "group") {
+				out.groupLabel = n.data?.title || L("LUMENN_FRAME.Group.DefaultName");
+				out.groupCount = kids.length;
+				out.groupOpen = !collapsed.has(n.id);
+				out.groupLocked = this.#lockedGroups.has(n.id)
+			} else if (n.type === "scene") {
 				const scene = n.data?.sceneId ? game.scenes.get(n.data.sceneId) : null;
 				out.sceneName = scene?.name ?? (n.data?.sceneId ? L("LUMENN_FRAME.Beat.InvalidScene") : L("LUMENN_FRAME.Beat.NoScene"));
 				out.sceneThumb = scene?.thumbnail ?? scene?.background?.src ?? null
@@ -556,6 +591,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				addScene: L("LUMENN_FRAME.Tool.AddScene"),
 				addAudio: L("LUMENN_FRAME.Tool.AddAudio"),
 				addNote: L("LUMENN_FRAME.Tool.AddNote"),
+				addGroup: L("LUMENN_FRAME.Tool.AddGroup"),
 				graph: L("LUMENN_FRAME.Inspector.Graph"),
 				scene: L("LUMENN_FRAME.Inspector.Scene"),
 				audio: L("LUMENN_FRAME.Inspector.Audio"),
@@ -569,6 +605,16 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				selectedState: L("LUMENN_FRAME.Legend.Selected"),
 				targetState: L("LUMENN_FRAME.Legend.Target"),
 				note: L("LUMENN_FRAME.Inspector.Note"),
+				group: L("LUMENN_FRAME.Inspector.Group"),
+				groupRooms: L("LUMENN_FRAME.Group.Rooms"),
+				groupCreate: L("LUMENN_FRAME.Inspector.GroupCreate"),
+				groupAdd: L("LUMENN_FRAME.Inspector.GroupAdd"),
+				groupRemove: L("LUMENN_FRAME.Inspector.GroupRemove"),
+				groupApplyRooms: L("LUMENN_FRAME.Inspector.GroupApplyRooms"),
+				groupUngroup: L("LUMENN_FRAME.Inspector.GroupUngroup"),
+				groupLock: L("LUMENN_FRAME.Group.Lock"),
+				groupUnlock: L("LUMENN_FRAME.Group.Unlock"),
+				groupToggle: L("LUMENN_FRAME.Group.Toggle"),
 				flowEdge: L("LUMENN_FRAME.Inspector.FlowEdge"),
 				audioEdge: L("LUMENN_FRAME.Inspector.AudioEdge"),
 				audioRoutingNote: L("LUMENN_FRAME.Inspector.AudioRoutingNote"),
@@ -655,6 +701,31 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		this.#dragDrop.forEach(d => d.bind(this.element));
 		const root = this.element;
 		root.querySelectorAll("[data-action]").forEach(el => el.addEventListener("click", e => this.#action(e)));
+		root.querySelectorAll("[data-group-toggle]").forEach(el => el.addEventListener("click", e => {
+			e.preventDefault();
+			e.stopPropagation();
+			const groupId = e.currentTarget.dataset.groupToggle;
+			if (!groupId) return;
+			if (this.#collapsedGroups.has(groupId)) this.#collapsedGroups.delete(groupId);
+			else {
+				this.#collapsedGroups.add(groupId);
+				const selected = this.#selected.kind === "node" ? LumennGraphStore.getNode(this.#graphId, this.#selected.id) : null;
+				if (selected?.parentId === groupId) this.#selected = {
+					kind: null,
+					id: null
+				}
+			}
+			this.render()
+		}));
+		root.querySelectorAll("[data-group-lock]").forEach(el => el.addEventListener("click", e => {
+			e.preventDefault();
+			e.stopPropagation();
+			const groupId = e.currentTarget.dataset.groupLock;
+			if (!groupId) return;
+			if (this.#lockedGroups.has(groupId)) this.#lockedGroups.delete(groupId);
+			else this.#lockedGroups.add(groupId);
+			this.render()
+		}));
 		root.querySelectorAll("[data-tool]").forEach(el => el.addEventListener("click", e => {
 			const tool = e.currentTarget.dataset.tool;
 			this.#tool = tool;
@@ -667,6 +738,8 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		const selector = root.querySelector("select[data-graph-selector]");
 		selector?.addEventListener("change", e => {
 			this.#graphId = e.target.value;
+			this.#collapsedGroups.clear();
+			this.#lockedGroups.clear();
 			this.#selected = {
 				kind: null,
 				id: null
@@ -715,7 +788,12 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			const viewportRect = viewport.getBoundingClientRect();
 			const graphSnapshot = LumennGraphStore.getGraph(this.#graphId);
 			const beat = graphSnapshot?.nodes?.find(candidate => candidate.id === node.dataset.id);
-			const base = beat?.position ?? {
+			const isGroup = beat?.type === "group";
+			const groupChildren = isGroup ? childrenOf(graphSnapshot?.nodes ?? [], beat.id) : [];
+			const base = isGroup ? {
+				x: node.offsetLeft,
+				y: node.offsetTop
+			} : beat?.position ?? {
 				x: 0,
 				y: 0
 			};
@@ -745,6 +823,26 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				const dy = next.y - base.y;
 				if (!moved && Math.hypot(dx, dy) >= 3) moved = true;
 				node.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+				if (isGroup) {
+					const overrides = new Map;
+					for (const child of groupChildren) {
+						const position = {
+							x: Math.round((child.position?.x ?? 0) + dx),
+							y: Math.round((child.position?.y ?? 0) + dy)
+						};
+						overrides.set(child.id, position);
+						this.#pendingEdgeNodes.set(child.id, position);
+						const element = root.querySelector(`.lf-node[data-id="${child.id}"]`);
+						if (element) {
+							element.style.left = `${position.x}px`;
+							element.style.top = `${position.y}px`
+						}
+					}
+					this.#groupDragOverrides = overrides;
+					this.#edgeGraphSnapshot = graphSnapshot;
+					this.#scheduleEdgeDraw(root);
+					return
+				}
 				this.#scheduleEdgeDraw(root, node.dataset.id, next, graphSnapshot)
 			};
 			const up = async ev => {
@@ -756,13 +854,38 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				node.removeEventListener("pointercancel", up);
 				node.classList.remove("dragging");
 				node.style.transform = "";
-				node.style.left = `${next.x}px`;
-				node.style.top = `${next.y}px`;
+				if (!isGroup) {
+					node.style.left = `${next.x}px`;
+					node.style.top = `${next.y}px`
+				}
 				this.#suppressNodeClick = moved;
 				if (this.#edgeFrame !== null) cancelAnimationFrame(this.#edgeFrame);
 				this.#edgeFrame = null;
 				this.#pendingEdgeNodes.clear();
 				this.#edgeGraphSnapshot = null;
+				if (isGroup) {
+					const patches = movePositions(groupChildren, {
+						x: next.x - base.x,
+						y: next.y - base.y
+					});
+					patches.unshift({
+						id: beat.id,
+						position: {
+							x: next.x,
+							y: next.y
+						}
+					});
+					this.#groupDragOverrides = null;
+					const updated = await LumennGraphStore.updateNodes(this.#graphId, patches);
+					node.style.transform = "";
+					if (!updated.length) {
+						this.render();
+						return
+					}
+					this.#resizeWorld(root);
+					this.render();
+					return
+				}
 				this.#updateIncidentEdges(root, graphSnapshot, new Map([
 					[node.dataset.id, next]
 				]));
@@ -775,7 +898,8 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 					this.#drawEdges(root);
 					return
 				}
-				this.#resizeWorld(root)
+				this.#resizeWorld(root);
+				if (beat?.parentId) this.render()
 			};
 			node.addEventListener("pointermove", move);
 			node.addEventListener("pointerup", up, {
@@ -841,7 +965,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		if (e.target.closest(".lf-node") || e.target.closest("[data-port]") || e.target.closest(".lf-edge-hit") || e.target.closest(".lf-camera-bar")) return;
 		if (this.#spaceDown) return;
 		if (!this.#editable()) return;
-		if (this.#tool === "scene" || this.#tool === "audio" || this.#tool === "note") {
+		if (this.#tool === "scene" || this.#tool === "audio" || this.#tool === "note" || this.#tool === "group") {
 			const point = this.#clientToCanvas(e, this.element.querySelector(".lf-viewport"));
 			this.#createNodeAt(this.#tool, point);
 			return
@@ -873,6 +997,8 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				loop: true,
 				fadeIn: null,
 				fadeOut: null
+			} : type === "group" ? {
+				title: game.i18n.localize("LUMENN_FRAME.Group.DefaultName")
 			} : {
 				title: "",
 				body: ""
@@ -968,16 +1094,22 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		let maxX = viewport.clientWidth,
 			maxY = viewport.clientHeight;
 		for (const n of graph?.nodes ?? []) {
-			const [w, h] = nodeSize(n.type, n.size);
-			maxX = Math.max(maxX, n.position.x + w + 400);
-			maxY = Math.max(maxY, n.position.y + h + 400)
+			const bounds = this.#nodeBounds(n.id, null, graph);
+			if (!bounds) continue;
+			maxX = Math.max(maxX, bounds.x + bounds.width + 400);
+			maxY = Math.max(maxY, bounds.y + bounds.height + 400)
 		}
 		world.style.width = `${maxX}px`;
 		world.style.height = `${maxY}px`
 	}
 	#nodeBounds(nodeId, positionOverride = null, graph = null) {
-		const node = graph?.nodes?.find(candidate => candidate.id === nodeId) ?? LumennGraphStore.getNode(this.#graphId, nodeId);
+		const source = graph ?? LumennGraphStore.getGraph(this.#graphId);
+		const node = source?.nodes?.find(candidate => candidate.id === nodeId) ?? LumennGraphStore.getNode(this.#graphId, nodeId);
 		if (!node) return null;
+		if (node.type === "group") {
+			const bounds = groupBounds(source?.nodes ?? [], node.id, nodeSize, GROUP_PADDING, child => this.#groupDragOverrides?.get(child.id) ?? child.position);
+			if (bounds) return bounds
+		}
 		const [w, h] = nodeSize(node.type, node.size);
 		const p = positionOverride ?? node.position;
 		return {
@@ -985,6 +1117,34 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			y: p.y,
 			width: w,
 			height: h
+		}
+	}
+	#navigableSet(graph) {
+		const set = new Set;
+		if (this.#mode === "live" && graph?.activeNodeId) {
+			for (const edge of graph.edges ?? []) {
+				if ((edge.type === "flow" || edge.type === "audio") && edge.from === graph.activeNodeId) set.add(edge.to)
+			}
+		}
+		return set
+	}
+	#isGroupOpen(groupId, graph) {
+		if (this.#mode === "edit") return !this.#collapsedGroups.has(groupId);
+		return groupOpenFor(groupId, graph?.nodes ?? [], graph?.activeNodeId ?? null, this.#navigableSet(graph), this.#lockedGroups)
+	}
+	#collapsedSet(graph) {
+		const set = new Set;
+		for (const node of graph?.nodes ?? []) {
+			if (node.type === "group" && !this.#isGroupOpen(node.id, graph)) set.add(node.id)
+		}
+		return set
+	}
+	#effectiveEdgeIds(edge, graph, collapsed = null) {
+		const closed = collapsed ?? this.#collapsedSet(graph);
+		const parents = parentMap(graph?.nodes ?? []);
+		return {
+			from: effectiveEndpoint(edge.from, parents, closed),
+			to: effectiveEndpoint(edge.to, parents, closed)
 		}
 	}
 	#portAnchor(nodeId, port, positionOverride = null, graph = null) {
@@ -1016,11 +1176,12 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			y: y + h * .62
 		}
 	}
-	#edgeGeometry(edge, graph, positionOverrides = null) {
+	#edgeGeometry(edge, graph, positionOverrides = null, collapsed = null) {
 		const fromPosition = positionOverrides?.get(edge.from) ?? null;
 		const toPosition = positionOverrides?.get(edge.to) ?? null;
-		const fromBounds = this.#nodeBounds(edge.from, fromPosition, graph);
-		const toBounds = this.#nodeBounds(edge.to, toPosition, graph);
+		const ids = this.#effectiveEdgeIds(edge, graph, collapsed);
+		const fromBounds = this.#nodeBounds(ids.from, fromPosition, graph);
+		const toBounds = this.#nodeBounds(ids.to, toPosition, graph);
 		if (!fromBounds || !toBounds) return {
 			d: "",
 			midX: 0,
@@ -1076,10 +1237,13 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		const graph = LumennGraphStore.getGraph(this.#graphId);
 		if (!svg) return;
 		svg.innerHTML = "";
+		const collapsed = this.#collapsedSet(graph);
 		for (const e of graph?.edges ?? []) {
 			const from = graph.nodes.find(node => node.id === e.from);
 			const to = graph.nodes.find(node => node.id === e.to);
 			if (!from || !to) continue;
+			const ids = this.#effectiveEdgeIds(e, graph, collapsed);
+			if (ids.from === ids.to) continue;
 			const {
 				d,
 				midX,
@@ -1088,7 +1252,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				ny,
 				start: edgeStart,
 				end: edgeEnd
-			} = this.#edgeGeometry(e, graph);
+			} = this.#edgeGeometry(e, graph, null, collapsed);
 			if (e.type === "audio") {
 				const role = from.data?.audioRole === "sfx" ? "sfx" : "music";
 				const rolePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -1118,7 +1282,8 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 					gradient.setAttribute("y2", "0%");
 					const start = document.createElementNS("http://www.w3.org/2000/svg", "stop");
 					start.setAttribute("offset", "0%");
-					start.setAttribute("stop-color", from.id === graph.activeNodeId ? "#ffd166" : "#f0a321");
+					const fromActive = ids.from === graph.activeNodeId || childrenOf(graph.nodes, ids.from).some(kid => kid.id === graph.activeNodeId);
+					start.setAttribute("stop-color", fromActive ? "#ffd166" : "#f0a321");
 					const end = document.createElementNS("http://www.w3.org/2000/svg", "stop");
 					end.setAttribute("offset", "100%");
 					end.setAttribute("stop-color", "#8b6a28");
@@ -1202,9 +1367,12 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		const svg = root.querySelector(".lf-edges");
 		if (!svg || !graph) return;
 		const dirtyNodes = new Set(positionOverrides.keys());
+		const collapsed = this.#collapsedSet(graph);
 		for (const edge of graph.edges ?? []) {
 			if (!dirtyNodes.has(edge.from) && !dirtyNodes.has(edge.to)) continue;
-			const geometry = this.#edgeGeometry(edge, graph, positionOverrides);
+			const ids = this.#effectiveEdgeIds(edge, graph, collapsed);
+			if (ids.from === ids.to) continue;
+			const geometry = this.#edgeGeometry(edge, graph, positionOverrides, collapsed);
 			const elements = svg.querySelectorAll(`[data-edge-id="${edge.id}"]`);
 			for (const element of elements) {
 				if (element.tagName.toLowerCase() === "text") {
@@ -1580,6 +1748,53 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			this.render()
 		} else if (action === "set-initial") {
 			LumennGraphStore.setActiveNode(this.#graphId, this.#selected.id).then(() => this.render())
+		} else if (action === "group-create") {
+			const scene = LumennGraphStore.getNode(this.#graphId, this.#selected.id);
+			if (scene?.type !== "scene") return;
+			const group = await LumennGraphStore.addNode(this.#graphId, {
+				type: "group",
+				position: {
+					x: scene.position.x - GROUP_PADDING,
+					y: scene.position.y - GROUP_PADDING
+				},
+				data: {
+					title: game.i18n.localize("LUMENN_FRAME.Group.DefaultName")
+				}
+			});
+			if (!group) return;
+			await LumennGraphStore.updateNode(this.#graphId, scene.id, {
+				parentId: group.id
+			});
+			this.#selected = {
+				kind: "node",
+				id: group.id
+			};
+			this.render()
+		} else if (action === "group-add") {
+			const target = root.querySelector('[data-insp-pick="groupTarget"]')?.value;
+			if (!target) return;
+			await LumennGraphStore.updateNode(this.#graphId, this.#selected.id, {
+				parentId: target
+			});
+			this.render()
+		} else if (action === "group-remove") {
+			await LumennGraphStore.updateNode(this.#graphId, this.#selected.id, {
+				parentId: null
+			});
+			this.render()
+		} else if (action === "group-apply-rooms") {
+			const groupId = this.#selected.id;
+			const graph = LumennGraphStore.getGraph(this.#graphId);
+			const checks = new Map([...root.querySelectorAll("[data-insp-room]")].map(el => [el.dataset.inspRoom, el.checked]));
+			const patches = (graph?.nodes ?? []).filter(n => n.type === "scene").map(n => {
+				const checked = !!checks.get(n.id);
+				return {
+					id: n.id,
+					parentId: checked ? groupId : n.parentId === groupId ? null : n.parentId ?? null
+				}
+			});
+			await LumennGraphStore.updateNodes(this.#graphId, patches);
+			this.render()
 		} else if (action === "delete-node") {
 			LumennGraphStore.deleteNode(this.#graphId, this.#selected.id).then(() => {
 				this.#selected = {
@@ -1878,6 +2093,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		}
 	}
 	#nodeLabel(node) {
+		if (node.type === "group") return node.data?.title || game.i18n.localize("LUMENN_FRAME.Group.DefaultName");
 		if (node.type === "scene") {
 			const s = node.data?.sceneId ? game.scenes.get(node.data.sceneId) : null;
 			return s?.name ?? "Scene"
@@ -1925,7 +2141,17 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 					audioNodes: (graph?.nodes ?? []).filter(n => n.type === "audio").map(n => ({
 						id: n.id,
 						name: this.#nodeLabel(n)
-					}))
+					})),
+					groups: (graph?.nodes ?? []).filter(n => n.type === "group" && n.id !== node.id).map(n => ({
+						id: n.id,
+						name: this.#nodeLabel(n)
+					})),
+					groupCount: node.type === "group" ? childrenOf(graph?.nodes ?? [], node.id).length : 0,
+					groupScenes: node.type === "group" ? (graph?.nodes ?? []).filter(n => n.type === "scene").map(n => ({
+						id: n.id,
+						name: this.#nodeLabel(n),
+						inGroup: n.parentId === node.id
+					})) : []
 				}
 			}
 		}

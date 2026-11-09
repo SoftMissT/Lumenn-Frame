@@ -1,1230 +1,1165 @@
-/* Lumenn Frame – Graph Editor 2.0 (Cinematic Edit Bay) ─────────────────────
-   Direção: chrome calmo e preciso; cor só onde carrega significado (tipo de nó,
-   direção, estado). O âmbar é o único acento da interface; o resto é neutro.
-   Fontes: Modesto Condensed (títulos) e Signika (corpo), ambas já embutidas no
-   Foundry. Nada de CDN, nada de fonte que dependa da máquina do usuário. */
-
-/* ── Tokens ────────────────────────────────────────────────────────── */
 .lumenn-frame {
-  /* neutros */
-  --lf-ink: #0c0c0f;
-  --lf-surface: #16161a;
-  --lf-panel: #1d1d23;
-  --lf-panel-alt: #242430;
-  --lf-text: #e0ddd4;
-  /* texto secundário: 5,87:1 sobre --lf-panel (o antigo #73707c dava 3,46:1) */
-  --lf-muted: #9a97a6;
-  --lf-badge: #2b2c33;
-  --lf-badge-border: #3b3c44;
-  --lf-hairline: #ffffff0f;
-
-  /* acento da interface */
-  --lf-amber: #f0a321;
-  --lf-amber-dim: #f0a32166;
-  --lf-focus: #ffd166;
-
-  /* semântica do grafo */
-  --lf-scene: #f59e0b;
-  --lf-music: #8b5cf6;
-  --lf-sfx: #22d3ee;
-  --lf-note: #3b82f6;
-  --lf-flow-in: #facc15;
-  --lf-flow-out: #f97316;
-  --lf-input: #f8fafc;
-  --lf-output: #ef4444;
-
-  /* estados */
-  --lf-active: #22c55e;
-  --lf-navigable: #84cc16;
-  --lf-target: #ec4899;
-  --lf-selected: #ffffff;
-  --lf-teal: #2dd4bf;
-  --lf-teal-dim: #2dd4bf55;
-  --lf-danger: #e45656;
-  --lf-danger-solid: #c2414b; /* branco sobre ele: 5,06:1 */
-
-  --lf-shadow: 0 2px 10px #00000060;
-  --lf-shadow-lift: 0 4px 16px #00000080;
-
-  /* tipografia: piso de 11px, escala curta */
-  --lf-font-display: "Modesto Condensed", "Signika", sans-serif;
-  --lf-font-body: "Signika", sans-serif;
-  --lf-fs-xs: 11px;
-  --lf-fs-sm: 12px;
-  --lf-fs-md: 13px;
-  --lf-fs-lg: 16px;
-
-  --lf-radius: 4px;
-  --lf-control-h: 28px;
-  --lf-transition: 0.15s ease;
+    --lf-ink: #0c0c0f;
+    --lf-surface: #16161a;
+    --lf-panel: #1d1d23;
+    --lf-panel-alt: #242430;
+    --lf-text: #e0ddd4;
+    --lf-muted: #9a97a6;
+    --lf-badge: #2b2c33;
+    --lf-badge-border: #3b3c44;
+    --lf-hairline: #ffffff0f;
+    --lf-amber: #f0a321;
+    --lf-amber-dim: #f0a32166;
+    --lf-focus: #ffd166;
+    --lf-scene: #f59e0b;
+    --lf-music: #8b5cf6;
+    --lf-sfx: #22d3ee;
+    --lf-note: #3b82f6;
+    --lf-flow-in: #facc15;
+    --lf-flow-out: #f97316;
+    --lf-input: #f8fafc;
+    --lf-output: #ef4444;
+    --lf-active: #22c55e;
+    --lf-navigable: #84cc16;
+    --lf-target: #ec4899;
+    --lf-selected: #fff;
+    --lf-teal: #2dd4bf;
+    --lf-teal-dim: #2dd4bf55;
+    --lf-danger: #e45656;
+    --lf-danger-solid: #c2414b;
+    --lf-shadow: 0 2px 10px #00000060;
+    --lf-shadow-lift: 0 4px 16px #00000080;
+    --lf-font-display: 'Modesto Condensed', 'Signika', sans-serif;
+    --lf-font-body: 'Signika', sans-serif;
+    --lf-fs-xs: 11px;
+    --lf-fs-sm: 12px;
+    --lf-fs-md: 13px;
+    --lf-fs-lg: 16px;
+    --lf-radius: 4px;
+    --lf-control-h: 28px;
+    --lf-transition: 0.15s ease;
 }
-
-/* ── Base ──────────────────────────────────────────────────────────── */
 .lumenn-frame.graph-editor {
-  background: var(--lf-ink);
-  color: var(--lf-text);
-  font-family: var(--lf-font-body);
-  font-size: 15px;
-  overflow: hidden;
-  isolation: isolate;
+    background: var(--lf-ink);
+    color: var(--lf-text);
+    font-family: var(--lf-font-body);
+    font-size: 15px;
+    isolation: isolate;
+    overflow: hidden;
 }
-
-/* Preview usa o canvas real do Foundry; a janela volta no finally do caller. */
 .lumenn-frame.graph-editor.lf-previewing {
-  opacity: 0;
-  pointer-events: none;
+    opacity: 0;
+    pointer-events: none;
 }
-
 .lumenn-frame .window-header {
-  background: var(--lf-panel);
-  border-bottom: 1px solid var(--lf-hairline);
+    background: var(--lf-panel);
+    border-bottom: 1px solid var(--lf-hairline);
 }
-
 .lumenn-frame .window-header .window-title {
-  font-family: var(--lf-font-display);
-  color: var(--lf-amber);
-  letter-spacing: 0.04em;
+    color: var(--lf-amber);
+    font-family: var(--lf-font-display);
+    letter-spacing: 0.04em;
 }
-
 .lumenn-frame.graph-editor .window-content {
-  background: var(--lf-ink);
-  padding: 0;
-  overflow: hidden;
-  position: relative;
+    background: var(--lf-ink);
+    overflow: hidden;
+    padding: 0;
+    position: relative;
 }
-
 .lumenn-frame.graph-editor .lf-root {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+    display: flex;
+    flex-direction: column;
+    inset: 0;
+    min-height: 0;
+    position: absolute;
 }
-
-/* Foco visível em todo controle (antes só havia troca de borda nos inputs). */
 .lumenn-frame :is(button, select, input, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--lf-focus);
-  outline-offset: 2px;
+    outline: 2px solid var(--lf-focus);
+    outline-offset: 2px;
 }
-
-/* ── Topbar ────────────────────────────────────────────────────────── */
 .lf-topbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-  padding: 6px 10px;
-  background: var(--lf-panel);
-  border-bottom: 1px solid var(--lf-hairline);
-  z-index: 60;
+    align-items: center;
+    background: var(--lf-panel);
+    border-bottom: 1px solid var(--lf-hairline);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    padding: 6px 10px;
+    z-index: 60;
 }
-
-/* O título da janela do Foundry já diz "Lumenn Frame": repetir aqui só gasta largura. */
 .lf-brand {
-  display: none;
+    display: none;
 }
-
 .lf-topbar select {
-  flex: 0 1 200px;
-  min-width: 0;
-  height: var(--lf-control-h);
-  background: var(--lf-badge);
-  border: 1px solid var(--lf-badge-border);
-  color: var(--lf-text);
-  font-family: var(--lf-font-body);
-  font-size: var(--lf-fs-sm);
-  padding: 0 8px;
-  border-radius: var(--lf-radius);
-  cursor: pointer;
+    background: var(--lf-badge);
+    border: 1px solid var(--lf-badge-border);
+    border-radius: var(--lf-radius);
+    color: var(--lf-text);
+    cursor: pointer;
+    flex: 0 1 200px;
+    font-family: var(--lf-font-body);
+    font-size: var(--lf-fs-sm);
+    height: var(--lf-control-h);
+    min-width: 0;
+    padding: 0 8px;
 }
-
-/* O core do Foundry dá width:100% aos button; sem isto o + e o Expandir viravam
-   barras de largura total e o rótulo "Ao Vivo" quebrava em duas linhas (só "Ao"
-   aparecia). Medido no Foundry 14.367. */
-.lf-top-btn,
+.lf-camera-controls button,
 .lf-mode-toggle button,
-.lf-camera-controls button {
-  width: auto;
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
 .lf-top-btn {
-  height: var(--lf-control-h);
-  font-family: var(--lf-font-body);
-  font-size: var(--lf-fs-sm);
-  font-weight: 500;
-  padding: 0 11px;
-  border: 1px solid var(--lf-badge-border);
-  border-radius: var(--lf-radius);
-  background: var(--lf-badge);
-  color: var(--lf-text);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background var(--lf-transition), border-color var(--lf-transition);
+    flex: 0 0 auto;
+    white-space: nowrap;
+    width: auto;
 }
-
+.lf-top-btn {
+    background: var(--lf-badge);
+    border: 1px solid var(--lf-badge-border);
+    border-radius: var(--lf-radius);
+    color: var(--lf-text);
+    cursor: pointer;
+    font-family: var(--lf-font-body);
+    font-size: var(--lf-fs-sm);
+    font-weight: 500;
+    height: var(--lf-control-h);
+    padding: 0 11px;
+    transition:
+        background var(--lf-transition),
+        border-color var(--lf-transition);
+    white-space: nowrap;
+}
 .lf-top-btn:hover {
-  background: var(--lf-panel-alt);
-  border-color: var(--lf-muted);
+    background: var(--lf-panel-alt);
+    border-color: var(--lf-muted);
 }
-
 .lf-top-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding-left: 8px;
-  border-left: 1px solid var(--lf-badge-border);
+    align-items: center;
+    border-left: 1px solid var(--lf-badge-border);
+    display: flex;
+    gap: 4px;
+    padding-left: 8px;
 }
-
 .lf-top-btn-danger {
-  color: #ffd7d7;
-  border-color: #a63f4a;
+    border-color: #a63f4a;
+    color: #ffd7d7;
 }
-
 .lf-top-btn-danger:hover {
-  color: #fff;
-  background: var(--lf-danger-solid);
-  border-color: var(--lf-danger-solid);
+    background: var(--lf-danger-solid);
+    border-color: var(--lf-danger-solid);
+    color: #fff;
 }
-
 .lf-topbar-spacer {
-  flex: 1 1 auto;
+    flex: 1 1 auto;
 }
-
 .lf-mode-toggle {
-  display: flex;
-  height: var(--lf-control-h);
-  border: 1px solid var(--lf-badge-border);
-  border-radius: var(--lf-radius);
-  overflow: hidden;
+    border: 1px solid var(--lf-badge-border);
+    border-radius: var(--lf-radius);
+    display: flex;
+    height: var(--lf-control-h);
+    overflow: hidden;
 }
-
 .lf-mode-toggle button {
-  border: none;
-  border-radius: 0;
-  font-family: var(--lf-font-body);
-  font-size: var(--lf-fs-sm);
-  font-weight: 500;
-  padding: 0 14px;
-  color: var(--lf-muted);
-  background: transparent;
-  cursor: pointer;
-  transition: color var(--lf-transition), background var(--lf-transition);
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    color: var(--lf-muted);
+    cursor: pointer;
+    font-family: var(--lf-font-body);
+    font-size: var(--lf-fs-sm);
+    font-weight: 500;
+    padding: 0 14px;
+    transition:
+        color var(--lf-transition),
+        background var(--lf-transition);
 }
-
 .lf-mode-toggle button:not(.active):hover {
-  color: var(--lf-text);
-  background: var(--lf-panel-alt);
+    background: var(--lf-panel-alt);
+    color: var(--lf-text);
 }
-
 .lf-mode-toggle button.active {
-  background: var(--lf-amber);
-  color: var(--lf-ink);
-  font-weight: 600;
+    background: var(--lf-amber);
+    color: var(--lf-ink);
+    font-weight: 600;
 }
-
 .lf-mode-toggle button:not(:first-child) {
-  border-left: 1px solid var(--lf-badge-border);
+    border-left: 1px solid var(--lf-badge-border);
 }
-
 .lf-camera-controls {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  height: var(--lf-control-h);
-  padding: 0 2px;
-  background: var(--lf-badge);
-  border: 1px solid var(--lf-badge-border);
-  border-radius: var(--lf-radius);
+    align-items: center;
+    background: var(--lf-badge);
+    border: 1px solid var(--lf-badge-border);
+    border-radius: var(--lf-radius);
+    display: flex;
+    gap: 2px;
+    height: var(--lf-control-h);
+    padding: 0 2px;
 }
-
 .lf-camera-controls button {
-  height: 22px;
-  font-family: var(--lf-font-body);
-  font-size: var(--lf-fs-xs);
-  font-weight: 600;
-  min-width: 24px;
-  padding: 0 7px;
-  border: none;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--lf-text);
-  cursor: pointer;
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    color: var(--lf-text);
+    cursor: pointer;
+    font-family: var(--lf-font-body);
+    font-size: var(--lf-fs-xs);
+    font-weight: 600;
+    height: 22px;
+    min-width: 24px;
+    padding: 0 7px;
 }
-
 .lf-camera-controls button:hover {
-  background: var(--lf-panel-alt);
+    background: var(--lf-panel-alt);
 }
-
 .lf-camera-controls .lf-camera-percent {
-  min-width: 42px;
-  text-align: center;
-  font-size: var(--lf-fs-xs);
-  color: var(--lf-muted);
-  font-variant-numeric: tabular-nums;
+    color: var(--lf-muted);
+    font-size: var(--lf-fs-xs);
+    font-variant-numeric: tabular-nums;
+    min-width: 42px;
+    text-align: center;
 }
-
-/* ── Body layout ───────────────────────────────────────────────────── */
 .lf-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: row;
-  position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: row;
+    min-height: 0;
+    position: relative;
 }
-
 .lf-toolbar-left {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 4px;
-  width: 42px;
-  flex: 0 0 42px;
-  background: var(--lf-panel);
-  border-right: 1px solid var(--lf-hairline);
-  z-index: 60;
+    background: var(--lf-panel);
+    border-right: 1px solid var(--lf-hairline);
+    display: flex;
+    flex: 0 0 42px;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 4px;
+    width: 42px;
+    z-index: 60;
 }
-
 .lf-tool {
-  --lf-tool-color: var(--lf-text);
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 15px;
-  border: 1px solid var(--lf-badge-border);
-  border-radius: var(--lf-radius);
-  background: var(--lf-badge);
-  color: var(--lf-tool-color);
-  cursor: pointer;
-  transition: background var(--lf-transition), color var(--lf-transition), border-color var(--lf-transition);
+    --lf-tool-color: var(--lf-text);
+    align-items: center;
+    background: var(--lf-badge);
+    border: 1px solid var(--lf-badge-border);
+    border-radius: var(--lf-radius);
+    color: var(--lf-tool-color);
+    cursor: pointer;
+    display: flex;
+    font-size: 15px;
+    height: 34px;
+    justify-content: center;
+    transition:
+        background var(--lf-transition),
+        color var(--lf-transition),
+        border-color var(--lf-transition);
+    width: 34px;
 }
-
-.lf-tool[data-tool="select"] { --lf-tool-color: var(--lf-selected); }
-.lf-tool[data-tool="hand"] { --lf-tool-color: #94a3b8; }
-.lf-tool[data-tool="connect"] { --lf-tool-color: var(--lf-flow-out); }
-.lf-tool[data-tool="scene"] { --lf-tool-color: var(--lf-scene); }
-.lf-tool[data-tool="audio"] { --lf-tool-color: var(--lf-music); }
-.lf-tool[data-tool="note"] { --lf-tool-color: var(--lf-note); }
-
+.lf-tool[data-tool='select'] {
+    --lf-tool-color: var(--lf-selected);
+}
+.lf-tool[data-tool='hand'] {
+    --lf-tool-color: #94a3b8;
+}
+.lf-tool[data-tool='connect'] {
+    --lf-tool-color: var(--lf-flow-out);
+}
+.lf-tool[data-tool='scene'] {
+    --lf-tool-color: var(--lf-scene);
+}
+.lf-tool[data-tool='audio'] {
+    --lf-tool-color: var(--lf-music);
+}
+.lf-tool[data-tool='note'] {
+    --lf-tool-color: var(--lf-note);
+}
 .lf-tool:hover {
-  border-color: var(--lf-muted);
-  background: var(--lf-panel-alt);
+    background: var(--lf-panel-alt);
+    border-color: var(--lf-muted);
 }
-
 .lf-tool.active {
-  background: var(--lf-tool-color);
-  color: var(--lf-ink);
-  border-color: var(--lf-tool-color);
+    background: var(--lf-tool-color);
+    border-color: var(--lf-tool-color);
+    color: var(--lf-ink);
 }
-
 .lf-tool i {
-  font-size: 15px;
-  line-height: 1;
+    font-size: 15px;
+    line-height: 1;
 }
-
-/* ── Viewport / Camera / World ─────────────────────────────────────── */
-/* Vinheta pintada no próprio fundo: não há camada extra cobrindo o editor. */
 .lf-viewport {
-  flex: 1 1 auto;
-  min-width: 0;
-  position: relative;
-  overflow: hidden;
-  background:
-    radial-gradient(ellipse at center, transparent 62%, #00000080 100%),
-    var(--lf-ink);
-  z-index: 1;
-  touch-action: none;
-  overscroll-behavior: contain;
+    background: radial-gradient(ellipse at center, transparent 62%, #00000080 100%), var(--lf-ink);
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    overscroll-behavior: contain;
+    position: relative;
+    touch-action: none;
+    z-index: 1;
 }
-
 .lf-camera {
-  position: absolute;
-  top: 0;
-  left: 0;
-  min-width: 100%;
-  min-height: 100%;
-  transform-origin: 0 0;
-  will-change: transform;
+    left: 0;
+    min-height: 100%;
+    min-width: 100%;
+    position: absolute;
+    top: 0;
+    transform-origin: 0 0;
+    will-change: transform;
 }
-
-.lf-viewport.space-hold { cursor: grab; }
-.lf-viewport.panning { cursor: grabbing; }
-
+.lf-viewport.space-hold {
+    cursor: grab;
+}
+.lf-viewport.panning {
+    cursor: grabbing;
+}
 .lf-viewport.drag-over {
-  outline: 2px dashed var(--lf-amber);
-  outline-offset: -4px;
+    outline: 2px dashed var(--lf-amber);
+    outline-offset: -4px;
 }
-
 .lf-edges {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 2;
-  overflow: visible;
+    height: 100%;
+    inset: 0;
+    overflow: visible;
+    pointer-events: none;
+    position: absolute;
+    width: 100%;
+    z-index: 2;
 }
-
 .lf-edges .lf-edge-hit {
-  pointer-events: stroke;
-  cursor: pointer;
+    cursor: pointer;
+    pointer-events: stroke;
 }
-
 .lf-edges .lf-edge-hit:hover {
-  stroke: #ffffff14;
+    stroke: #ffffff14;
 }
-
 .lf-edges .lf-ghost {
-  pointer-events: none;
+    pointer-events: none;
 }
-
-/* ── Edges ─────────────────────────────────────────────────────────── */
 .lf-edge {
-  vector-effect: non-scaling-stroke;
-  transition: stroke-width var(--lf-transition), opacity var(--lf-transition);
+    transition:
+        stroke-width var(--lf-transition),
+        opacity var(--lf-transition);
+    vector-effect: non-scaling-stroke;
 }
-
+.lf-edge-audio,
 .lf-edge-flow {
-  stroke-linecap: round;
+    stroke-linecap: round;
 }
-
 .lf-edge-audio {
-  stroke-linecap: round;
-  stroke-width: 2.5px;
+    stroke-width: 2.5px;
 }
-
 .lf-edge-audio-left {
-  stroke: #ffffff;
+    stroke: #fff;
 }
-
-/* Sem filter: brightness/blur em SVG força repaint por frame durante pan/hover. */
 .lf-edge:hover {
-  stroke-width: 4px;
+    stroke-width: 4px;
 }
-
 .lf-edge-dock {
-  pointer-events: none;
-  stroke: #101014;
-  stroke-width: 1.5px;
+    pointer-events: none;
+    stroke: #101014;
+    stroke-width: 1.5px;
 }
-
-.lf-edge-dock-flow { fill: var(--lf-amber); }
-.lf-edge-dock-audio { fill: var(--lf-output); }
-
+.lf-edge-dock-flow {
+    fill: var(--lf-amber);
+}
+.lf-edge-dock-audio {
+    fill: var(--lf-output);
+}
 .lf-edge-audio-role {
-  pointer-events: none;
-  stroke-width: 8px;
-  opacity: 0.28;
+    opacity: 0.28;
+    pointer-events: none;
+    stroke-width: 8px;
 }
-
-.lf-edge-audio-role-music { stroke: var(--lf-music); }
-.lf-edge-audio-role-sfx { stroke: var(--lf-sfx); }
-
-/* O rótulo contra-escala pelo zoom da câmera (--lf-inv-zoom, definida no
-   #applyCamera) para não virar pó quando o grafo está afastado. O teto 1,5
-   segura o crescimento: o SVG fica sob os cards, então um rótulo mais largo
-   que o vão entre dois nós ainda passa por baixo deles. */
+.lf-edge-audio-role-music {
+    stroke: var(--lf-music);
+}
+.lf-edge-audio-role-sfx {
+    stroke: var(--lf-sfx);
+}
 .lf-edge-label {
-  --lf-label-scale: min(var(--lf-inv-zoom, 1), 1.5);
-  font-size: calc(11px * var(--lf-label-scale));
-  stroke-width: calc(3px * var(--lf-label-scale));
-  font-weight: 600;
-  user-select: none;
+    --lf-label-scale: min(var(--lf-inv-zoom, 1), 1.5);
+    font-size: calc(11px * var(--lf-label-scale));
+    font-weight: 600;
+    stroke-width: calc(3px * var(--lf-label-scale));
+    user-select: none;
 }
-
-/* ── Overlays do viewport ──────────────────────────────────────────── */
 .lf-connect-hint,
 .lf-transitioning {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 5px 14px;
-  border-radius: 999px;
-  background: #101014f2;
-  font-family: var(--lf-font-body);
-  font-size: var(--lf-fs-sm);
-  font-weight: 600;
-  pointer-events: none;
-  animation: lf-fadeIn 0.18s ease;
+    animation: lf-fadeIn 0.18s ease;
+    background: #101014f2;
+    border-radius: 999px;
+    font-family: var(--lf-font-body);
+    font-size: var(--lf-fs-sm);
+    font-weight: 600;
+    left: 50%;
+    padding: 5px 14px;
+    pointer-events: none;
+    position: absolute;
+    top: 10px;
+    transform: translateX(-50%);
 }
-
 .lf-connect-hint {
-  border: 1px solid var(--lf-amber-dim);
-  color: var(--lf-amber);
-  z-index: 8;
+    border: 1px solid var(--lf-amber-dim);
+    color: var(--lf-amber);
+    z-index: 8;
 }
-
 .lf-transitioning {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--lf-teal-dim);
-  color: var(--lf-teal);
-  z-index: 7;
+    align-items: center;
+    border: 1px solid var(--lf-teal-dim);
+    color: var(--lf-teal);
+    display: flex;
+    gap: 7px;
+    z-index: 7;
 }
-
 .lf-transitioning .lf-transitioning-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--lf-teal);
-  animation: lf-pulse 0.9s ease-in-out infinite;
+    animation: lf-pulse 0.9s ease-in-out infinite;
+    background: var(--lf-teal);
+    border-radius: 50%;
+    height: 8px;
+    width: 8px;
 }
-
-/* Legenda: frases curtas em caixa de frase, 11px (antes 9px em caixa alta). */
 .lf-audio-legend {
-  position: absolute;
-  right: 12px;
-  bottom: 10px;
-  display: flex;
-  flex-wrap: wrap;
-  max-width: min(560px, calc(100% - 24px));
-  gap: 4px 14px;
-  padding: 6px 10px;
-  border: 1px solid var(--lf-hairline);
-  border-radius: 6px;
-  background: #101014e6;
-  color: var(--lf-muted);
-  font-size: var(--lf-fs-xs);
-  pointer-events: none;
-  z-index: 8;
+    background: #101014e6;
+    border: 1px solid var(--lf-hairline);
+    border-radius: 6px;
+    bottom: 10px;
+    color: var(--lf-muted);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: var(--lf-fs-xs);
+    gap: 4px 14px;
+    max-width: min(560px, calc(100% - 24px));
+    padding: 6px 10px;
+    pointer-events: none;
+    position: absolute;
+    right: 12px;
+    z-index: 8;
 }
-
 .lf-audio-key {
-  --k: var(--lf-muted);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+    --k: var(--lf-muted);
+    align-items: center;
+    display: inline-flex;
+    gap: 5px;
 }
-
 .lf-audio-key i {
-  width: 14px;
-  height: 4px;
-  display: inline-block;
-  border-radius: 2px;
-  background: var(--k);
+    background: var(--k);
+    border-radius: 2px;
+    display: inline-block;
+    height: 4px;
+    width: 14px;
 }
-
-.lf-audio-key-scene { --k: var(--lf-scene); }
-.lf-audio-key-music { --k: var(--lf-music); }
-.lf-audio-key-sfx { --k: var(--lf-sfx); }
-.lf-audio-key-note { --k: var(--lf-note); }
-.lf-audio-key-active { --k: var(--lf-active); }
-.lf-audio-key-navigable { --k: var(--lf-navigable); }
-.lf-audio-key-selected { --k: var(--lf-selected); }
-.lf-audio-key-target { --k: var(--lf-target); }
-.lf-audio-key-flow-in { --k: var(--lf-flow-in); }
-.lf-audio-key-flow-out { --k: var(--lf-flow-out); }
-.lf-audio-key-left { --k: var(--lf-input); }
-.lf-audio-key-right { --k: var(--lf-output); }
-
+.lf-audio-key-scene {
+    --k: var(--lf-scene);
+}
+.lf-audio-key-music {
+    --k: var(--lf-music);
+}
+.lf-audio-key-sfx {
+    --k: var(--lf-sfx);
+}
+.lf-audio-key-note {
+    --k: var(--lf-note);
+}
+.lf-audio-key-active {
+    --k: var(--lf-active);
+}
+.lf-audio-key-navigable {
+    --k: var(--lf-navigable);
+}
+.lf-audio-key-selected {
+    --k: var(--lf-selected);
+}
+.lf-audio-key-target {
+    --k: var(--lf-target);
+}
+.lf-audio-key-flow-in {
+    --k: var(--lf-flow-in);
+}
+.lf-audio-key-flow-out {
+    --k: var(--lf-flow-out);
+}
+.lf-audio-key-left {
+    --k: var(--lf-input);
+}
+.lf-audio-key-right {
+    --k: var(--lf-output);
+}
 .lf-audio-key-left i,
 .lf-audio-key-right i {
-  height: 2px;
+    height: 2px;
 }
-
-/* ── Nodes ─────────────────────────────────────────────────────────── */
 .lf-node {
-  --lf-role: var(--node-color);
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  background: var(--lf-panel);
-  border: 2px solid var(--lf-badge-border);
-  border-radius: 6px;
-  /* barra lateral = cor escolhida pelo usuário; o resto empilha por estado */
-  box-shadow: inset 3px 0 var(--node-color), var(--lf-shadow);
-  /* ports ficam fora do card: não recortar */
-  overflow: visible;
-  z-index: 3;
-  cursor: grab;
-  transition: border-color var(--lf-transition);
-  user-select: none;
-  touch-action: none;
-  contain: layout style;
+    --lf-role: var(--node-color);
+    background: var(--lf-panel);
+    border: 2px solid var(--lf-badge-border);
+    border-radius: 6px;
+    box-shadow:
+        inset 3px 0 var(--node-color),
+        var(--lf-shadow);
+    contain: layout style;
+    cursor: grab;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    position: absolute;
+    touch-action: none;
+    transition: border-color var(--lf-transition);
+    user-select: none;
+    z-index: 3;
 }
-
-.lf-node-scene { --lf-role: var(--lf-scene); }
-.lf-node-note { --lf-role: var(--lf-note); }
-.lf-node-audio.lf-audio-role-music { --lf-role: var(--lf-music); border-color: #8b5cf680; }
-.lf-node-audio.lf-audio-role-sfx { --lf-role: var(--lf-sfx); border-color: #22d3ee80; }
-
+.lf-node-scene {
+    --lf-role: var(--lf-scene);
+}
+.lf-node-note {
+    --lf-role: var(--lf-note);
+}
+.lf-node-audio.lf-audio-role-music {
+    --lf-role: var(--lf-music);
+    border-color: #8b5cf680;
+}
+.lf-node-audio.lf-audio-role-sfx {
+    --lf-role: var(--lf-sfx);
+    border-color: #22d3ee80;
+}
 .lf-node.dragging {
-  cursor: grabbing;
-  z-index: 7;
-  will-change: transform;
-  transition: none;
+    cursor: grabbing;
+    transition: none;
+    will-change: transform;
+    z-index: 7;
 }
-
-/* Conteúdo interno clippado (thumbnail/título), mantendo o card arredondado. */
 .lf-node-content {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: 4px;
+    border-radius: 4px;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
 }
-
 .lf-node:hover {
-  border-color: var(--lf-muted);
+    border-color: var(--lf-muted);
 }
-
 .lf-node.selected {
-  outline: 2px solid var(--lf-selected);
-  outline-offset: 2px;
-  box-shadow: inset 3px 0 var(--node-color), 0 0 0 1px #ffffff40, var(--lf-shadow-lift);
+    box-shadow:
+        inset 3px 0 var(--node-color),
+        0 0 0 1px #ffffff40,
+        var(--lf-shadow-lift);
+    outline: 2px solid var(--lf-selected);
+    outline-offset: 2px;
 }
-
 .lf-node.target-hi {
-  outline: 3px solid var(--lf-target);
-  outline-offset: 3px;
-  box-shadow: inset 3px 0 var(--node-color), 0 0 16px #ec489966, var(--lf-shadow-lift);
+    box-shadow:
+        inset 3px 0 var(--node-color),
+        0 0 16px #ec489966,
+        var(--lf-shadow-lift);
+    outline: 3px solid var(--lf-target);
+    outline-offset: 3px;
 }
-
 .lf-node.active {
-  box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-active), 0 0 18px #22c55e66, var(--lf-shadow-lift);
+    box-shadow:
+        inset 3px 0 var(--node-color),
+        0 0 0 2px var(--lf-active),
+        0 0 18px #22c55e66,
+        var(--lf-shadow-lift);
 }
-
 .lf-node.navigable {
-  cursor: pointer;
-  box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-navigable), var(--lf-shadow-lift);
+    box-shadow:
+        inset 3px 0 var(--node-color),
+        0 0 0 2px var(--lf-navigable),
+        var(--lf-shadow-lift);
+    cursor: pointer;
 }
-
-/* Ao Vivo: nó de áudio acionável (clique = crossfade da música / dispara SFX;
-   clicar de novo em um que toca = fade out). O aro usa a cor da função. */
 .lf-node.playable {
-  cursor: pointer;
-  box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-role), var(--lf-shadow-lift);
+    box-shadow:
+        inset 3px 0 var(--node-color),
+        0 0 0 2px var(--lf-role),
+        var(--lf-shadow-lift);
+    cursor: pointer;
 }
-
 .lf-node.playable:hover {
-  border-color: var(--lf-role);
+    border-color: var(--lf-role);
 }
-
 .lf-node.playing {
-  box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-role), 0 0 18px color-mix(in srgb, var(--lf-role) 55%, transparent), var(--lf-shadow-lift);
+    box-shadow:
+        inset 3px 0 var(--node-color),
+        0 0 0 2px var(--lf-role),
+        0 0 18px color-mix(in srgb, var(--lf-role) 55%, transparent),
+        var(--lf-shadow-lift);
 }
-
 .lf-node.playing .lf-node-wave i {
-  opacity: 0.95;
+    opacity: 0.95;
 }
-
 .lf-node.active.navigable {
-  box-shadow: inset 3px 0 var(--node-color), 0 0 0 2px var(--lf-active), 0 0 0 5px var(--lf-navigable), 0 0 18px #22c55e66;
+    box-shadow:
+        inset 3px 0 var(--node-color),
+        0 0 0 2px var(--lf-active),
+        0 0 0 5px var(--lf-navigable),
+        0 0 18px #22c55e66;
 }
-
 .lf-node.active.selected,
 .lf-node.navigable.selected {
-  outline: 2px solid var(--lf-selected);
-  outline-offset: 6px;
+    outline: 2px solid var(--lf-selected);
+    outline-offset: 6px;
 }
-
 .lf-node.target-hi,
 .lf-node.target-hi.selected {
-  outline-color: var(--lf-target);
-  outline-offset: 6px;
+    outline-color: var(--lf-target);
+    outline-offset: 6px;
 }
-
-/* Sem filter: grayscale por nó cria uma camada de composição para cada card. */
 .lf-node.dimmed {
-  opacity: 0.38;
-  cursor: default;
+    cursor: default;
+    opacity: 0.38;
 }
-
 .lf-node.dimmed:hover {
-  border-color: var(--lf-badge-border);
+    border-color: var(--lf-badge-border);
 }
-
 .lf-node-head {
-  flex: 0 0 6px;
-  background: var(--lf-role);
+    background: var(--lf-role);
+    flex: 0 0 6px;
 }
-
 .lf-node-thumb {
-  flex: 1 1 auto;
-  min-height: 0;
-  background: var(--lf-ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
+    align-items: center;
+    background: var(--lf-ink);
+    display: flex;
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
 }
-
 .lf-node-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  pointer-events: none;
-  -webkit-user-drag: none;
-  user-select: none;
+    display: block;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    width: 100%;
+    -webkit-user-drag: none;
+    user-select: none;
 }
-
-.lf-node-thumb-ph i,
-.lf-node-thumb .lf-node-thumb-ph {
-  font-size: 26px;
-  color: var(--lf-muted);
-  opacity: 0.5;
+.lf-node-thumb .lf-node-thumb-ph,
+.lf-node-thumb-ph i {
+    color: var(--lf-muted);
+    font-size: 26px;
+    opacity: 0.5;
 }
-
 .lf-node-title {
-  padding: 7px 10px 2px;
-  font-family: var(--lf-font-display);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--lf-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.25;
+    color: var(--lf-text);
+    font-family: var(--lf-font-display);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.25;
+    overflow: hidden;
+    padding: 7px 10px 2px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
-
 .lf-node-tag {
-  padding: 0 10px 7px;
-  font-size: var(--lf-fs-xs);
-  color: var(--lf-muted);
+    color: var(--lf-muted);
+    font-size: var(--lf-fs-xs);
+    padding: 0 10px 7px;
 }
-
 .lf-node-tag i,
 .lf-node-title i {
-  margin-right: 4px;
-  font-size: 11px;
-  opacity: 0.8;
+    font-size: 11px;
+    margin-right: 4px;
+    opacity: 0.8;
 }
-
-/* Cena como quadro de filme: o título entra como lower-third sobre a imagem,
-   e a imagem ganha a altura que antes era gasta numa faixa escura. */
-.lf-node-scene .lf-node-thumb::after {
-  content: "";
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 58%;
-  background: linear-gradient(to top, #0c0c0ff2 0%, #0c0c0fb8 45%, transparent 100%);
-  pointer-events: none;
+.lf-node-scene .lf-node-thumb:after {
+    background: linear-gradient(0deg, #0c0c0ff2, #0c0c0fb8 45%, transparent);
+    content: '';
+    height: 58%;
+    inset: auto 0 0 0;
+    pointer-events: none;
+    position: absolute;
 }
-
-.lf-node-scene .lf-node-title,
-.lf-node-scene .lf-node-tag {
-  position: absolute;
-  left: 0;
-  right: 0;
-  z-index: 1;
-}
-
+.lf-node-scene .lf-node-tag,
 .lf-node-scene .lf-node-title {
-  bottom: 22px;
-  padding-bottom: 0;
-  font-size: 17px;
-  color: #fff;
-  text-shadow: 0 1px 3px #000c;
+    left: 0;
+    position: absolute;
+    right: 0;
+    z-index: 1;
 }
-
+.lf-node-scene .lf-node-title {
+    bottom: 22px;
+    color: #fff;
+    font-size: 17px;
+    padding-bottom: 0;
+    text-shadow: 0 1px 3px #000c;
+}
 .lf-node-scene .lf-node-tag {
-  bottom: 0;
+    bottom: 0;
 }
-
 .lf-node-body {
-  flex: 1 1 auto;
-  padding: 2px 10px 6px;
-  font-size: var(--lf-fs-sm);
-  line-height: 1.4;
-  color: var(--lf-text);
-  opacity: 0.88;
-  white-space: pre-wrap;
-  overflow: hidden;
+    color: var(--lf-text);
+    flex: 1 1 auto;
+    font-size: var(--lf-fs-sm);
+    line-height: 1.4;
+    opacity: 0.88;
+    overflow: hidden;
+    padding: 2px 10px 6px;
+    white-space: pre-wrap;
 }
-
 .lf-node-wave {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 4px 10px 10px;
+    align-items: center;
+    display: flex;
+    flex: 1 1 auto;
+    gap: 3px;
+    padding: 4px 10px 10px;
 }
-
-/* A forma de onda herda a cor da função: violeta = música, ciano = efeito. */
 .lf-node-wave i {
-  flex: 1;
-  height: 26px;
-  background: var(--lf-role);
-  border-radius: 2px;
-  opacity: 0.55;
-  transform: scaleY(0.5);
+    background: var(--lf-role);
+    border-radius: 2px;
+    flex: 1;
+    height: 26px;
+    opacity: 0.55;
+    transform: scaleY(0.5);
 }
-
-.lf-node-wave i:nth-child(even) { transform: scaleY(0.85); }
-.lf-node-wave i:nth-child(3n) { transform: scaleY(0.3); }
-
+.lf-node-wave i:nth-child(2n) {
+    transform: scaleY(0.85);
+}
+.lf-node-wave i:nth-child(3n) {
+    transform: scaleY(0.3);
+}
 .lf-audio-role-badge {
-  display: inline-block;
-  margin-right: 5px;
-  padding: 1px 6px;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  font-weight: 700;
+    border: 1px solid;
+    border-radius: 999px;
+    display: inline-block;
+    font-weight: 700;
+    margin-right: 5px;
+    padding: 1px 6px;
 }
-
-.lf-audio-role-music .lf-audio-role-badge { color: #c4b5fd; }
-.lf-audio-role-sfx .lf-audio-role-badge { color: #67e8f9; }
-
+.lf-audio-role-music .lf-audio-role-badge {
+    color: #c4b5fd;
+}
+.lf-audio-role-sfx .lf-audio-role-badge {
+    color: #67e8f9;
+}
 .lf-badge-live {
-  display: inline-block;
-  margin-right: 5px;
-  padding: 1px 6px;
-  border: 1px solid var(--lf-amber-dim);
-  border-radius: 3px;
-  color: var(--lf-amber);
-  font-size: var(--lf-fs-xs);
+    border: 1px solid var(--lf-amber-dim);
+    border-radius: 3px;
+    color: var(--lf-amber);
+    display: inline-block;
+    font-size: var(--lf-fs-xs);
+    margin-right: 5px;
+    padding: 1px 6px;
 }
-
-/* ── Ports ─────────────────────────────────────────────────────────── */
 .lf-ports {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
 }
-
 .lf-port {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--lf-ink);
-  border: 2px solid var(--lf-badge-border);
-  box-sizing: border-box;
-  pointer-events: auto;
-  cursor: crosshair;
-  opacity: 0.35;
-  z-index: 5;
-  transition: opacity var(--lf-transition), box-shadow var(--lf-transition), transform var(--lf-transition);
+    background: var(--lf-ink);
+    border: 2px solid var(--lf-badge-border);
+    box-sizing: border-box;
+    cursor: crosshair;
+    height: 14px;
+    opacity: 0.35;
+    pointer-events: auto;
+    transition:
+        opacity var(--lf-transition),
+        box-shadow var(--lf-transition),
+        transform var(--lf-transition);
+    width: 14px;
+    z-index: 5;
 }
-
-/* Hit area expandida (mín. ~24px) sem inflar o círculo visual. */
-.lf-port::after {
-  content: "";
-  position: absolute;
-  inset: -9px;
-  border-radius: 50%;
+.lf-port,
+.lf-port:after {
+    border-radius: 50%;
+    position: absolute;
 }
-
-/* Em Edição os ports ficam visíveis: FLOW amarelo/laranja, AUDIO branco/vermelho. */
-.lumenn-frame.graph-editor.editing .lf-port,
-.lf-node:hover .lf-port,
+.lf-port:after {
+    content: '';
+    inset: -9px;
+}
 .lf-node.selected .lf-port,
-.lf-viewport.connect-mode .lf-port {
-  opacity: 1;
+.lf-node:hover .lf-port,
+.lf-viewport.connect-mode .lf-port,
+.lumenn-frame.graph-editor.editing .lf-port {
+    opacity: 1;
 }
-
 .lf-port:hover {
-  transform: scale(1.35);
-  box-shadow: 0 0 8px currentColor;
+    box-shadow: 0 0 8px currentColor;
+    transform: scale(1.35);
 }
-
 .lf-port-in,
 .lf-port-out {
-  border-color: var(--lf-amber);
-  color: var(--lf-amber);
+    border-color: var(--lf-amber);
+    color: var(--lf-amber);
 }
-
-.lf-port-flow-in { border-color: var(--lf-flow-in); color: var(--lf-flow-in); }
-.lf-port-flow-out { border-color: var(--lf-flow-out); color: var(--lf-flow-out); }
-
+.lf-port-flow-in {
+    border-color: var(--lf-flow-in);
+    color: var(--lf-flow-in);
+}
+.lf-port-flow-out {
+    border-color: var(--lf-flow-out);
+    color: var(--lf-flow-out);
+}
 .lf-port-audio {
-  border-color: var(--lf-input);
-  color: var(--lf-input);
-  width: 12px;
-  height: 12px;
+    border-color: var(--lf-input);
+    color: var(--lf-input);
+    height: 12px;
+    width: 12px;
 }
-
 .lf-node-audio .lf-port-in,
 .lf-node-scene .lf-port-audio {
-  border-color: var(--lf-input);
-  color: var(--lf-input);
-  box-shadow: 0 0 0 2px #ffffff20;
+    border-color: var(--lf-input);
+    box-shadow: 0 0 0 2px #ffffff20;
+    color: var(--lf-input);
 }
-
 .lf-node-audio .lf-port-out {
-  border-color: var(--lf-output);
-  color: var(--lf-output);
-  box-shadow: 0 0 0 2px #ef444420;
+    border-color: var(--lf-output);
+    box-shadow: 0 0 0 2px #ef444420;
+    color: var(--lf-output);
 }
-
-.lf-port-audio:hover,
-.lf-node-audio .lf-port-audio:hover {
-  box-shadow: 0 0 0 4px currentColor, 0 0 12px currentColor;
+.lf-node-audio .lf-port-audio:hover,
+.lf-port-audio:hover {
+    box-shadow:
+        0 0 0 4px currentColor,
+        0 0 12px currentColor;
 }
-
-.lf-port-in { left: -7px; top: 30%; }
-.lf-port-out { right: -7px; top: 30%; }
-.lf-node-audio .lf-port-out { left: auto; right: -7px; top: 62%; }
-.lf-port-audio { left: -7px; top: 62%; }
-
-/* ── Empty state ───────────────────────────────────────────────────── */
+.lf-port-in {
+    left: -7px;
+    top: 30%;
+}
+.lf-port-out {
+    right: -7px;
+    top: 30%;
+}
+.lf-node-audio .lf-port-out {
+    left: auto;
+    right: -7px;
+    top: 62%;
+}
+.lf-port-audio {
+    left: -7px;
+    top: 62%;
+}
 .lf-empty-state {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: var(--lf-muted);
-  gap: 8px;
-  pointer-events: none;
-  z-index: 5;
+    align-items: center;
+    color: var(--lf-muted);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    inset: 0;
+    justify-content: center;
+    pointer-events: none;
+    position: absolute;
+    text-align: center;
+    z-index: 5;
 }
-
-.lf-empty-state .lf-empty-icon,
-.lf-empty-icon i {
-  font-size: 32px;
-  opacity: 0.3;
+.lf-empty-icon i,
+.lf-empty-state .lf-empty-icon {
+    font-size: 32px;
+    opacity: 0.3;
 }
-
 .lf-empty-state .lf-empty-title {
-  font-family: var(--lf-font-display);
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--lf-text);
-  opacity: 0.8;
+    color: var(--lf-text);
+    font-family: var(--lf-font-display);
+    font-size: 18px;
+    font-weight: 600;
+    opacity: 0.8;
 }
-
 .lf-empty-state .lf-empty-hint {
-  font-size: var(--lf-fs-md);
-  max-width: 340px;
-  line-height: 1.45;
+    font-size: var(--lf-fs-md);
+    line-height: 1.45;
+    max-width: 340px;
 }
-
-/* ── Inspector ─────────────────────────────────────────────────────── */
 .lf-inspector {
-  flex: 0 1 340px;
-  width: 340px;
-  min-width: 320px;
-  min-height: 0;
-  padding: 12px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: var(--lf-badge-border) transparent;
-  background: var(--lf-panel);
-  border-left: 1px solid var(--lf-hairline);
-  z-index: 60;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+    background: var(--lf-panel);
+    border-left: 1px solid var(--lf-hairline);
+    display: flex;
+    flex: 0 1 340px;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+    min-width: 320px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 12px;
+    scrollbar-color: var(--lf-badge-border) transparent;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    width: 340px;
+    z-index: 60;
 }
-
 .lf-insp-title {
-  font-family: var(--lf-font-display);
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--lf-amber);
-  margin: 4px 0 6px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--lf-hairline);
+    border-bottom: 1px solid var(--lf-hairline);
+    color: var(--lf-amber);
+    font-family: var(--lf-font-display);
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin: 4px 0 6px;
+    padding-bottom: 8px;
 }
-
-/* Cada título depois do primeiro abre uma seção nova com respiro. */
 .lf-insp-title:not(:first-child) {
-  margin-top: 14px;
+    margin-top: 14px;
 }
-
 .lf-insp-label {
-  margin-top: 6px;
-  font-size: var(--lf-fs-sm);
-  font-weight: 500;
-  color: var(--lf-muted);
+    color: var(--lf-muted);
+    font-size: var(--lf-fs-sm);
+    font-weight: 500;
+    margin-top: 6px;
 }
-
 .lf-insp-label.lf-insp-check {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--lf-text);
-  font-size: var(--lf-fs-md);
+    align-items: center;
+    color: var(--lf-text);
+    display: flex;
+    font-size: var(--lf-fs-md);
+    gap: 7px;
 }
-
-.lf-inspector :is(select, input[type="text"], input[type="number"], textarea) {
-  width: 100%;
-  min-height: var(--lf-control-h);
-  padding: 4px 8px;
-  border: 1px solid var(--lf-badge-border);
-  border-radius: var(--lf-radius);
-  background: var(--lf-badge);
-  color: var(--lf-text);
-  font-family: var(--lf-font-body);
-  font-size: var(--lf-fs-md);
-  box-sizing: border-box;
-  transition: border-color var(--lf-transition);
+.lf-inspector :is(select, input[type='text'], input[type='number'], textarea) {
+    background: var(--lf-badge);
+    border: 1px solid var(--lf-badge-border);
+    border-radius: var(--lf-radius);
+    box-sizing: border-box;
+    color: var(--lf-text);
+    font-family: var(--lf-font-body);
+    font-size: var(--lf-fs-md);
+    min-height: var(--lf-control-h);
+    padding: 4px 8px;
+    transition: border-color var(--lf-transition);
+    width: 100%;
 }
-
 .lf-inspector :is(select, input, textarea):hover {
-  border-color: var(--lf-muted);
+    border-color: var(--lf-muted);
 }
-
 .lf-inspector :is(select, input, textarea):focus {
-  border-color: var(--lf-amber);
+    border-color: var(--lf-amber);
 }
-
-.lf-inspector input[type="color"] {
-  width: 100%;
-  height: var(--lf-control-h);
-  padding: 2px;
-  border: 1px solid var(--lf-badge-border);
-  border-radius: var(--lf-radius);
-  background: var(--lf-badge);
-  cursor: pointer;
+.lf-inspector input[type='color'] {
+    background: var(--lf-badge);
+    border: 1px solid var(--lf-badge-border);
+    border-radius: var(--lf-radius);
+    cursor: pointer;
+    height: var(--lf-control-h);
+    padding: 2px;
+    width: 100%;
 }
-
-.lf-inspector input[type="range"],
-.lf-inspector input[type="checkbox"] {
-  accent-color: var(--lf-amber);
+.lf-inspector input[type='checkbox'],
+.lf-inspector input[type='range'] {
+    accent-color: var(--lf-amber);
 }
-
-.lf-inspector input[type="range"] {
-  width: 100%;
+.lf-inspector input[type='range'] {
+    width: 100%;
 }
-
 .lf-inspector :disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+    cursor: not-allowed;
+    opacity: 0.5;
 }
-
 .lf-insp-p {
-  margin: 0;
-  font-size: var(--lf-fs-md);
-  color: var(--lf-text);
-  opacity: 0.88;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
+    color: var(--lf-text);
+    font-size: var(--lf-fs-md);
+    line-height: 1.45;
+    margin: 0;
+    opacity: 0.88;
+    overflow-wrap: anywhere;
 }
-
 .lf-audio-routing-note {
-  border-left: 2px solid var(--lf-output);
-  padding-left: 8px;
-  color: #f3f4f6;
+    border-left: 2px solid var(--lf-output);
+    color: #f3f4f6;
+    padding-left: 8px;
 }
-
 .lf-insp-edges {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  max-height: 160px;
-  overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    list-style: none;
+    margin: 0;
+    max-height: 160px;
+    overflow-y: auto;
+    padding: 0;
 }
-
 .lf-insp-edges li {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 26px;
-  font-size: var(--lf-fs-sm);
-  color: var(--lf-text);
-  background: var(--lf-badge);
-  border: 1px solid var(--lf-badge-border);
-  border-radius: 3px;
-  padding: 2px 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    align-items: center;
+    background: var(--lf-badge);
+    border: 1px solid var(--lf-badge-border);
+    border-radius: 3px;
+    color: var(--lf-text);
+    display: flex;
+    font-size: var(--lf-fs-sm);
+    gap: 4px;
+    min-height: 26px;
+    overflow: hidden;
+    padding: 2px 6px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
-
 .lf-insp-edge-dir {
-  color: var(--lf-muted);
-  flex: 0 0 auto;
+    color: var(--lf-muted);
+    flex: 0 0 auto;
 }
-
 .lf-insp-edge-open {
-  min-width: 0;
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  overflow: hidden;
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    display: flex;
+    flex: 1 1 auto;
+    font: inherit;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0;
+    text-align: left;
 }
-
 .lf-insp-edge-open span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-
 .lf-insp-edge-open:hover {
-  color: var(--lf-amber);
+    color: var(--lf-amber);
 }
-
 .lf-insp-x {
-  flex: 0 0 auto;
-  margin-left: auto;
-  padding: 2px 4px;
-  border: none;
-  background: transparent;
-  color: var(--lf-muted);
-  cursor: pointer;
-  font-size: var(--lf-fs-xs);
-  line-height: 1;
+    background: transparent;
+    border: none;
+    color: var(--lf-muted);
+    cursor: pointer;
+    flex: 0 0 auto;
+    font-size: var(--lf-fs-xs);
+    line-height: 1;
+    margin-left: auto;
+    padding: 2px 4px;
 }
-
 .lf-insp-x:hover {
-  color: var(--lf-danger);
+    color: var(--lf-danger);
 }
-
 .lf-swatches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
 }
-
 .lf-swatch {
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: transform var(--lf-transition), border-color var(--lf-transition);
+    border: 2px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    height: 22px;
+    transition:
+        transform var(--lf-transition),
+        border-color var(--lf-transition);
+    width: 22px;
 }
-
 .lf-swatch:hover {
-  transform: scale(1.15);
-  border-color: #ffffff80;
+    border-color: #ffffff80;
+    transform: scale(1.15);
 }
-
-/* Hierarquia dos botões: ação única = âmbar cheio; ação ao lado de outra =
-   contorno; destrutiva = vermelho. Antes tudo era âmbar cheio. */
 .lf-insp-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
 }
-
 .lf-insp-actions button {
-  flex: 1 1 auto;
-  min-height: 30px;
-  font-family: var(--lf-font-body);
-  font-size: var(--lf-fs-sm);
-  font-weight: 600;
-  padding: 4px 12px;
-  border: 1px solid var(--lf-amber-dim);
-  border-radius: var(--lf-radius);
-  background: transparent;
-  color: var(--lf-amber);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background var(--lf-transition), color var(--lf-transition);
+    background: transparent;
+    border: 1px solid var(--lf-amber-dim);
+    border-radius: var(--lf-radius);
+    color: var(--lf-amber);
+    cursor: pointer;
+    flex: 1 1 auto;
+    font-family: var(--lf-font-body);
+    font-size: var(--lf-fs-sm);
+    font-weight: 600;
+    min-height: 30px;
+    padding: 4px 12px;
+    transition:
+        background var(--lf-transition),
+        color var(--lf-transition);
+    white-space: nowrap;
 }
-
 .lf-insp-actions button:hover {
-  background: #f0a32126;
+    background: #f0a32126;
 }
-
 .lf-insp-actions button:only-child {
-  background: var(--lf-amber);
-  color: var(--lf-ink);
+    background: var(--lf-amber);
+    color: var(--lf-ink);
 }
-
 .lf-insp-actions button:only-child:hover {
-  background: #d9931e;
+    background: #d9931e;
 }
-
 .lf-insp-actions button.danger {
-  background: var(--lf-danger-solid);
-  border-color: var(--lf-danger-solid);
-  color: #fff;
+    background: var(--lf-danger-solid);
+    border-color: var(--lf-danger-solid);
+    color: #fff;
 }
-
 .lf-insp-actions button.danger:hover {
-  background: #a8353e;
+    background: #a8353e;
 }
-
 .lf-insp-actions button:disabled {
-  opacity: 0.5;
-  cursor: default;
+    cursor: default;
+    opacity: 0.5;
 }
-
 .lf-live-edit-note {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 10px;
-  padding: 7px 8px;
-  border: 1px solid var(--lf-teal-dim);
-  border-radius: var(--lf-radius);
-  background: #0d2a2b;
-  color: var(--lf-teal);
+    align-items: center;
+    background: #0d2a2b;
+    border: 1px solid var(--lf-teal-dim);
+    border-radius: var(--lf-radius);
+    color: var(--lf-teal);
+    display: flex;
+    gap: 6px;
+    margin: 0 0 10px;
+    padding: 7px 8px;
 }
-
-/* Selo native / fallback de transição */
 .lf-insp-native {
-  float: right;
-  margin-top: 4px;
-  font-family: var(--lf-font-body);
-  font-size: var(--lf-fs-xs);
-  font-weight: 600;
-  letter-spacing: 0;
-  color: var(--lf-teal);
-  border: 1px solid var(--lf-teal-dim);
-  border-radius: 3px;
-  padding: 1px 6px;
+    border: 1px solid var(--lf-teal-dim);
+    border-radius: 3px;
+    color: var(--lf-teal);
+    float: right;
+    font-family: var(--lf-font-body);
+    font-size: var(--lf-fs-xs);
+    font-weight: 600;
+    letter-spacing: 0;
+    margin-top: 4px;
+    padding: 1px 6px;
 }
-
-/* ── Responsivo ────────────────────────────────────────────────────── */
 @media (max-width: 1100px) {
-  .lf-inspector {
-    flex-basis: 320px;
-    width: 320px;
-    min-width: 300px;
-  }
-
-  .lf-toolbar-left {
-    width: 48px;
-    flex-basis: 48px;
-  }
-
-  .lf-tool {
-    width: 38px;
-    height: 38px;
-    font-size: 17px;
-  }
+    .lf-inspector {
+        flex-basis: 320px;
+        min-width: 300px;
+        width: 320px;
+    }
+    .lf-toolbar-left {
+        flex-basis: 48px;
+        width: 48px;
+    }
+    .lf-tool {
+        font-size: 17px;
+        height: 38px;
+        width: 38px;
+    }
 }
-
-/* ── Animações / scrollbar ─────────────────────────────────────────── */
 @keyframes lf-fadeIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
 }
-
 @keyframes lf-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.35; transform: scale(0.7); }
+    0%,
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.35;
+        transform: scale(0.7);
+    }
 }
-
 @media (prefers-reduced-motion: reduce) {
-  .lumenn-frame *,
-  .lumenn-frame *::before,
-  .lumenn-frame *::after {
-    animation: none !important;
-    transition: none !important;
-  }
+    .lumenn-frame *,
+    .lumenn-frame :after,
+    .lumenn-frame :before {
+        animation: none !important;
+        transition: none !important;
+    }
 }
-
-.lf-inspector::-webkit-scrollbar { width: 6px; }
-.lf-inspector::-webkit-scrollbar-track { background: transparent; }
-.lf-inspector::-webkit-scrollbar-thumb { background: var(--lf-badge-border); border-radius: 3px; }
+.lf-inspector::-webkit-scrollbar {
+    width: 6px;
+}
+.lf-inspector::-webkit-scrollbar-track {
+    background: transparent;
+}
+.lf-inspector::-webkit-scrollbar-thumb {
+    background: var(--lf-badge-border);
+    border-radius: 3px;
+}

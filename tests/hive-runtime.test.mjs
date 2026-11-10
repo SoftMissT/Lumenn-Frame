@@ -67,10 +67,14 @@ test('trilha empilha, atualiza a sala ativa e desempilha sem mutar a original', 
         graphId: 'school',
         activeNodeId: 'gate',
         viaPortId: 'in',
+        refNodeId: 'ref',
+        fromNodeId: 'outside',
     });
     const moved = setNavigationNode(nested, 'school', 'gym');
     const popped = popNavigationLevel(moved);
     assert.equal(currentNavigationLevel(moved).activeNodeId, 'gym');
+    assert.equal(currentNavigationLevel(moved).refNodeId, 'ref');
+    assert.equal(currentNavigationLevel(moved).fromNodeId, 'outside');
     assert.equal(popped.level.graphId, 'school');
     assert.deepEqual(popped.trail, root);
     assert.equal(currentNavigationLevel(root).activeNodeId, 'outside');

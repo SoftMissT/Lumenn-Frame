@@ -22,6 +22,32 @@ import {
 } from "./graph-viewport.mjs";
 import { openLumennGuide } from "./guide-journal.mjs";
 import {
+	createNavigationTrail,
+	popNavigationLevel,
+	pushNavigationLevel,
+	setNavigationNode,
+	validateHiveExport
+} from "./hive-runtime.mjs";
+import {
+	FILM_EFFECTS,
+	FILM_PREFIX,
+	filmCutPoint,
+	filmEffectOf,
+	filmPreview,
+	waitPlayersReady
+} from "./film-transitions.mjs";
+import {
+	buildHiveExport,
+	DEFAULT_HIVE_TRANSITIONS,
+	normalizeHiveTransition,
+	resolveHiveExitEdge,
+	HIVE_EXPORT_FORMAT,
+	hiveEntryPort,
+	hiveExitPortsAt,
+	listHivePending,
+	planHiveImport
+} from "./hive-io.mjs";
+import {
 	childrenOf,
 	effectiveEndpoint,
 	GROUP_PADDING,
@@ -58,6 +84,16 @@ const NODE_SIZES = {
 		compact: [280, 180],
 		normal: [360, 240],
 		large: [460, 300]
+	},
+	"hive-ref": {
+		compact: [230, 160],
+		normal: [320, 215],
+		large: [400, 260]
+	},
+	encounter: {
+		compact: [210, 120],
+		normal: [270, 150],
+		large: [340, 190]
 	}
 };
 const COLORS = ["#f0a321", "#2dd4bf", "#e45656", "#7aa2f7", "#bb9af7", "#9ece6a", "#73707c", "#ffffff"];
@@ -123,6 +159,14 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 	#tool = "select";
 	#collapsedGroups = new Set();
 	#lockedGroups = new Set();
+	#trail = [];
+	#editStack = [];
+	#history = [];
+	#future = [];
+	#browserOpen = false;
+	#browserFilter = "all";
+	#cameraFadeIn = false;
+	#fitPending = false;
 	#groupDragOverrides = null;
 	#camera = {
 		panX: 0,
@@ -174,6 +218,11 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		this.#camera.zoom = clampGraphZoom(LumennSettings.getCameraDefaults().zoom);
 		document.addEventListener("keydown", e => {
 			if (e.key === "Escape") {
+				if (this.#browserOpen) {
+					this.#browserOpen = false;
+					this.render();
+					return
+				}
 				if (this.#previewing) {
 					canvas.transition?.cancel?.();
 					e.preventDefault();
@@ -211,6 +260,60 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 	#editable() {
 		return this.#mode === "edit" && LumennCompat.isGM()
 	}
+	/** Storyboard exibido; dentro de uma Hive no Ao Vivo, o nó ativo vem da trilha, nunca da Hive. */
+	#graph() {
+		return this.#overlay(LumennGraphStore.getGraph(this.#graphId))
+	}
+	#hiveLevel(graphId = this.#graphId) {
+		if (this.#mode !== "live" || this.#trail.length < 2) return null;
+		const last = this.#trail.at(-1);
+		return last.graphId === graphId ? last : null
+	}
+	#overlay(graph) {
+		const level = graph ? this.#hiveLevel(graph.id) : null;
+		return level ? {
+			...graph,
+			activeNodeId: level.activeNodeId
+		} : graph
+	}
+	#resetTrail() {
+		this.#trail = []
+	}
+	/** Garante uma trilha coerente com o storyboard exibido (Ao Vivo). */
+	#syncTrail() {
+		const ids = this.#trail.map(level => level.graphId);
+		if (!this.#trail.length || !ids.includes(this.#graphId)) {
+			const root = LumennGraphStore.getGraph(this.#graphId);
+			let trail = createNavigationTrail(this.#graphId, root?.activeNodeId ?? null);
+			if (root) for (const level of LumennGraphStore.getLiveTrail(root.id)) {
+				if (!LumennGraphStore.getGraph(level.graphId)?.isHive) {
+					ui.notifications.warn(game.i18n.localize("LUMENN_FRAME.Warn.HiveGone"));
+					break
+				}
+				trail = pushNavigationLevel(trail, level)
+			}
+			this.#trail = trail
+		}
+		const valid = [this.#trail[0]];
+		for (const level of this.#trail.slice(1)) {
+			if (!LumennGraphStore.getGraph(level.graphId)?.isHive) break;
+			valid.push(level)
+		}
+		if (valid.length !== this.#trail.length) {
+			ui.notifications.warn(game.i18n.localize("LUMENN_FRAME.Warn.HiveGone"));
+			this.#trail = valid;
+			this.#saveTrail()
+		}
+		const last = this.#trail.at(-1);
+		if (last && last.graphId !== this.#graphId) {
+			this.#graphId = last.graphId;
+			this.#fitPending = true
+		}
+	}
+	async #saveTrail() {
+		if (!LumennCompat.isGM() || !this.#trail.length) return;
+		await LumennGraphStore.setLiveTrail(this.#trail[0].graphId, this.#trail.slice(1))
+	}
 	#canEditLiveAudio() {
 		if (this.#mode !== "live" || !LumennCompat.isGM()) return false;
 		if (this.#selected.kind !== "edge") return false;
@@ -246,6 +349,8 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		event.preventDefault();
 		this.element.querySelector(".lf-viewport")?.classList.remove("drag-over");
 		if (!this.#editable()) return;
+		const hiveId = event.dataTransfer?.getData("application/x-lumenn-hive");
+		if (hiveId) return this.#insertHive(hiveId, this.#clientToCanvas(event, this.element.querySelector(".lf-viewport")));
 		const data = LumennCompat.getDragData(event);
 		const doc = await LumennCompat.resolveUuid(data?.uuid);
 		if (!doc) return;
@@ -255,7 +360,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		if (dropNode?.dataset?.id) return this.#attachDrop(dropNode.dataset.id, doc);
 		const items = this.#resolveDropItems(doc);
 		if (!items.length) return;
-		const graph = LumennGraphStore.getGraph(this.#graphId);
+		const graph = this.#graph();
 		const imp = LumennSettings.getImportDefaults();
 		const created = [];
 		for (let i = 0; i < items.length; i++) {
@@ -298,7 +403,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 	#attachDrop(nodeId, doc) {
 		const node = LumennGraphStore.getNode(this.#graphId, nodeId);
 		if (!node) return;
-		if (node.type === "group") {
+		if (node.type === "group" || node.type === "hive-ref" || node.type === "encounter") {
 			ui.notifications.warn(game.i18n.localize("LUMENN_FRAME.Group.DropUnsupported"));
 			return
 		}
@@ -453,7 +558,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 	#fitAll(root) {
 		const viewport = root.querySelector(".lf-viewport");
 		if (!viewport) return;
-		const graph = LumennGraphStore.getGraph(this.#graphId);
+		const graph = this.#graph();
 		const nodes = graph?.nodes ?? [];
 		if (!nodes.length) {
 			this.#camera.panX = 0;
@@ -501,8 +606,13 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			await LumennGraphStore.createGraph()
 		}
 		const graphs = LumennGraphStore.getAll();
-		const activeGraph = graphs.find(g => g.id === this.#graphId) ?? graphs[0] ?? null;
+		let activeGraph = graphs.find(g => g.id === this.#graphId) ?? graphs[0] ?? null;
 		if (activeGraph) this.#graphId = activeGraph.id;
+		if (this.#mode === "live" && activeGraph) {
+			this.#syncTrail();
+			activeGraph = graphs.find(g => g.id === this.#graphId) ?? activeGraph
+		}
+		activeGraph = this.#overlay(activeGraph);
 		const L = k => game.i18n.localize(k);
 		const navigable = this.#navigableSet(activeGraph);
 		const defaultColors = LumennGraphStore.getDefaultColors();
@@ -518,8 +628,9 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				x: bounds.x,
 				y: bounds.y
 			} : n.position;
-			const audioSource = this.#audioSourceOf(n);
-			const playable = n.type !== "group" && this.#mode === "live" && LumennCompat.isGM() && !!audioSource;
+			const audioSource = n.type === "encounter" ? this.#audioSourcesFor(activeGraph, n.id)[0] ?? null : this.#audioSourceOf(n);
+			const encounterHere = n.type !== "encounter" || !n.data?.sceneNodeId || n.data.sceneNodeId === activeGraph.activeNodeId;
+			const playable = n.type !== "group" && this.#mode === "live" && LumennCompat.isGM() && !!audioSource && encounterHere;
 			const groupActive = kids.some(k => k.id === activeGraph.activeNodeId);
 			const groupNavigable = kids.some(k => navigable.has(k.id));
 			const out = {
@@ -551,9 +662,44 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				out.audioBadge = label.badge;
 				out.audioRole = n.data?.audioRole === "sfx" ? "sfx" : "music";
 				out.audioRoleLabel = out.audioRole === "sfx" ? L("LUMENN_FRAME.AudioRole.Sfx") : L("LUMENN_FRAME.AudioRole.Music")
+			} else if (n.type === "hive-ref") {
+				const hive = LumennGraphStore.getGraph(n.data?.graphId);
+				const rooms = (hive?.nodes ?? []).filter(room => room.type === "scene");
+				const cover = rooms.map(room => room.data?.sceneId ? game.scenes.get(room.data.sceneId) : null).find(Boolean);
+				out.hiveName = hive?.isHive ? hive.name : L("LUMENN_FRAME.Hive.Missing");
+				out.hiveMissing = !hive?.isHive;
+				out.hiveRooms = rooms.length;
+				out.hiveThumb = cover?.thumbnail ?? cover?.background?.src ?? null;
+				out.hivePortName = (hive ? hiveEntryPort(hive, n.data?.portId)?.name : "") || L("LUMENN_FRAME.Hive.AutoPort")
+			} else if (n.type === "encounter") {
+				const kind = ["combat", "event", "npc"].includes(n.data?.encounterType) ? n.data.encounterType : "event";
+				out.encTitle = n.data?.title || L("LUMENN_FRAME.Encounter.Default");
+				out.encTypeLabel = L(`LUMENN_FRAME.Encounter.${kind}`)
 			}
 			return out
 		});
+		const hiveLevel = this.#hiveLevel(activeGraph?.id);
+		const trail = hiveLevel ? {
+			crumbs: this.#trail.map(level => ({
+				name: LumennGraphStore.getGraph(level.graphId)?.name ?? "?"
+			})),
+			canExit: LumennCompat.isGM(),
+			exitPorts: hiveExitPortsAt(activeGraph, activeGraph.activeNodeId).map(port => ({
+				id: port.id,
+				name: port.name || L("LUMENN_FRAME.Hive.PortDefaultName")
+			}))
+		} : null;
+		const editTrail = this.#mode === "edit" && this.#editStack.length ? {
+			crumbs: [...this.#editStack, activeGraph?.id].map(id => ({
+				name: LumennGraphStore.getGraph(id)?.name ?? "?"
+			})),
+			back: LumennGraphStore.getGraph(this.#editStack.at(-1))?.name ?? ""
+		} : null;
+		const library = LumennGraphStore.getHives().filter(h => h.id !== activeGraph?.id).map(h => ({
+			id: h.id,
+			name: h.name,
+			rooms: (h.nodes ?? []).filter(n => n.type === "scene").length
+		}));
 		const inspector = this.#buildInspector(activeGraph);
 		let connectHint = null;
 		if (this.#editable() && this.#connectState) {
@@ -562,8 +708,19 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			connectHint = L("LUMENN_FRAME.Connect.HintIdle")
 		}
 		return {
-			graphs,
+			graphs: graphs.map(g => ({
+				id: g.id,
+				name: g.name,
+				isHive: g.isHive === true
+			})),
 			activeGraph,
+			isHiveGraph: activeGraph?.isHive === true,
+			browser: this.#browserView(graphs, activeGraph?.id),
+			canBack: this.#history.length > 0,
+			canForward: this.#future.length > 0,
+			trail,
+			editTrail,
+			library,
 			nodes,
 			edgeCount: activeGraph?.edges?.length ?? 0,
 			mode: this.#mode,
@@ -595,6 +752,73 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				addAudio: L("LUMENN_FRAME.Tool.AddAudio"),
 				addNote: L("LUMENN_FRAME.Tool.AddNote"),
 				addGroup: L("LUMENN_FRAME.Tool.AddGroup"),
+				addEncounter: L("LUMENN_FRAME.Tool.AddEncounter"),
+				curve: L("LUMENN_FRAME.Inspector.Curve"),
+				preview: L("LUMENN_FRAME.Inspector.Preview"),
+				v14Native: L("LUMENN_FRAME.Inspector.Native"),
+				fallbackMode: L("LUMENN_FRAME.Inspector.FallbackMode"),
+				hiveBadge: L("LUMENN_FRAME.Hive.Badge"),
+				hiveSection: L("LUMENN_FRAME.Hive.Section"),
+				hiveMark: L("LUMENN_FRAME.Hive.Mark"),
+				hiveUnmark: L("LUMENN_FRAME.Hive.Unmark"),
+				hiveIntro: L("LUMENN_FRAME.Hive.Intro"),
+				hivePorts: L("LUMENN_FRAME.Hive.Ports"),
+				hivePortAdd: L("LUMENN_FRAME.Hive.PortAdd"),
+				hivePortRemove: L("LUMENN_FRAME.Hive.PortRemove"),
+				hivePortName: L("LUMENN_FRAME.Hive.PortName"),
+				hivePortEntry: L("LUMENN_FRAME.Hive.PortEntry"),
+				hivePortExit: L("LUMENN_FRAME.Hive.PortExit"),
+				hivePortNoRoom: L("LUMENN_FRAME.Hive.PortNoRoom"),
+				hiveTransition: L("LUMENN_FRAME.Hive.Transition"),
+				hiveTransitionUse: L("LUMENN_FRAME.Hive.TransitionUse"),
+				hiveTransitionAudio: L("LUMENN_FRAME.Hive.TransitionAudio"),
+				hiveLibrary: L("LUMENN_FRAME.Hive.Library"),
+				hiveLibraryEmpty: L("LUMENN_FRAME.Hive.LibraryEmpty"),
+				hiveInsert: L("LUMENN_FRAME.Hive.Insert"),
+				hiveOpen: L("LUMENN_FRAME.Hive.Open"),
+				hiveExport: L("LUMENN_FRAME.Hive.Export"),
+				hiveImport: L("LUMENN_FRAME.Hive.Import"),
+				hivePending: L("LUMENN_FRAME.Hive.Pending"),
+				hivePendingHint: L("LUMENN_FRAME.Hive.PendingHint"),
+				hiveRelink: L("LUMENN_FRAME.Hive.Relink"),
+				hiveUsedIn: L("LUMENN_FRAME.Hive.UsedIn"),
+				hiveTarget: L("LUMENN_FRAME.Hive.Target"),
+				hiveEntryPort: L("LUMENN_FRAME.Hive.EntryPort"),
+				hiveRooms: L("LUMENN_FRAME.Hive.Rooms"),
+				hiveNoneSelected: L("LUMENN_FRAME.Hive.NoneSelected"),
+				hiveExitHint: L("LUMENN_FRAME.Hive.ExitHint"),
+				trailLabel: L("LUMENN_FRAME.Trail.Label"),
+				trailExit: L("LUMENN_FRAME.Trail.Exit"),
+				trailExitVia: L("LUMENN_FRAME.Trail.ExitVia"),
+				encType: L("LUMENN_FRAME.Encounter.Type"),
+				encRoom: L("LUMENN_FRAME.Encounter.Room"),
+				encAnyRoom: L("LUMENN_FRAME.Encounter.AnyRoom"),
+				groupToHive: L("LUMENN_FRAME.Group.ToHive"),
+				groupToHiveHint: L("LUMENN_FRAME.Group.ToHiveHint"),
+				hiveEnter: L("LUMENN_FRAME.Hive.Enter"),
+				editBack: L("LUMENN_FRAME.Hive.EditBack"),
+				hiveEntryStyle: L("LUMENN_FRAME.Hive.EntryStyle"),
+				hiveExitTransition: L("LUMENN_FRAME.Hive.ExitTransition"),
+				hiveStyleScene: L("LUMENN_FRAME.Hive.StyleScene"),
+				hiveStyleCutscene: L("LUMENN_FRAME.Hive.StyleCutscene"),
+				hiveCaption: L("LUMENN_FRAME.Hive.Caption"),
+				legend: L("LUMENN_FRAME.Legend.Title"),
+				filmMusic: L("LUMENN_FRAME.Film.MusicLabel"),
+				filmVideoFile: L("LUMENN_FRAME.Film.VideoFile"),
+				filmCutAt: L("LUMENN_FRAME.Film.CutAt"),
+				filmVideoSound: L("LUMENN_FRAME.Film.VideoSound"),
+				filmVideoHint: L("LUMENN_FRAME.Film.VideoHint"),
+				filmPlayersOnly: L("LUMENN_FRAME.Film.PlayersOnly"),
+				browse: L("LUMENN_FRAME.Browser.Open"),
+				browserTitle: L("LUMENN_FRAME.Browser.Title"),
+				browserAll: L("LUMENN_FRAME.Browser.All"),
+				browserStoryboards: L("LUMENN_FRAME.Browser.Storyboards"),
+				browserHives: L("LUMENN_FRAME.Browser.Hives"),
+				browserCurrent: L("LUMENN_FRAME.Browser.Current"),
+				browserScenes: L("LUMENN_FRAME.Browser.Scenes"),
+				historyBack: L("LUMENN_FRAME.Browser.Back"),
+				historyForward: L("LUMENN_FRAME.Browser.Forward"),
+				encHint: L("LUMENN_FRAME.Encounter.Hint"),
 				graph: L("LUMENN_FRAME.Inspector.Graph"),
 				scene: L("LUMENN_FRAME.Inspector.Scene"),
 				audio: L("LUMENN_FRAME.Inspector.Audio"),
@@ -730,6 +954,11 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			else this.#lockedGroups.add(groupId);
 			this.render()
 		}));
+		root.querySelectorAll("[data-hive-field]").forEach(el => el.addEventListener("change", e => this.#hiveFieldChange(e)));
+		root.querySelectorAll("[data-hive-drag]").forEach(el => el.addEventListener("dragstart", e => {
+			e.dataTransfer.setData("application/x-lumenn-hive", el.dataset.hiveDrag);
+			e.dataTransfer.effectAllowed = "copy"
+		}));
 		root.querySelectorAll("[data-tool]").forEach(el => el.addEventListener("click", e => {
 			const tool = e.currentTarget.dataset.tool;
 			this.#tool = tool;
@@ -742,6 +971,8 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		const selector = root.querySelector("select[data-graph-selector]");
 		selector?.addEventListener("change", e => {
 			this.#graphId = e.target.value;
+			this.#resetTrail();
+			this.#editStack = [];
 			this.#collapsedGroups.clear();
 			this.#lockedGroups.clear();
 			this.#selected = {
@@ -766,6 +997,19 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		root.querySelectorAll(".lf-node").forEach(node => node.addEventListener("click", e => this.#nodeClick(e)));
 		root.querySelector(".lf-edges")?.addEventListener("click", e => this.#edgeClick(e));
 		root.classList.toggle("editing", this.#mode === "edit");
+		if (this.#fitPending) {
+			this.#fitPending = false;
+			this.#fitAll(root)
+		}
+		if (this.#cameraFadeIn) {
+			this.#cameraFadeIn = false;
+			root.querySelector(".lf-camera")?.classList.add("lf-camera-in")
+		}
+		root.querySelectorAll("[data-hive-enter]").forEach(el => el.addEventListener("click", e => {
+			e.preventDefault();
+			e.stopPropagation();
+			this.#hiveEnterButton(el.dataset.hiveEnter)
+		}));
 		if (!this._workspaceAuto && LumennSettings.get("openInWorkspace") && !this.#expanded) {
 			this._workspaceAuto = true;
 			this.#toggleWorkspace(root)
@@ -790,7 +1034,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			node.setPointerCapture(e.pointerId);
 			const viewport = root.querySelector(".lf-viewport");
 			const viewportRect = viewport.getBoundingClientRect();
-			const graphSnapshot = LumennGraphStore.getGraph(this.#graphId);
+			const graphSnapshot = this.#graph();
 			const beat = graphSnapshot?.nodes?.find(candidate => candidate.id === node.dataset.id);
 			const isGroup = beat?.type === "group";
 			const groupChildren = isGroup ? childrenOf(graphSnapshot?.nodes ?? [], beat.id) : [];
@@ -939,7 +1183,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 	}
 	#focusNode(nodeId, boostZoom = false) {
 		const viewport = this.element.querySelector(".lf-viewport");
-		const graph = LumennGraphStore.getGraph(this.#graphId);
+		const graph = this.#graph();
 		const bounds = this.#nodeBounds(nodeId, null, graph);
 		if (!viewport || !bounds) return;
 		const targetZoom = boostZoom ? Math.max(this.#camera.zoom, 1.25) : this.#camera.zoom;
@@ -982,7 +1226,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		if (e.target.closest(".lf-node") || e.target.closest("[data-port]") || e.target.closest(".lf-edge-hit") || e.target.closest(".lf-camera-bar")) return;
 		if (this.#spaceDown) return;
 		if (!this.#editable()) return;
-		if (this.#tool === "scene" || this.#tool === "audio" || this.#tool === "note" || this.#tool === "group") {
+		if (this.#tool === "scene" || this.#tool === "audio" || this.#tool === "note" || this.#tool === "group" || this.#tool === "encounter") {
 			const point = this.#clientToCanvas(e, this.element.querySelector(".lf-viewport"));
 			this.#createNodeAt(this.#tool, point);
 			return
@@ -1016,11 +1260,17 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				fadeOut: null
 			} : type === "group" ? {
 				title: game.i18n.localize("LUMENN_FRAME.Group.DefaultName")
+			} : type === "encounter" ? {
+				encounterType: "event",
+				title: game.i18n.localize("LUMENN_FRAME.Encounter.Default"),
+				sceneNodeId: null
 			} : {
 				title: "",
 				body: ""
 			}
 		};
+		const reason = LumennGraphStore.addNodeBlockReason(this.#graphId, node);
+		if (reason) return this.#warnBlock(reason);
 		const created = await LumennGraphStore.addNode(this.#graphId, node);
 		if (created) {
 			this.#selected = {
@@ -1030,8 +1280,15 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			this.render()
 		}
 	}
+	#warnBlock(reason) {
+		const key = {
+			"encounter-outside-hive": "LUMENN_FRAME.Warn.EncounterOutsideHive",
+			"hive-cycle": "LUMENN_FRAME.Warn.HiveCycle"
+		}[reason];
+		if (key) ui.notifications.warn(game.i18n.localize(key))
+	}
 	#isNavigable(id) {
-		const graph = LumennGraphStore.getGraph(this.#graphId);
+		const graph = this.#graph();
 		return !!graph?.edges?.some(e => (e.type === "flow" || e.type === "audio") && e.from === graph.activeNodeId && e.to === id)
 	}
 	#bindCamera(root) {
@@ -1107,7 +1364,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		const viewport = root.querySelector(".lf-viewport");
 		const world = root.querySelector(".lf-camera");
 		if (!viewport || !world) return;
-		const graph = LumennGraphStore.getGraph(this.#graphId);
+		const graph = this.#graph();
 		let maxX = viewport.clientWidth,
 			maxY = viewport.clientHeight;
 		for (const n of graph?.nodes ?? []) {
@@ -1120,7 +1377,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		world.style.height = `${maxY}px`
 	}
 	#nodeBounds(nodeId, positionOverride = null, graph = null) {
-		const source = graph ?? LumennGraphStore.getGraph(this.#graphId);
+		const source = graph ?? this.#graph();
 		const node = source?.nodes?.find(candidate => candidate.id === nodeId) ?? LumennGraphStore.getNode(this.#graphId, nodeId);
 		if (!node) return null;
 		if (node.type === "group") {
@@ -1251,7 +1508,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		this.#pendingEdgeNodes.clear();
 		this.#edgeGraphSnapshot = null;
 		const svg = root.querySelector(".lf-edges");
-		const graph = LumennGraphStore.getGraph(this.#graphId);
+		const graph = this.#graph();
 		if (!svg) return;
 		svg.innerHTML = "";
 		const collapsed = this.#collapsedSet(graph);
@@ -1424,7 +1681,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			}
 			const overrides = new Map(this.#pendingEdgeNodes);
 			this.#pendingEdgeNodes.clear();
-			const graph = this.#edgeGraphSnapshot ?? LumennGraphStore.getGraph(this.#graphId);
+			const graph = this.#edgeGraphSnapshot ?? this.#graph();
 			this.#edgeGraphSnapshot = null;
 			this.#updateIncidentEdges(root, graph, overrides)
 		})
@@ -1584,6 +1841,36 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		}
 		if (action === "workspace-toggle") return this.#toggleWorkspace(root);
 		if (action === "open-guide") return openLumennGuide();
+		if (action === "hive-exit") return this.#exitHive(event.currentTarget.dataset.port || null);
+		if (action === "browser-open" || action === "browser-close") {
+			this.#browserOpen = action === "browser-open";
+			return this.render()
+		}
+		if (action === "browser-filter") {
+			this.#browserFilter = event.currentTarget.dataset.filter || "all";
+			return this.render()
+		}
+		if (action === "browser-go") return this.#switchGraph(event.currentTarget.dataset.graph);
+		if (action === "nav-back" || action === "nav-forward") {
+			const from = action === "nav-back" ? this.#history : this.#future;
+			const to = action === "nav-back" ? this.#future : this.#history;
+			let target = from.pop();
+			while (target && !LumennGraphStore.getGraph(target)) target = from.pop();
+			if (!target) return;
+			to.push(this.#graphId);
+			return this.#switchGraph(target, false)
+		}
+		if (action === "edit-back") {
+			const back = this.#editStack.pop();
+			if (back && LumennGraphStore.getGraph(back)) this.#graphId = back;
+			this.#selected = {
+				kind: null,
+				id: null
+			};
+			this.#fitPending = true;
+			this.#cameraFadeIn = true;
+			return this.render()
+		}
 		if (!LumennCompat.isGM() || this.#mode !== "edit") return;
 		if (action === "create-graph") {
 			const raw = await foundry.applications.api.DialogV2.prompt({
@@ -1600,12 +1887,13 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			if (!name) return;
 			const g = await LumennGraphStore.createGraph(name);
 			this.#graphId = g?.id ?? this.#graphId;
+			this.#resetTrail();
 			this.render()
 		} else if (action === "sort-graphs") {
 			await LumennGraphStore.sortGraphsByName();
 			this.render()
 		} else if (action === "rename-graph") {
-			const graph = LumennGraphStore.getGraph(this.#graphId);
+			const graph = this.#graph();
 			const raw = await foundry.applications.api.DialogV2.prompt({
 				window: {
 					title: game.i18n.localize("LUMENN_FRAME.Toolbar.RenameStoryboard")
@@ -1633,7 +1921,15 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				}
 			});
 			if (ok) {
-				await LumennGraphStore.deleteGraph(this.#graphId);
+				const deleted = await LumennGraphStore.deleteGraph(this.#graphId);
+				if (!deleted) {
+					const where = LumennGraphStore.getHiveUsages(this.#graphId).map(use => use.graphName).join(", ");
+					ui.notifications.warn(game.i18n.format("LUMENN_FRAME.Warn.HiveInUse", {
+						where
+					}));
+					return
+				}
+				this.#resetTrail();
 				this.#graphId = null;
 				this.#selected = {
 					kind: null,
@@ -1661,7 +1957,11 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				...patch.transition,
 				scene: {
 					...edge?.transition?.scene ?? {},
-					...patch.transition.scene ?? {}
+					...patch.transition.scene ?? {},
+					video: {
+						...edge?.transition?.scene?.video ?? {},
+						...patch.transition.scene?.video ?? {}
+					}
 				},
 				audio: {
 					...edge?.transition?.audio ?? {},
@@ -1677,7 +1977,8 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		if (!this.#canEditInspectorPath(path)) return;
 		if (this.#mode === "live" && path !== "transition.scope" && !path.startsWith("transition.audio.")) return;
 		let val = e.currentTarget.type === "checkbox" ? e.currentTarget.checked : e.currentTarget.value;
-		if (typeof val === "string" && /Duration|volume|fadeIn|fadeOut|duration/.test(path)) val = Number.isFinite(Number(val)) ? Number(val) : null;
+		if (typeof val === "string" && /Duration|volume|fadeIn|fadeOut|duration|cutAt/.test(path)) val = Number.isFinite(Number(val)) ? Number(val) : null;
+		if (typeof val === "number" && path.endsWith("cutAt")) val = Math.max(0, Math.min(6e4, val));
 		if (typeof val === "number" && /Duration|duration|fadeIn|fadeOut/.test(path)) val = Math.max(0, Math.min(1e4, val));
 		if (typeof val === "number" && path.endsWith("volume")) val = Math.max(0, Math.min(1, val));
 		const kind = this.#selected.kind;
@@ -1687,10 +1988,19 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			val = normalizeHexColor(val, "#000000");
 			e.currentTarget.value = val
 		}
+		if (["data.sceneNodeId", "data.portId", "data.graphId"].includes(path) && val === "") val = null;
 		if (kind === "node") {
 			const node = LumennGraphStore.getNode(this.#graphId, id);
 			const patch = {};
 			this.#setPath(patch, path, val);
+			if (path === "data.graphId") {
+				patch.data.portId = null;
+				const reason = LumennGraphStore.retargetBlockReason(this.#graphId, id, val);
+				if (val && reason) {
+					this.#warnBlock(reason);
+					return this.render()
+				}
+			}
 			LumennGraphStore.updateNode(this.#graphId, id, {
 				...patch,
 				data: {
@@ -1703,7 +2013,9 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			const patch = {};
 			this.#setPath(patch, path, val);
 			LumennGraphStore.updateEdge(this.#graphId, id, this.#mergeEdgePatch(edge, patch)).then(() => {
-				const graph = LumennGraphStore.getGraph(this.#graphId);
+				// Trocar o tipo muda os campos do Inspector (ex.: arquivo do stinger de vídeo).
+				if (path === "transition.scene.type") return this.render();
+				const graph = this.#graph();
 				const edge = graph?.edges?.find(candidate => candidate.id === id);
 				if (!edge) return;
 				const label = this.element.querySelector(`.lf-edge-label[data-edge-id="${id}"]`);
@@ -1756,6 +2068,25 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		if (action === "focus-node") {
 			const nodeId = e.currentTarget.dataset.inspNode;
 			this.#focusNode(nodeId)
+		} else if (action === "pick-video") {
+			// FilePicker do Foundry (v13+: foundry.applications.apps.FilePicker); escreve no campo e dispara change.
+			const input = root.querySelector(e.currentTarget.dataset.pickFor);
+			const Picker = foundry.applications?.apps?.FilePicker?.implementation ?? globalThis.FilePicker;
+			if (!input || !Picker) return;
+			new Picker({
+				type: "video",
+				current: input.value || "",
+				callback: path => {
+					input.value = path;
+					input.dispatchEvent(new Event("change", {
+						bubbles: true
+					}))
+				}
+			}).render(true)
+		} else if (action === "group-to-hive") {
+			await this.#groupToHive(this.#selected.id)
+		} else if (action.startsWith("hive-")) {
+			await this.#hiveAction(action, e.currentTarget.dataset)
 		} else if (action === "set-initial") {
 			LumennGraphStore.setActiveNode(this.#graphId, this.#selected.id).then(() => this.render())
 		} else if (action === "group-create") {
@@ -1794,7 +2125,7 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			this.render()
 		} else if (action === "group-apply-rooms") {
 			const groupId = this.#selected.id;
-			const graph = LumennGraphStore.getGraph(this.#graphId);
+			const graph = this.#graph();
 			const group = graph?.nodes?.find(n => n.id === groupId);
 			if (!group || group.type !== "group") {
 				this.render();
@@ -1879,6 +2210,21 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 				type: "cut",
 				duration: 0
 			};
+			const effect = filmEffectOf(sceneTrans.type);
+			if (effect) {
+				// Prévia de cinema: só na tela do mestre, sem trocar cena nem áudio.
+				await filmPreview({
+					effect,
+					duration: sceneTrans.duration,
+					color: normalizeHexColor(sceneTrans.color, "#000000"),
+					caption: target ? this.#nodeLabel(target) : "",
+					subtitle: LumennGraphStore.getGraph(this.#graphId)?.name ?? "",
+					src: sceneTrans.video?.src ?? "",
+					cutAt: sceneTrans.video?.cutAt,
+					sound: sceneTrans.video?.sound === true
+				});
+				return
+			}
 			if ((scope === "scene" || scope === "both") && scene) {
 				this.#previewing = true;
 				e.currentTarget.disabled = true;
@@ -1963,8 +2309,9 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 	}
 	async #playAudioNode(id) {
 		if (this.#transitioning || !LumennCompat.isGM()) return;
-		const graph = LumennGraphStore.getGraph(this.#graphId);
+		const graph = this.#graph();
 		const node = graph?.nodes?.find(n => n.id === id);
+		if (node?.type === "encounter") return this.#playEncounter(graph, node);
 		const source = this.#audioSourceOf(node);
 		if (!source) return;
 		if (!LumennCompat.resolveAudioDoc(source)) {
@@ -2036,37 +2383,92 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 		}
 		return base
 	}
-	async #navigateTo(id) {
-		if (this.#transitioning) return;
-		const graph = LumennGraphStore.getGraph(this.#graphId);
-		const edge = graph?.edges?.find(e => (e.type === "flow" || e.type === "audio") && e.from === graph.activeNodeId && e.to === id);
-		if (!edge) return;
-		if (LumennSettings.get("confirmSceneTransition")) {
-			const ok = await foundry.applications.api.DialogV2.confirm({
-				title: game.i18n.localize("LUMENN_FRAME.Toolbar.LiveMode"),
-				content: game.i18n.localize("LUMENN_FRAME.ConfirmTransition"),
-				yes: {
-					label: game.i18n.localize("LUMENN_FRAME.Edge.Go")
-				},
-				no: {
-					label: game.i18n.localize("LUMENN_FRAME.Config.Cancel")
-				}
-			});
-			if (!ok) return
+	async #confirmGo() {
+		if (!LumennSettings.get("confirmSceneTransition")) return true;
+		return foundry.applications.api.DialogV2.confirm({
+			title: game.i18n.localize("LUMENN_FRAME.Toolbar.LiveMode"),
+			content: game.i18n.localize("LUMENN_FRAME.ConfirmTransition"),
+			yes: {
+				label: game.i18n.localize("LUMENN_FRAME.Edge.Go")
+			},
+			no: {
+				label: game.i18n.localize("LUMENN_FRAME.Config.Cancel")
+			}
+		})
+	}
+	/** Áudio que pode estar tocando agora: o de todos os níveis da trilha, não só do storyboard exibido. */
+	#currentAudioSources(graph) {
+		const ids = new Set([graph?.id, ...this.#trail.map(level => level.graphId)]);
+		const sources = [];
+		const seen = new Set;
+		for (const id of ids) {
+			for (const source of this.#allAudioSources(LumennGraphStore.getGraph(id))) {
+				const key = `${source.role}:${source.type}:${source.id}`;
+				if (seen.has(key)) continue;
+				seen.add(key);
+				sources.push(source)
+			}
 		}
+		return sources
+	}
+	/** Grava a sala ativa onde ela mora: na trilha (dentro de uma Hive) ou no storyboard. */
+	async #commitActive(graph, id) {
+		if (this.#hiveLevel(graph.id)) {
+			this.#trail = setNavigationNode(this.#trail, graph.id, id);
+			await this.#saveTrail()
+		} else {
+			await LumennGraphStore.setActiveNode(graph.id, id);
+			if (this.#trail.length) this.#trail = setNavigationNode(this.#trail, graph.id, id)
+		}
+	}
+	/**
+	 * Troca de cena + áudio. Tipo `film:*` roda só na tela dos jogadores (socket); o mestre não
+	 * escurece. `audioTrans.mode === "none"` deixa a música como está.
+	 */
+	async #playTransition({
+		scene,
+		scope,
+		sceneTrans,
+		audioTrans,
+		currentSources,
+		targetSources,
+		commit,
+		film = null
+	}) {
 		this.#transitioning = true;
 		await this.render();
+		const effect = filmEffectOf(sceneTrans?.type);
+		const filmPayload = effect ? {
+			type: "film",
+			effect,
+			duration: sceneTrans.duration,
+			color: normalizeHexColor(sceneTrans.color, "#000000"),
+			caption: film?.caption ?? "",
+			subtitle: film?.subtitle ?? "",
+			src: sceneTrans.video?.src ?? "",
+			cutAt: sceneTrans.video?.cutAt,
+			sound: sceneTrans.video?.sound === true
+		} : null;
 		try {
-			const scope = edge.type === "audio" ? "audio" : ["audio", "scene", "both"].includes(edge.transition?.scope) ? edge.transition.scope : "both";
-			const sceneTrans = edge.transition?.scene ?? {
-				type: "cut",
-				duration: 0
-			};
-			const audioTrans = this.#audioTransitionFor(graph, edge);
-			const targetNode = graph.nodes.find(n => n.id === id);
-			const scene = targetNode?.data?.sceneId ? game.scenes.get(targetNode.data.sceneId) : null;
-			const currentSources = this.#allAudioSources(graph);
-			const targetSources = this.#audioSourcesFor(graph, id);
+			if (filmPayload) {
+				if (effect === "video") {
+					// Pré-carga: os jogadores baixam o vídeo antes; o mestre espera a confirmação (até 3 s).
+					LumennCompat.socketEmit({
+						type: "film-prepare",
+						src: filmPayload.src
+					});
+					await waitPlayersReady(filmPayload.src, game.users.filter(u => u.active && !u.isGM).map(u => u.id))
+				}
+				LumennCompat.socketEmit({
+					...filmPayload,
+					phase: "in"
+				});
+				await new Promise(r => setTimeout(r, filmCutPoint(effect, filmPayload.duration, filmPayload.cutAt)));
+				sceneTrans = {
+					type: "cut",
+					duration: 0
+				}
+			}
 			LumennCompat.socketEmit({
 				type: "transition:start",
 				sceneId: scene?.id ?? null,
@@ -2098,17 +2500,517 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 					await lumennClientSceneFade(scene.id, sceneTrans)
 				}
 			})() : null;
-			const audioTask = scope === "audio" || scope === "both" ? this.#controller.goToAudio(currentSources, targetSources, audioTrans, LumennGraphStore.getDefaultCrossfadeDuration(), audioTrans?.curve ?? "linear") : null;
+			const touchAudio = (scope === "audio" || scope === "both") && audioTrans?.mode !== "none";
+			const audioTask = touchAudio ? this.#controller.goToAudio(currentSources, targetSources, audioTrans, LumennGraphStore.getDefaultCrossfadeDuration(), audioTrans?.curve ?? "linear") : null;
 			const [, audioResult] = await Promise.all([sceneTask, audioTask]);
 			if (audioResult === "invalid-source") ui.notifications.warn(game.i18n.localize("LUMENN_FRAME.WarnInvalidAudioSource"));
-			await LumennGraphStore.setActiveNode(this.#graphId, id);
+			await commit();
 			LumennCompat.socketEmit({
 				type: "transition:end"
 			})
 		} finally {
+			if (filmPayload) LumennCompat.socketEmit({
+				...filmPayload,
+				phase: "out"
+			});
 			this.#transitioning = false;
 			await this.render()
 		}
+	}
+	async #navigateTo(id) {
+		if (this.#transitioning) return;
+		const graph = this.#graph();
+		const edge = graph?.edges?.find(e => (e.type === "flow" || e.type === "audio") && e.from === graph.activeNodeId && e.to === id);
+		if (!edge) return;
+		const target = graph.nodes.find(n => n.id === id);
+		if (target?.type === "hive-ref") return edge.type === "flow" ? this.#enterHive(graph, edge, target) : undefined;
+		if (!(await this.#confirmGo())) return;
+		const scope = edge.type === "audio" ? "audio" : ["audio", "scene", "both"].includes(edge.transition?.scope) ? edge.transition.scope : "both";
+		await this.#playTransition({
+			scene: target?.data?.sceneId ? game.scenes.get(target.data.sceneId) : null,
+			scope,
+			sceneTrans: edge.transition?.scene ?? {
+				type: "cut",
+				duration: 0
+			},
+			audioTrans: this.#audioTransitionFor(graph, edge),
+			currentSources: this.#currentAudioSources(graph),
+			targetSources: this.#audioSourcesFor(graph, id),
+			film: {
+				caption: this.#nodeLabel(target),
+				subtitle: LumennGraphStore.getGraph(graph.id)?.name ?? ""
+			},
+			commit: () => this.#commitActive(graph, id)
+		})
+	}
+	/** Zoom de câmera para dentro do nó antes de trocar de storyboard (efeito de "entrar"). */
+	async #zoomInto(nodeId) {
+		const root = this.element;
+		const camEl = root?.querySelector(".lf-camera");
+		const viewport = root?.querySelector(".lf-viewport");
+		const bounds = this.#nodeBounds(nodeId, null, this.#graph());
+		if (!camEl || !viewport || !bounds) return;
+		const target = focusCameraOnBounds(this.#camera, {
+			width: viewport.clientWidth,
+			height: viewport.clientHeight
+		}, bounds, clampGraphZoom(Math.max(this.#camera.zoom * 2.5, 2.5)));
+		camEl.style.transition = "transform 420ms cubic-bezier(.6,0,.9,.4), opacity 420ms ease-in";
+		this.#camera = target;
+		this.#applyCamera(root);
+		camEl.style.opacity = "0";
+		await new Promise(r => setTimeout(r, 430));
+		this.#cameraFadeIn = true
+	}
+	/** Entra na Hive pela porta, com a transição de entrada dela. `edge` pode faltar (botão Entrar). */
+	async #enterHive(graph, edge, refNode) {
+		const L = k => game.i18n.localize(k);
+		const hive = LumennGraphStore.getGraph(refNode.data?.graphId);
+		if (!hive) return void ui.notifications.warn(L("LUMENN_FRAME.Warn.HiveMissing"));
+		if (!hive.isHive) return void ui.notifications.warn(L("LUMENN_FRAME.Warn.HiveNotHive"));
+		const port = hiveEntryPort(hive, edge?.portId ?? refNode.data?.portId);
+		if (!port?.node) return void ui.notifications.warn(L("LUMENN_FRAME.Warn.HiveNoEntry"));
+		const pending = listHivePending(hive, this.#worldChecks());
+		if (pending.length) {
+			const items = pending.map(item => item.name ?? this.#nodeLabel(hive.nodes.find(n => n.id === item.nodeId))).join(", ");
+			return void ui.notifications.warn(game.i18n.format("LUMENN_FRAME.Warn.HivePending", {
+				items
+			}))
+		}
+		if (!(await this.#confirmGo())) return;
+		const cfg = hive.hive?.transition ? normalizeHiveTransition(hive.hive.transition, DEFAULT_HIVE_TRANSITIONS.transition) : {
+			...normalizeHiveTransition(null, DEFAULT_HIVE_TRANSITIONS.transition),
+			...(edge?.transition ?? {})
+		};
+		const scope = ["audio", "scene", "both"].includes(cfg.scope) ? cfg.scope : "both";
+		await this.#zoomInto(refNode.id);
+		await this.#playTransition({
+			scene: port.node.data?.sceneId ? game.scenes.get(port.node.data.sceneId) : null,
+			scope,
+			sceneTrans: cfg.scene,
+			audioTrans: cfg.audio?.mode === "none" ? cfg.audio : this.#audioTransitionFor(hive, {
+				...(edge ?? {}),
+				to: port.node.id,
+				transition: cfg
+			}),
+			currentSources: this.#currentAudioSources(graph),
+			targetSources: this.#audioSourcesFor(hive, port.node.id),
+			film: cfg.caption === false ? null : {
+				caption: hive.name,
+				subtitle: port.name
+			},
+			commit: async () => {
+				const fromNodeId = graph.activeNodeId;
+				await this.#commitActive(graph, refNode.id);
+				this.#trail = pushNavigationLevel(this.#trail, {
+					graphId: hive.id,
+					activeNodeId: port.node.id,
+					viaPortId: port.id,
+					refNodeId: refNode.id,
+					fromNodeId
+				});
+				this.#graphId = hive.id;
+				this.#selected = {
+					kind: null,
+					id: null
+				};
+				this.#collapsedGroups.clear();
+				this.#lockedGroups.clear();
+				this.#fitPending = true;
+				await this.#saveTrail()
+			}
+		})
+	}
+	/**
+	 * Sai da Hive. Com porta de saída ligada no pai (aresta com `exitPortId`), vai direto para o destino
+	 * dela; sem destino, volta ao nó Hive. Padrão: cutscene de filme só nos jogadores, música intocada.
+	 */
+	async #exitHive(portId = null) {
+		if (this.#transitioning || !LumennCompat.isGM() || this.#trail.length < 2) return;
+		const level = this.#trail.at(-1);
+		const parentLevel = this.#trail.at(-2);
+		const hive = LumennGraphStore.getGraph(level.graphId);
+		const parent = LumennGraphStore.getGraph(parentLevel.graphId);
+		const ref = parent?.nodes?.find(n => n.id === level.refNodeId) ?? null;
+		const roomPorts = hiveExitPortsAt(hive, level.activeNodeId);
+		const port = portId ? (hive?.hive?.ports ?? []).find(p => p.id === portId) ?? null : roomPorts.length === 1 ? roomPorts[0] : null;
+		const exitEdge = ref ? resolveHiveExitEdge(parent, ref.id, port?.id ?? null) : null;
+		const target = exitEdge ? parent.nodes.find(n => n.id === exitEdge.to) ?? null : null;
+		const cfg = normalizeHiveTransition(hive?.hive?.exit, DEFAULT_HIVE_TRANSITIONS.exit);
+		const resume = parent && ref ? this.#audioSourcesFor(parent, ref.id) : [];
+		const fallback = resume.length ? resume : parent && level.fromNodeId ? this.#audioSourcesFor(parent, level.fromNodeId) : [];
+		if (this.#mode === "live") this.#cameraFadeIn = true;
+		await this.#playTransition({
+			scene: target?.data?.sceneId ? game.scenes.get(target.data.sceneId) : null,
+			scope: target ? "both" : "audio",
+			sceneTrans: cfg.scene,
+			audioTrans: cfg.audio,
+			currentSources: this.#currentAudioSources(hive),
+			targetSources: target ? this.#audioSourcesFor(parent, target.id) : fallback,
+			film: cfg.caption === false ? null : {
+				caption: target ? this.#nodeLabel(target) : parent?.name ?? "",
+				subtitle: port?.name && target && port.name !== this.#nodeLabel(target) ? port.name : hive?.name ?? ""
+			},
+			commit: async () => {
+				this.#trail = popNavigationLevel(this.#trail).trail;
+				this.#graphId = parentLevel.graphId;
+				this.#selected = {
+					kind: null,
+					id: null
+				};
+				this.#fitPending = true;
+				if (target) await this.#commitActive(this.#graph(), target.id);
+				await this.#saveTrail()
+			}
+		})
+	}
+	/** Troca o storyboard exibido como num seletor de fases: guarda histórico, limpa trilha e seleção. */
+	#switchGraph(graphId, record = true) {
+		if (!graphId || !LumennGraphStore.getGraph(graphId)) return;
+		if (record && graphId !== this.#graphId) {
+			if (this.#graphId) this.#history.push(this.#graphId);
+			this.#future = []
+		}
+		this.#graphId = graphId;
+		this.#browserOpen = false;
+		this.#resetTrail();
+		this.#editStack = [];
+		this.#collapsedGroups.clear();
+		this.#lockedGroups.clear();
+		this.#selected = {
+			kind: null,
+			id: null
+		};
+		this.#fitPending = true;
+		this.#cameraFadeIn = true;
+		return this.render()
+	}
+	#graphThumb(graph) {
+		for (const node of graph?.nodes ?? []) {
+			if (node.type !== "scene" || !node.data?.sceneId) continue;
+			const scene = game.scenes.get(node.data.sceneId);
+			const src = scene?.thumbnail ?? scene?.background?.src;
+			if (src) return src
+		}
+		return null
+	}
+	#browserView(graphs, currentId) {
+		const filter = this.#browserFilter;
+		const cards = graphs.filter(g => filter === "all" || (filter === "hives" ? g.isHive : !g.isHive)).map(g => ({
+			id: g.id,
+			name: g.name,
+			isHive: g.isHive === true,
+			isCurrent: g.id === currentId,
+			scenes: (g.nodes ?? []).filter(n => n.type === "scene").length,
+			thumb: this.#graphThumb(g)
+		}));
+		return {
+			open: this.#browserOpen,
+			cards,
+			tabs: ["all", "boards", "hives"].map(id => ({
+				id,
+				active: id === filter
+			}))
+		}
+	}
+	/** Grupo vira Hive: salas viram um storyboard inteiro, o Grupo vira um nó só com portas automáticas. */
+	async #groupToHive(groupId) {
+		const L = k => game.i18n.localize(k);
+		const group = LumennGraphStore.getNode(this.#graphId, groupId);
+		if (group?.type !== "group") return;
+		const ok = await foundry.applications.api.DialogV2.confirm({
+			window: {
+				title: L("LUMENN_FRAME.Group.ToHive")
+			},
+			content: `<p>${L("LUMENN_FRAME.Group.ToHiveConfirm")}</p>`,
+			rejectClose: false
+		});
+		if (!ok) return;
+		const plan = await LumennGraphStore.convertGroupToHive(this.#graphId, groupId, node => this.#nodeLabel(node));
+		if (!plan) return void ui.notifications.warn(L("LUMENN_FRAME.Warn.GroupEmpty"));
+		ui.notifications.info(game.i18n.format("LUMENN_FRAME.Info.GroupToHive", {
+			name: plan.hive.name,
+			entries: plan.entries.length,
+			exits: plan.exits.length
+		}));
+		this.#selected = {
+			kind: "node",
+			id: plan.refNode.id
+		};
+		this.#fitPending = true;
+		this.render()
+	}
+	/** Botão Entrar do card: na Edição abre a Hive por dentro; no Ao Vivo entra nela. */
+	async #hiveEnterButton(refNodeId) {
+		const graph = this.#graph();
+		const ref = graph?.nodes?.find(n => n.id === refNodeId);
+		if (!ref || ref.type !== "hive-ref") return;
+		if (this.#mode === "live") {
+			if (this.#transitioning || !LumennCompat.isGM()) return;
+			const edge = graph.edges?.find(e => e.type === "flow" && e.from === graph.activeNodeId && e.to === ref.id) ?? null;
+			return this.#enterHive(graph, edge, ref)
+		}
+		const hive = LumennGraphStore.getGraph(ref.data?.graphId);
+		if (!hive) return void ui.notifications.warn(game.i18n.localize("LUMENN_FRAME.Warn.HiveMissing"));
+		await this.#zoomInto(ref.id);
+		this.#editStack.push(this.#graphId);
+		this.#graphId = hive.id;
+		this.#selected = {
+			kind: null,
+			id: null
+		};
+		this.#fitPending = true;
+		this.render()
+	}
+	/** Clique no Encontro: toca a música dele sem trocar de cena; de novo, volta à música da sala. */
+	async #playEncounter(graph, node) {
+		const sources = this.#audioSourcesFor(graph, node.id);
+		if (!sources.length) return void ui.notifications.warn(game.i18n.localize("LUMENN_FRAME.Warn.EncounterNoAudio"));
+		const playing = sources.some(source => this.#isAudioPlaying(source));
+		const fallback = LumennGraphStore.getDefaultCrossfadeDuration();
+		const edge = (graph.edges ?? []).find(e => e.type === "audio" && e.to === node.id);
+		const cfg = {
+			curve: "linear",
+			...edge?.transition?.audio ?? {}
+		};
+		const room = graph.activeNodeId ? this.#audioSourcesFor(graph, graph.activeNodeId) : [];
+		const result = await this.#controller.goToAudio(this.#currentAudioSources(graph), playing ? room : sources, {
+			mode: "crossfade",
+			crossfadeDuration: cfg.crossfadeDuration ?? fallback,
+			curve: cfg.curve
+		}, fallback, cfg.curve);
+		if (result === "invalid-source") ui.notifications.warn(game.i18n.localize("LUMENN_FRAME.WarnInvalidAudioSource"));
+		await this.render()
+	}
+	async #insertHive(hiveId, point = null) {
+		if (!this.#editable()) return;
+		const L = k => game.i18n.localize(k);
+		if (hiveId === this.#graphId) return void ui.notifications.warn(L("LUMENN_FRAME.Warn.HiveSelf"));
+		const viewport = this.element.querySelector(".lf-viewport");
+		const center = point ?? this.#screenToWorld({
+			x: viewport.clientWidth / 2,
+			y: viewport.clientHeight / 2
+		});
+		const [w, h] = nodeSize("hive-ref", "normal");
+		const node = {
+			id: `node_${foundry.utils.randomID(16)}`,
+			type: "hive-ref",
+			position: {
+				x: Math.round(center.x - w / 2),
+				y: Math.round(center.y - h / 2)
+			},
+			data: {
+				graphId: hiveId,
+				portId: null
+			}
+		};
+		const reason = LumennGraphStore.addNodeBlockReason(this.#graphId, node);
+		if (reason) return void this.#warnBlock(reason);
+		const created = await LumennGraphStore.addNode(this.#graphId, node);
+		if (!created) return;
+		this.#selected = {
+			kind: "node",
+			id: created.id
+		};
+		this.render()
+	}
+	async #hiveAction(action, data) {
+		const L = k => game.i18n.localize(k);
+		const graph = LumennGraphStore.getGraph(this.#graphId);
+		if (!graph) return;
+		if (action === "hive-mark") {
+			await LumennGraphStore.markHive(graph.id)
+		} else if (action === "hive-unmark") {
+			const ok = await LumennGraphStore.unmarkHive(graph.id);
+			if (!ok) ui.notifications.warn(game.i18n.format("LUMENN_FRAME.Warn.HiveInUse", {
+				where: LumennGraphStore.getHiveUsages(graph.id).map(use => use.graphName).join(", ")
+			}))
+		} else if (action === "hive-port-add") {
+			const rooms = graph.nodes.filter(n => n.type === "scene");
+			if (!rooms.length) return void ui.notifications.warn(L("LUMENN_FRAME.Warn.HivePortNoRoom"));
+			const ports = [...graph.hive?.ports ?? [], {
+				name: `${L("LUMENN_FRAME.Hive.PortDefaultName")} ${(graph.hive?.ports?.length ?? 0) + 1}`,
+				direction: "entry",
+				nodeId: rooms[0].id
+			}];
+			await LumennGraphStore.updateHive(graph.id, {
+				ports
+			})
+		} else if (action === "hive-port-remove") {
+			await LumennGraphStore.updateHive(graph.id, {
+				ports: (graph.hive?.ports ?? []).filter(port => port.id !== data.portId)
+			})
+		} else if (action === "hive-insert") {
+			return this.#insertHive(data.hiveId)
+		} else if (action === "hive-open") {
+			return this.#switchGraph(data.hiveId)
+		} else if (action === "hive-export") {
+			return this.#exportHive(data.hiveId ?? graph.id)
+		} else if (action === "hive-import") {
+			return this.#importHive()
+		} else if (action === "hive-relink") {
+			const value = this.element.querySelector(`[data-hive-relink="${data.nodeId}"]`)?.value;
+			const node = LumennGraphStore.getNode(graph.id, data.nodeId);
+			if (!value || !node) return;
+			const next = {
+				...node.data
+			};
+			delete next.pendingName;
+			if (node.type === "scene") next.sceneId = value;
+			else next.audioId = value;
+			await LumennGraphStore.updateNode(graph.id, node.id, {
+				data: next
+			})
+		}
+		this.render()
+	}
+	/** Edita nome, direção e sala das portas, e a transição padrão da Hive. */
+	async #hiveFieldChange(e) {
+		if (!this.#editable()) return;
+		const el = e.currentTarget;
+		const graph = LumennGraphStore.getGraph(this.#graphId);
+		if (!graph?.isHive) return;
+		if (el.dataset.hivePort) {
+			const ports = (graph.hive?.ports ?? []).map(port => port.id === el.dataset.hivePort ? {
+				...port,
+				[el.dataset.hiveField]: el.value || null
+			} : port);
+			await LumennGraphStore.updateHive(graph.id, {
+				ports
+			})
+		} else {
+			const root = this.element;
+			const field = name => root.querySelector(`[data-hive-field="${name}"]`);
+			const num = (name, fallback) => {
+				const value = Number(field(name)?.value);
+				return Number.isFinite(value) ? Math.max(0, Math.min(1e4, value)) : fallback
+			};
+			// Entrada (transition) e saída (exit) têm os mesmos campos: tipo, duração, música e legenda.
+			const build = (kind, defaults, current) => {
+				const music = field(`${kind}.music`)?.value;
+				return {
+					scope: "both",
+					caption: field(`${kind}.caption`) ? field(`${kind}.caption`).checked : defaults.caption,
+					scene: {
+						type: field(`${kind}.type`)?.value || defaults.scene.type,
+						duration: num(`${kind}.duration`, defaults.scene.duration),
+						color: current?.scene?.color ?? "#000000",
+						video: {
+							src: field(`${kind}.videoSrc`)?.value ?? current?.scene?.video?.src ?? "",
+							cutAt: field(`${kind}.cutAt`) ? Math.max(0, Math.min(6e4, Number(field(`${kind}.cutAt`).value) || 0)) : current?.scene?.video?.cutAt ?? null,
+							sound: field(`${kind}.videoSound`) ? field(`${kind}.videoSound`).checked : current?.scene?.video?.sound === true
+						}
+					},
+					audio: {
+						mode: ["none", "auto", "crossfade", "cut"].includes(music) ? music : defaults.audio.mode,
+						crossfadeDuration: num(`${kind}.crossfade`, defaults.audio.crossfadeDuration),
+						curve: "linear"
+					}
+				}
+			};
+			await LumennGraphStore.updateHive(graph.id, {
+				transition: build("transition", DEFAULT_HIVE_TRANSITIONS.transition, graph.hive?.transition),
+				exit: build("exit", DEFAULT_HIVE_TRANSITIONS.exit, graph.hive?.exit)
+			})
+		}
+		this.render()
+	}
+	async #exportHive(hiveId) {
+		const L = k => game.i18n.localize(k);
+		const graph = LumennGraphStore.getGraph(hiveId);
+		if (!graph?.isHive) return;
+		const payload = buildHiveExport(graph, {
+			sceneName: id => game.scenes.get(id)?.name ?? null,
+			audioRef: data => {
+				if (!data?.audioId || !data?.audioType) return null;
+				if (data.audioType === "playlist") {
+					const playlist = game.playlists.get(data.audioId);
+					return playlist ? {
+						type: "playlist",
+						name: playlist.name
+					} : null
+				}
+				const sound = LumennCompat.resolveUuidSync(data.audioId);
+				return sound ? {
+					type: "track",
+					name: sound.name
+				} : null
+			}
+		});
+		const check = validateHiveExport(payload);
+		if (!check.valid) return void ui.notifications.warn(game.i18n.format("LUMENN_FRAME.Warn.HiveExportInvalid", {
+			errors: check.errors.join("; ")
+		}));
+		const blob = new Blob([JSON.stringify(payload, null, 2)], {
+			type: "application/json"
+		});
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement("a");
+		link.href = url;
+		link.download = `${String(graph.name || "hive").replace(/[^\p{L}\p{N}_-]+/gu, "-")}.lumenn-hive.json`;
+		document.body.append(link);
+		link.click();
+		link.remove();
+		setTimeout(() => URL.revokeObjectURL(url), 1e3);
+		ui.notifications.info(L("LUMENN_FRAME.Info.HiveExported"))
+	}
+	async #importHive() {
+		const file = await foundry.applications.api.DialogV2.prompt({
+			window: {
+				title: game.i18n.localize("LUMENN_FRAME.Hive.ImportTitle")
+			},
+			content: `<p>${game.i18n.localize("LUMENN_FRAME.Hive.ImportHint")}</p><input type="file" name="file" accept=".json,application/json">`,
+			ok: {
+				label: game.i18n.localize("LUMENN_FRAME.Hive.Import"),
+				callback: (ev, btn) => btn.form.elements.file.files[0] ?? null
+			},
+			rejectClose: false
+		});
+		if (!file || typeof file.text !== "function") return;
+		const fail = errors => ui.notifications.warn(game.i18n.format("LUMENN_FRAME.Warn.HiveImportInvalid", {
+			errors
+		}));
+		let payload;
+		try {
+			payload = JSON.parse(await file.text())
+		} catch (error) {
+			return void fail(String(error?.message ?? error))
+		}
+		if (payload?.format !== HIVE_EXPORT_FORMAT) return void fail(HIVE_EXPORT_FORMAT);
+		const check = validateHiveExport(payload);
+		if (!check.valid) return void fail(check.errors.join("; "));
+		const world = {
+			scenes: [...game.scenes.values()].map(s => ({
+				id: s.id,
+				name: s.name
+			})),
+			audio: [...game.playlists.values()].flatMap(p => [{
+				id: p.id,
+				name: p.name,
+				type: "playlist"
+			}, ...[...p.sounds.values()].map(s => ({
+				id: s.uuid,
+				name: s.name,
+				type: "track"
+			}))])
+		};
+		const {
+			graph,
+			pending
+		} = planHiveImport(payload.hives[0], world, prefix => `${prefix}_${foundry.utils.randomID(16)}`);
+		const saved = await LumennGraphStore.importHive(graph);
+		if (!saved) return;
+		ui.notifications.info(game.i18n.format("LUMENN_FRAME.Info.HiveImported", {
+			name: graph.name,
+			count: pending.length
+		}));
+		this.#graphId = graph.id;
+		this.#resetTrail();
+		this.#selected = {
+			kind: null,
+			id: null
+		};
+		this.#fitPending = true;
+		this.render()
 	}
 	#nodeLabel(node) {
 		if (node.type === "group") return node.data?.title || game.i18n.localize("LUMENN_FRAME.Group.DefaultName");
@@ -2117,6 +3019,11 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			return s?.name ?? "Scene"
 		}
 		if (node.type === "audio") return this.#audioLabel(node.data).name;
+		if (node.type === "hive-ref") {
+			const hive = LumennGraphStore.getGraph(node.data?.graphId);
+			return hive?.isHive ? hive.name : game.i18n.localize("LUMENN_FRAME.Hive.Missing")
+		}
+		if (node.type === "encounter") return node.data?.title || game.i18n.localize("LUMENN_FRAME.Encounter.Default");
 		return node.data?.title || "Note"
 	}
 	#buildInspector(graph) {
@@ -2152,7 +3059,29 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 					nodeType: node.type,
 					audioRole: node.data?.audioRole === "sfx" ? "sfx" : "music",
 					nodeEdges: edges,
-					flowTargets: (graph?.nodes ?? []).filter(n => n.type === "scene" && n.id !== node.id).map(n => ({
+					hasConnections: ["scene", "hive-ref", "encounter"].includes(node.type),
+					hasFlowOut: ["scene", "hive-ref"].includes(node.type),
+					hiveRefOptions: node.type === "hive-ref" ? LumennGraphStore.getHives().filter(h => h.id !== graph.id).map(h => ({
+						id: h.id,
+						name: h.name,
+						selected: h.id === node.data?.graphId
+					})) : [],
+					hiveRefPorts: node.type === "hive-ref" ? (LumennGraphStore.getGraph(node.data?.graphId)?.hive?.ports ?? []).filter(p => p.direction !== "exit" && p.nodeId).map(p => ({
+						id: p.id,
+						name: p.name || game.i18n.localize("LUMENN_FRAME.Hive.PortDefaultName"),
+						selected: p.id === node.data?.portId
+					})) : [],
+					encounterRooms: node.type === "encounter" ? (graph?.nodes ?? []).filter(n => n.type === "scene").map(n => ({
+						id: n.id,
+						name: this.#nodeLabel(n),
+						selected: n.id === node.data?.sceneNodeId
+					})) : [],
+					encounterTypes: node.type === "encounter" ? ["combat", "event", "npc"].map(t => ({
+						id: t,
+						name: game.i18n.localize(`LUMENN_FRAME.Encounter.${t}`),
+						selected: t === (node.data?.encounterType ?? "event")
+					})) : [],
+					flowTargets: (graph?.nodes ?? []).filter(n => (n.type === "scene" || n.type === "hive-ref") && n.id !== node.id).map(n => ({
 						id: n.id,
 						name: this.#nodeLabel(n)
 					})),
@@ -2198,8 +3127,11 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 					toLabel: to ? this.#nodeLabel(to) : edge.to,
 					reverse,
 					sceneTransitions: LumennCompat.getSceneTransitions(),
+					transitionGroups: this.#transitionOptions(edge.transition?.scene?.type ?? "cut"),
+					isFilm: !!filmEffectOf(edge.transition?.scene?.type),
+					isVideo: filmEffectOf(edge.transition?.scene?.type) === "video",
 					hasNativeTransitions: LumennCompat.hasNativeSceneTransitions(),
-					canPreviewTransition: edge.type === "flow" && transitionScope !== "audio" && !!to?.data?.sceneId,
+					canPreviewTransition: edge.type === "flow" && transitionScope !== "audio" && (!!to?.data?.sceneId || !!filmEffectOf(edge.transition?.scene?.type)),
 					curveOptions: ["linear", "equal-power"]
 				}
 			}
@@ -2210,7 +3142,115 @@ export class LumennGraphApp extends(HandlebarsApplicationMixin(ApplicationV2)) {
 			audioNodeIndex: (graph?.nodes ?? []).filter(node => node.type === "audio").map(node => ({
 				id: node.id,
 				name: this.#nodeLabel(node)
+			})),
+			hive: this.#hiveInspector(graph, base)
+		}
+	}
+	#hiveInspector(graph, base) {
+		if (!graph) return null;
+		const L = k => game.i18n.localize(k);
+		const rooms = (graph.nodes ?? []).filter(n => n.type === "scene").map(n => ({
+			id: n.id,
+			name: this.#nodeLabel(n)
+		}));
+		const own = graph.hive?.transition ?? null;
+		const checks = this.#worldChecks();
+		const pending = graph.isHive ? listHivePending(graph, checks).map(item => {
+			const node = graph.nodes.find(n => n.id === item.nodeId);
+			const isScene = item.kind === "scene";
+			const sounds = base.playlistsForAudio.flatMap(p => p.sounds.map(s => ({
+				id: s.uuid,
+				name: `${p.name} / ${s.name}`
+			})));
+			const options = isScene ? base.scenes : node?.data?.audioType === "playlist" ? base.playlistsForAudio.map(p => ({
+				id: p.id,
+				name: p.name
+			})) : sounds;
+			return {
+				nodeId: item.nodeId,
+				label: item.name ?? this.#nodeLabel(node),
+				kindLabel: isScene ? L("LUMENN_FRAME.Inspector.Scene") : L("LUMENN_FRAME.Inspector.Audio"),
+				options: [...options].sort((a, b) => String(a.name).localeCompare(String(b.name), game.i18n?.lang, {
+					sensitivity: "base",
+					numeric: true
+				}))
+			}
+		}) : [];
+		return {
+			isHive: graph.isHive === true,
+			rooms,
+			hasRooms: rooms.length > 0,
+			ports: (graph.hive?.ports ?? []).map(port => ({
+				...port,
+				isEntry: port.direction !== "exit",
+				rooms: rooms.map(room => ({
+					...room,
+					selected: room.id === port.nodeId
+				}))
+			})),
+			transition: this.#transitionView(normalizeHiveTransition(own, DEFAULT_HIVE_TRANSITIONS.transition)),
+			exit: this.#transitionView(normalizeHiveTransition(graph.hive?.exit, DEFAULT_HIVE_TRANSITIONS.exit)),
+			pending,
+			library: LumennGraphStore.getHives().map(hive => ({
+				id: hive.id,
+				name: hive.name,
+				rooms: (hive.nodes ?? []).filter(n => n.type === "scene").length,
+				isCurrent: hive.id === graph.id,
+				usedIn: LumennGraphStore.getHiveUsages(hive.id).map(use => use.graphName).join(", ")
 			}))
+		}
+	}
+	/** Lista de tipos de transição: Cinema (Lumenn, só jogadores) e Foundry (nativas). */
+	#transitionOptions(selected) {
+		const L = k => game.i18n.localize(k);
+		return [{
+			group: L("LUMENN_FRAME.Film.Group"),
+			items: FILM_EFFECTS.map(effect => ({
+				id: `${FILM_PREFIX}${effect.id}`,
+				label: L(effect.label),
+				selected: selected === `${FILM_PREFIX}${effect.id}`
+			}))
+		}, {
+			group: L("LUMENN_FRAME.Film.GroupFoundry"),
+			items: [{
+				id: "cut",
+				label: L("LUMENN_FRAME.Edge.Cut")
+			}, ...LumennCompat.getSceneTransitions()].map(item => ({
+				id: item.id,
+				label: item.label,
+				selected: selected === item.id
+			}))
+		}]
+	}
+	#transitionView(cfg) {
+		const music = cfg.audio?.mode ?? "auto";
+		return {
+			type: cfg.scene?.type,
+			isFilm: !!filmEffectOf(cfg.scene?.type),
+			isVideo: filmEffectOf(cfg.scene?.type) === "video",
+			video: {
+				src: cfg.scene?.video?.src ?? "",
+				cutAt: cfg.scene?.video?.cutAt ?? "",
+				sound: cfg.scene?.video?.sound === true
+			},
+			duration: cfg.scene?.duration ?? 1e3,
+			crossfade: cfg.audio?.crossfadeDuration ?? 2e3,
+			caption: cfg.caption !== false,
+			music: ["none", "auto", "crossfade", "cut"].map(id => ({
+				id,
+				label: game.i18n.localize(`LUMENN_FRAME.Film.Music.${id}`),
+				selected: id === music
+			})),
+			options: this.#transitionOptions(cfg.scene?.type)
+		}
+	}
+	#worldChecks() {
+		return {
+			hasScene: id => !!game.scenes.get(id),
+			hasAudio: data => !!LumennCompat.resolveAudioDoc({
+				type: data.audioType === "playlist" ? "playlist" : "track",
+				id: data.audioId
+			})
 		}
 	}
 }

@@ -6,12 +6,18 @@ function normalizeName(value) {
         .toLocaleLowerCase();
 }
 
+/** Portas da Hive: o store guarda em `graph.hive.ports`; exportações antigas, em `ports`. */
+export function portsOf(hive) {
+    if (Array.isArray(hive?.hive?.ports)) return hive.hive.ports;
+    return Array.isArray(hive?.ports) ? hive.ports : [];
+}
+
 function refsOf(hive) {
     const explicit = Array.isArray(hive?.references) ? hive.references : [];
     const nodes = Array.isArray(hive?.nodes) ? hive.nodes : [];
     const nodeRefs = nodes
-        .filter((node) => node?.type === 'hive-ref' && node?.data?.hiveId)
-        .map((node) => node.data.hiveId);
+        .filter((node) => node?.type === 'hive-ref' && (node?.data?.graphId || node?.data?.hiveId))
+        .map((node) => node.data.graphId ?? node.data.hiveId);
     return [...new Set([...explicit, ...nodeRefs].filter(Boolean))];
 }
 /** Detecta referências diretas ou indiretas entre Hives exportadas. */
@@ -41,7 +47,7 @@ export function detectHiveCycles(hives) {
 }
 /** Resolve uma porta por id ou nome e devolve a sala interna de destino. */
 export function resolveHivePort(hive, portRef) {
-    const ports = Array.isArray(hive?.ports) ? hive.ports : [];
+    const ports = portsOf(hive);
     const wanted = normalizeName(portRef);
     const port = ports.find(
         (candidate) => candidate?.id === portRef || normalizeName(candidate?.name) === wanted
@@ -59,9 +65,15 @@ export function createNavigationTrail(graphId, activeNodeId = null) {
             graphId,
             activeNodeId,
             viaPortId: null,
+            refNodeId: null,
+            fromNodeId: null,
         },
     ];
 }
+/**
+ * Empilha um nível de Hive. `refNodeId` é o nó hive-ref do pai por onde se entrou;
+ * `fromNodeId`, a sala do pai que estava ativa antes (música dela retoma na saída).
+ */
 export function pushNavigationLevel(trail, level) {
     if (!level?.graphId) return [...(trail ?? [])];
     return [
@@ -70,6 +82,8 @@ export function pushNavigationLevel(trail, level) {
             graphId: level.graphId,
             activeNodeId: level.activeNodeId ?? null,
             viaPortId: level.viaPortId ?? null,
+            refNodeId: level.refNodeId ?? null,
+            fromNodeId: level.fromNodeId ?? null,
         },
     ];
 }
@@ -149,7 +163,11 @@ export function validateHiveExport(payload) {
         if (hive?.id) ids.add(hive.id);
         const portIds = new Set();
         const portNames = new Set();
-        for (const port of hive?.ports ?? []) {
+        for (const node of hive?.nodes ?? []) {
+            if (node?.type === 'hive-ref')
+                errors.push(`Hive aninhada não é suportada: ${hive?.id ?? '?'}`);
+        }
+        for (const port of portsOf(hive)) {
             if (!port?.id || !port?.nodeId)
                 errors.push(`porta inválida na Hive ${hive?.id ?? '?'}`);
             if (port?.id && portIds.has(port.id)) errors.push(`porta duplicada: ${port.id}`);

@@ -3,6 +3,7 @@ const SCHEMA_VERSION = 2;
 import { LumennSettings } from './settings.mjs';
 import { childrenOf, GROUP_COLOR } from './graph-groups.mjs';
 import { detectHiveCycles } from './hive-runtime.mjs';
+import { planGroupToHive, sanitizeHivePorts } from './hive-io.mjs';
 const DEFAULT_COLORS = {
     scene: '#f0a321',
     audio: '#2dd4bf',
@@ -165,6 +166,22 @@ export class LumennGraphStore {
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
         return true;
     }
+    static #newId(prefix) {
+        return `${prefix}_${foundry.utils.randomID(16)}`;
+    }
+    static #applyHive(graph, patch = {}) {
+        const merged = {
+            ...(graph.hive ?? {}),
+            ...patch,
+        };
+        merged.ports = sanitizeHivePorts(
+            patch.ports ?? graph.hive?.ports ?? [],
+            graph.nodes,
+            LumennGraphStore.#newId
+        );
+        graph.isHive = true;
+        graph.hive = merged;
+    }
     static async markHive(graphId, patch = {}) {
         if (!game.user.isGM) return null;
         const data = foundry.utils.duplicate(
@@ -172,14 +189,106 @@ export class LumennGraphStore {
         );
         const graph = data.graphs.find((g) => g.id === graphId);
         if (!graph) return null;
-        graph.isHive = true;
-        graph.hive = {
-            ...(graph.hive ?? {}),
-            ports: Array.isArray(graph.hive?.ports) ? graph.hive.ports : [],
-            ...patch,
-        };
+        LumennGraphStore.#applyHive(graph, patch);
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
         return graph;
+    }
+    /** Atualiza portas e transição padrão de uma Hive já marcada. */
+    static async updateHive(graphId, patch = {}) {
+        if (!game.user.isGM) return null;
+        const data = foundry.utils.duplicate(
+            game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
+        );
+        const graph = data.graphs.find((g) => g.id === graphId);
+        if (!graph?.isHive) return null;
+        LumennGraphStore.#applyHive(graph, patch);
+        await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
+        return graph.hive;
+    }
+    /** Desmarca a Hive; bloqueia enquanto algum storyboard a usa. */
+    static async unmarkHive(graphId) {
+        if (!game.user.isGM) return false;
+        if (this.getHiveUsages(graphId).length) return false;
+        const data = foundry.utils.duplicate(
+            game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
+        );
+        const graph = data.graphs.find((g) => g.id === graphId);
+        if (!graph?.isHive) return false;
+        delete graph.isHive;
+        delete graph.hive;
+        await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
+        return true;
+    }
+    /**
+     * Grupo vira Hive numa única escrita: a Hive entra na biblioteca e o Grupo, no pai,
+     * vira um nó Hive ligado às mesmas setas. `labelOf(node)` dá nome às portas automáticas.
+     */
+    static async convertGroupToHive(graphId, groupId, labelOf) {
+        if (!game.user.isGM) return null;
+        const data = foundry.utils.duplicate(
+            game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
+        );
+        const graph = data.graphs.find((g) => g.id === graphId);
+        if (!graph) return null;
+        const plan = planGroupToHive(graph, groupId, {
+            newId: LumennGraphStore.#newId,
+            labelOf,
+        });
+        if (!plan) return null;
+        graph.nodes = plan.parent.nodes;
+        graph.edges = plan.parent.edges;
+        graph.activeNodeId = plan.parent.activeNodeId;
+        data.graphs.push(plan.hive);
+        await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
+        return plan;
+    }
+    /** Grava uma Hive montada por `planHiveImport` como storyboard novo do mundo. */
+    static async importHive(graph) {
+        if (!game.user.isGM || !graph?.id || graph.isHive !== true) return null;
+        const data = foundry.utils.duplicate(
+            game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
+        );
+        if (data.graphs.some((candidate) => candidate.id === graph.id)) return null;
+        data.graphs.push(foundry.utils.duplicate(graph));
+        await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
+        return graph;
+    }
+    /** Trilha de execução (níveis de Hive abaixo da raiz), gravada no storyboard-pai. */
+    static getLiveTrail(rootId) {
+        const trail = this.getGraph(rootId)?.liveTrail;
+        return Array.isArray(trail) ? trail : [];
+    }
+    static async setLiveTrail(rootId, levels) {
+        if (!game.user.isGM) return false;
+        const data = foundry.utils.duplicate(
+            game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
+        );
+        const graph = data.graphs.find((g) => g.id === rootId);
+        if (!graph) return false;
+        if (levels?.length) graph.liveTrail = levels;
+        else delete graph.liveTrail;
+        await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
+        return true;
+    }
+    /** Motivo pelo qual `addNode` recusaria o nó (para a interface avisar), ou null. */
+    static addNodeBlockReason(graphId, node, graphs = this.getAll()) {
+        if (!game.user.isGM) return 'not-gm';
+        const graph = graphs.find((g) => g.id === graphId);
+        if (!graph) return 'missing-graph';
+        if (node?.type === 'encounter' && graph.isHive !== true) return 'encounter-outside-hive';
+        if (
+            node?.type === 'hive-ref' &&
+            this.#wouldCreateHiveCycle(graphs, graphId, node.data?.graphId)
+        )
+            return 'hive-cycle';
+        return null;
+    }
+    /** Motivo pelo qual trocar a Hive de um `hive-ref` seria recusado, ou null. */
+    static retargetBlockReason(graphId, nodeId, targetGraphId) {
+        const graphs = this.getAll();
+        return this.#wouldCreateHiveCycle(graphs, graphId, targetGraphId, nodeId)
+            ? 'hive-cycle'
+            : null;
     }
     /* -- CRUD de Nodes ------------------------------------------------ */
     static async addNode(graphId, node) {
@@ -189,11 +298,7 @@ export class LumennGraphStore {
         );
         const graph = data.graphs.find((g) => g.id === graphId);
         if (!graph) return null;
-        if (node.type === 'encounter' && graph.isHive !== true) return null;
-        if (node.type === 'hive-ref') {
-            const targetGraphId = node.data?.graphId;
-            if (this.#wouldCreateHiveCycle(data.graphs, graphId, targetGraphId)) return null;
-        }
+        if (this.addNodeBlockReason(graphId, node, data.graphs)) return null;
         // Defaults das Settings aplicados quando o caller não os define.
         // Grupo não tem setting próprio (evita erro de chave não registrada).
         const d =
@@ -317,6 +422,14 @@ export class LumennGraphStore {
         graph.nodes = graph.nodes.filter((n) => n.id !== nodeId);
         graph.edges = graph.edges.filter((e) => e.from !== nodeId && e.to !== nodeId);
         if (graph.activeNodeId === nodeId) graph.activeNodeId = null;
+        // Sala apagada: porta e Encontro que apontavam para ela ficam sem sala (nunca órfãos).
+        for (const port of graph.hive?.ports ?? []) {
+            if (port.nodeId === nodeId) port.nodeId = null;
+        }
+        for (const other of graph.nodes) {
+            if (other.type === 'encounter' && other.data?.sceneNodeId === nodeId)
+                other.data.sceneNodeId = null;
+        }
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
         return true;
     }

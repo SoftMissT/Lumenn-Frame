@@ -1,13 +1,15 @@
 <div class="lf-root">
   <div class="lf-topbar">
     <span class="lf-brand">Lumenn Frame</span>
-    {{#if graphs.length}}
-    <select class="lf-graph-selector" data-graph-selector>
-      {{#each graphs}}
-      <option value="{{this.id}}" {{#if (lumenn-eq this.id ../activeGraph.id)}}selected{{/if}}>{{this.name}}</option>
-      {{/each}}
-    </select>
-    {{/if}}
+    <div class="lf-nav" role="group" aria-label="{{label.browserTitle}}">
+      <button type="button" class="lf-top-btn lf-nav-arrow" data-action="nav-back" title="{{label.historyBack}}" aria-label="{{label.historyBack}}" {{#unless canBack}}disabled{{/unless}}><i class="fa-solid fa-chevron-left"></i></button>
+      <button type="button" class="lf-top-btn lf-nav-arrow" data-action="nav-forward" title="{{label.historyForward}}" aria-label="{{label.historyForward}}" {{#unless canForward}}disabled{{/unless}}><i class="fa-solid fa-chevron-right"></i></button>
+      <button type="button" class="lf-sb-switch{{#if isHiveGraph}} is-hive{{/if}}" data-action="browser-open" title="{{label.browse}}" aria-haspopup="dialog">
+        <i class="fa-solid {{#if isHiveGraph}}fa-cubes{{else}}fa-film{{/if}}"></i>
+        <span class="lf-sb-name">{{activeGraph.name}}</span>
+        <i class="fa-solid fa-table-cells-large lf-sb-grid"></i>
+      </button>
+    </div>
     {{#if isGM}}
     <button class="lf-top-btn" data-action="create-graph" title="{{label.createGraph}}">+</button>
     {{#if editable}}
@@ -44,10 +46,53 @@
       <button class="lf-tool{{#if (lumenn-eq tool 'audio')}} active{{/if}}" data-tool="audio" title="{{label.addAudio}}"><i class="fa-solid fa-music"></i></button>
       <button class="lf-tool{{#if (lumenn-eq tool 'note')}} active{{/if}}" data-tool="note" title="{{label.addNote}}"><i class="fa-solid fa-note-sticky"></i></button>
       <button class="lf-tool{{#if (lumenn-eq tool 'group')}} active{{/if}}" data-tool="group" title="{{label.addGroup}}"><i class="fa-solid fa-object-group"></i></button>
+      {{#if isHiveGraph}}
+      <button class="lf-tool{{#if (lumenn-eq tool 'encounter')}} active{{/if}}" data-tool="encounter" title="{{label.addEncounter}}"><i class="fa-solid fa-bolt"></i></button>
+      {{/if}}
       {{/if}}
     </div>
 
     <div class="lf-viewport">
+      {{#if browser.open}}
+      <section class="lf-browser" role="dialog" aria-label="{{label.browserTitle}}">
+        <header class="lf-browser-head">
+          <h2><i class="fa-solid fa-clapperboard"></i> {{label.browserTitle}}</h2>
+          <nav class="lf-browser-tabs">
+            {{#each browser.tabs}}
+            <button type="button" class="{{#if this.active}}active{{/if}}" data-action="browser-filter" data-filter="{{this.id}}">{{#if (lumenn-eq this.id 'all')}}{{../label.browserAll}}{{/if}}{{#if (lumenn-eq this.id 'boards')}}{{../label.browserStoryboards}}{{/if}}{{#if (lumenn-eq this.id 'hives')}}{{../label.browserHives}}{{/if}}</button>
+            {{/each}}
+          </nav>
+          <button type="button" class="lf-browser-close" data-action="browser-close" aria-label="Esc"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+        <div class="lf-browser-grid">
+          {{#each browser.cards}}
+          <button type="button" class="lf-sb-card{{#if this.isHive}} is-hive{{/if}}{{#if this.isCurrent}} is-current{{/if}}" data-action="browser-go" data-graph="{{this.id}}">
+            <span class="lf-sb-thumb">{{#if this.thumb}}<img src="{{this.thumb}}" alt="" loading="lazy" draggable="false">{{else}}<i class="fa-solid {{#if this.isHive}}fa-cubes{{else}}fa-film{{/if}}"></i>{{/if}}</span>
+            <span class="lf-sb-meta">
+              <strong>{{this.name}}</strong>
+              <small>{{this.scenes}} {{../label.browserScenes}}{{#if this.isHive}} · {{../label.hiveBadge}}{{/if}}{{#if this.isCurrent}} · {{../label.browserCurrent}}{{/if}}</small>
+            </span>
+          </button>
+          {{/each}}
+        </div>
+      </section>
+      {{/if}}
+      {{#if trail}}
+      <div class="lf-trail" aria-label="{{label.trailLabel}}">
+        <span class="lf-trail-label"><i class="fa-solid fa-route"></i> {{label.trailLabel}}</span>
+        {{#each trail.crumbs}}<span class="lf-trail-crumb">{{this.name}}</span>{{#unless @last}}<span class="lf-trail-sep">&rsaquo;</span>{{/unless}}{{/each}}
+        {{#if trail.canExit}}
+        {{#each trail.exitPorts}}<button type="button" class="lf-top-btn" data-action="hive-exit" data-port="{{this.id}}" title="{{../label.hiveExitHint}}">{{../label.trailExitVia}}: {{this.name}}</button>{{/each}}
+        <button type="button" class="lf-top-btn" data-action="hive-exit" title="{{label.hiveExitHint}}"><i class="fa-solid fa-right-from-bracket"></i> {{label.trailExit}}</button>
+        {{/if}}
+      </div>
+      {{/if}}
+      {{#if editTrail}}
+      <div class="lf-trail" aria-label="{{label.trailLabel}}">
+        <button type="button" class="lf-top-btn" data-action="edit-back"><i class="fa-solid fa-arrow-left"></i> {{label.editBack}} {{editTrail.back}}</button>
+        {{#each editTrail.crumbs}}<span class="lf-trail-crumb">{{this.name}}</span>{{#unless @last}}<span class="lf-trail-sep">&rsaquo;</span>{{/unless}}{{/each}}
+      </div>
+      {{/if}}
       <div class="lf-camera">
         <svg class="lf-edges"></svg>
         {{#each nodes}}
@@ -88,8 +133,29 @@
             <div class="lf-node-body">{{this.data.body}}</div>
             <div class="lf-node-tag"><i class="fa-solid fa-note-sticky"></i> Note</div>
             {{/if}}
+            {{#if (lumenn-eq this.type 'hive-ref')}}
+            <div class="lf-node-thumb">
+              {{#if this.hiveThumb}}<img src="{{this.hiveThumb}}" alt="{{this.hiveName}}" loading="lazy" draggable="false">{{else}}<span class="lf-node-thumb-ph"><i class="fa-solid fa-cubes"></i></span>{{/if}}
+            </div>
+            <div class="lf-node-title"><i class="fa-solid fa-cubes"></i> {{this.hiveName}}</div>
+            <div class="lf-node-tag"><span class="lf-hive-badge">{{../label.hiveBadge}}</span> {{this.hiveRooms}} {{../label.hiveRooms}} &middot; {{this.hivePortName}}</div>
+            {{#if ../isGM}}{{#unless this.hiveMissing}}<button type="button" class="lf-hive-enter" data-hive-enter="{{this.id}}"><i class="fa-solid fa-door-open"></i> {{../label.hiveEnter}}</button>{{/unless}}{{/if}}
+            {{/if}}
+            {{#if (lumenn-eq this.type 'encounter')}}
+            <div class="lf-node-title"><i class="fa-solid fa-bolt"></i> {{this.encTitle}}</div>
+            <div class="lf-node-tag"><span class="lf-audio-role-badge">{{this.encTypeLabel}}</span></div>
+            <div class="lf-node-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            {{/if}}
           </div>
           <div class="lf-ports">
+            {{#if (lumenn-eq this.type 'encounter')}}
+            <span class="lf-port lf-port-in lf-port-audio" data-port="audio-in" data-node="{{this.id}}" title="AUDIO IN"></span>
+            {{/if}}
+            {{#if (lumenn-eq this.type 'hive-ref')}}
+            <span class="lf-port lf-port-in lf-port-flow-in" data-port="flow-in" data-node="{{this.id}}" title="FLOW IN"></span>
+            <span class="lf-port lf-port-out lf-port-flow-out" data-port="flow-out" data-node="{{this.id}}" title="FLOW OUT"></span>
+            <span class="lf-port lf-port-audio" data-port="audio-in" data-node="{{this.id}}" title="AUDIO IN"></span>
+            {{/if}}
             {{#if (lumenn-eq this.type 'scene')}}
             <span class="lf-port lf-port-in lf-port-flow-in" data-port="flow-in" data-node="{{this.id}}" title="FLOW IN"></span>
             <span class="lf-port lf-port-out lf-port-flow-out" data-port="flow-out" data-node="{{this.id}}" title="FLOW OUT"></span>
@@ -107,7 +173,26 @@
       <div class="lf-connect-hint">{{connectHint}}</div>
       {{/if}}
       {{#if editable}}
-      <div class="lf-audio-legend" aria-label="Legenda de áudio">
+      <details class="lf-library-dock" open>
+        <summary><i class="fa-solid fa-cubes"></i> {{label.hiveLibrary}} ({{library.length}})</summary>
+        {{#if library.length}}
+        <ul>
+          {{#each library}}
+          <li draggable="true" data-hive-drag="{{this.id}}">
+            <span class="lf-hive-name">{{this.name}} <small>{{this.rooms}} {{../label.hiveRooms}}</small></span>
+            <span class="lf-hive-btns">
+              <button type="button" data-insp-action="hive-insert" data-hive-id="{{this.id}}">{{../label.hiveInsert}}</button>
+              <button type="button" data-insp-action="hive-open" data-hive-id="{{this.id}}">{{../label.hiveOpen}}</button>
+            </span>
+          </li>
+          {{/each}}
+        </ul>
+        {{else}}
+        <p>{{label.groupToHiveHint}}</p>
+        {{/if}}
+      </details>
+      <details class="lf-audio-legend" aria-label="Legenda de áudio">
+        <summary>{{label.legend}}</summary>
         <span class="lf-audio-key lf-audio-key-scene"><i></i>{{label.scene}}</span>
         <span class="lf-audio-key lf-audio-key-music"><i></i>{{label.musicRole}}</span>
         <span class="lf-audio-key lf-audio-key-sfx"><i></i>{{label.sfxRole}}</span>
@@ -120,7 +205,7 @@
         <span class="lf-audio-key lf-audio-key-flow-out"><i></i>FLOW OUT</span>
         <span class="lf-audio-key lf-audio-key-left"><i></i>L / IN</span>
         <span class="lf-audio-key lf-audio-key-right"><i></i>R / OUT</span>
-      </div>
+      </details>
       {{/if}}
       {{#if transitioning}}
       <div class="lf-transitioning"><span class="lf-transitioning-dot"></span>{{label.transition}}</div>
@@ -146,9 +231,10 @@
           {{/each}}
         </select>
         {{/if}}
-        {{#if (lumenn-eq inspector.nodeType 'scene')}}
+        {{#if inspector.hasConnections}}
         <h3 class="lf-insp-title">{{label.connections}}</h3>
         {{#if editable}}
+        {{#if inspector.hasFlowOut}}
         <label class="lf-insp-label">{{label.outgoing}}</label>
         {{#if inspector.flowTargets.length}}
         <select data-insp-pick="flowTarget">
@@ -157,6 +243,7 @@
         <div class="lf-insp-actions"><button data-insp-action="add-flow">{{label.addDestination}}</button></div>
         {{else}}
         <p class="lf-insp-p">{{label.noScenes}}</p>
+        {{/if}}
         {{/if}}
         <label class="lf-insp-label">{{label.attachAudio}}</label>
         {{#if inspector.audioNodes.length}}
@@ -238,6 +325,37 @@
         <label class="lf-insp-label">{{label.body}}</label>
         <textarea data-insp-input="data.body" rows="4">{{inspector.node.data.body}}</textarea>
         {{/if}}
+        {{#if (lumenn-eq inspector.nodeType 'hive-ref')}}
+        <h3 class="lf-insp-title">{{label.hiveBadge}}</h3>
+        <label class="lf-insp-label">{{label.hiveTarget}}</label>
+        <select data-insp="data.graphId">
+          <option value="">{{label.hiveNoneSelected}}</option>
+          {{#each inspector.hiveRefOptions}}<option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>{{/each}}
+        </select>
+        <label class="lf-insp-label">{{label.hiveEntryPort}}</label>
+        <select data-insp="data.portId">
+          <option value="">{{label.auto}}</option>
+          {{#each inspector.hiveRefPorts}}<option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>{{/each}}
+        </select>
+        {{#if inspector.node.data.graphId}}
+        <div class="lf-insp-actions"><button data-insp-action="hive-open" data-hive-id="{{inspector.node.data.graphId}}">{{label.hiveOpen}}</button></div>
+        {{/if}}
+        {{/if}}
+        {{#if (lumenn-eq inspector.nodeType 'encounter')}}
+        <h3 class="lf-insp-title">{{label.addEncounter}}</h3>
+        <label class="lf-insp-label">{{label.title}}</label>
+        <input type="text" data-insp-input="data.title" value="{{inspector.node.data.title}}">
+        <label class="lf-insp-label">{{label.encType}}</label>
+        <select data-insp="data.encounterType">
+          {{#each inspector.encounterTypes}}<option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>{{/each}}
+        </select>
+        <label class="lf-insp-label">{{label.encRoom}}</label>
+        <select data-insp="data.sceneNodeId">
+          <option value="">{{label.encAnyRoom}}</option>
+          {{#each inspector.encounterRooms}}<option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>{{/each}}
+        </select>
+        <p class="lf-insp-p">{{label.encHint}}</p>
+        {{/if}}
         {{#if (lumenn-eq inspector.nodeType 'group')}}
         <h3 class="lf-insp-title">{{label.group}}</h3>
         <label class="lf-insp-label">{{label.title}}</label>
@@ -251,6 +369,8 @@
           {{/each}}
         </div>
         <div class="lf-insp-actions"><button data-insp-action="group-apply-rooms">{{label.groupApplyRooms}}</button></div>
+        <p class="lf-insp-p">{{label.groupToHiveHint}}</p>
+        <div class="lf-insp-actions"><button data-insp-action="group-to-hive"><i class="fa-solid fa-cubes"></i> {{label.groupToHive}}</button></div>
         {{/if}}
         {{/if}}
         <label class="lf-insp-label">{{label.color}}</label>
@@ -290,11 +410,24 @@
         </select>
         <label class="lf-insp-label">{{label.sceneTrans}}</label>
         <select data-insp="transition.scene.type" {{#if inspector.liveAudioEditing}}disabled{{/if}}>
-          <option value="cut" {{#if (lumenn-eq inspector.edge.transition.scene.type 'cut')}}selected{{/if}}>{{label.cut}}</option>
-          {{#each inspector.sceneTransitions}}
-          <option value="{{this.id}}" {{#if (lumenn-eq this.id ../inspector.edge.transition.scene.type)}}selected{{/if}}>{{this.label}}</option>
+          {{#each inspector.transitionGroups}}
+          <optgroup label="{{this.group}}">
+            {{#each this.items}}<option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>{{/each}}
+          </optgroup>
           {{/each}}
         </select>
+        {{#if inspector.isFilm}}<p class="lf-insp-p lf-film-note"><i class="fa-solid fa-eye-slash"></i> {{label.filmPlayersOnly}}</p>{{/if}}
+        {{#if inspector.isVideo}}
+        <label class="lf-insp-label">{{label.filmVideoFile}}</label>
+        <div class="lf-pick-row">
+          <input type="text" id="lf-edge-video" data-insp="transition.scene.video.src" value="{{inspector.edge.transition.scene.video.src}}" placeholder="stinger.webm">
+          <button type="button" data-insp-action="pick-video" data-pick-for="#lf-edge-video" title="{{label.filmVideoFile}}"><i class="fa-solid fa-folder-open"></i></button>
+        </div>
+        <label class="lf-insp-label">{{label.filmCutAt}}</label>
+        <input type="number" min="0" step="50" data-insp="transition.scene.video.cutAt" value="{{inspector.edge.transition.scene.video.cutAt}}">
+        <label class="lf-insp-label lf-insp-check"><input type="checkbox" data-insp="transition.scene.video.sound" {{#if inspector.edge.transition.scene.video.sound}}checked{{/if}}> {{label.filmVideoSound}}</label>
+        <p class="lf-insp-p lf-film-note">{{label.filmVideoHint}}</p>
+        {{/if}}
         <label class="lf-insp-label">{{label.duration}} (ms)</label>
         <input type="number" min="0" step="100" data-insp="transition.scene.duration" value="{{inspector.edge.transition.scene.duration}}" {{#if inspector.liveAudioEditing}}disabled{{/if}}>
         <label class="lf-insp-label">{{label.color}}</label>
@@ -369,6 +502,128 @@
       <p class="lf-insp-p">{{activeGraph.name}}</p>
       <p class="lf-insp-p">{{nodes.length}} nodes &middot; {{edgeCount}} edges</p>
       <p class="lf-insp-p">Schema v2 &middot; graph editor</p>
+      {{#if editable}}
+      <h3 class="lf-insp-title">{{label.hiveSection}}</h3>
+      {{#if inspector.hive.isHive}}
+      <p class="lf-insp-p">{{label.hiveIntro}}</p>
+      <label class="lf-insp-label">{{label.hivePorts}}</label>
+      <ul class="lf-hive-ports">
+        {{#each inspector.hive.ports}}
+        <li>
+          <input type="text" data-hive-field="name" data-hive-port="{{this.id}}" value="{{this.name}}" placeholder="{{../label.hivePortName}}">
+          <select data-hive-field="direction" data-hive-port="{{this.id}}">
+            <option value="entry" {{#if this.isEntry}}selected{{/if}}>{{../label.hivePortEntry}}</option>
+            <option value="exit" {{#unless this.isEntry}}selected{{/unless}}>{{../label.hivePortExit}}</option>
+          </select>
+          <select data-hive-field="nodeId" data-hive-port="{{this.id}}">
+            <option value="">{{../label.hivePortNoRoom}}</option>
+            {{#each this.rooms}}<option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>{{/each}}
+          </select>
+          <button class="lf-insp-x" data-insp-action="hive-port-remove" data-port-id="{{this.id}}" title="{{../label.hivePortRemove}}">&#10005;</button>
+        </li>
+        {{/each}}
+      </ul>
+      <div class="lf-insp-actions"><button data-insp-action="hive-port-add">{{label.hivePortAdd}}</button></div>
+      <div class="lf-trans-card">
+        <h4 class="lf-trans-title"><i class="fa-solid fa-door-open"></i> {{label.hiveTransition}}</h4>
+        <select data-hive-field="transition.type">
+          {{#each inspector.hive.transition.options}}
+          <optgroup label="{{this.group}}">
+            {{#each this.items}}<option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>{{/each}}
+          </optgroup>
+          {{/each}}
+        </select>
+        {{#if inspector.hive.transition.isVideo}}
+        <label class="lf-insp-label">{{label.filmVideoFile}}</label>
+        <div class="lf-pick-row">
+          <input type="text" id="lf-hive-video-in" data-hive-field="transition.videoSrc" value="{{inspector.hive.transition.video.src}}" placeholder="stinger.webm">
+          <button type="button" data-insp-action="pick-video" data-pick-for="#lf-hive-video-in" title="{{label.filmVideoFile}}"><i class="fa-solid fa-folder-open"></i></button>
+        </div>
+        <div class="lf-trans-row">
+          <label>{{label.filmCutAt}}<input type="number" min="0" step="50" data-hive-field="transition.cutAt" value="{{inspector.hive.transition.video.cutAt}}"></label>
+          <label class="lf-insp-check"><input type="checkbox" data-hive-field="transition.videoSound" {{#if inspector.hive.transition.video.sound}}checked{{/if}}> {{label.filmVideoSound}}</label>
+        </div>
+        {{/if}}
+        <div class="lf-trans-row">
+          <label>{{label.duration}} (ms)<input type="number" min="0" step="100" data-hive-field="transition.duration" value="{{inspector.hive.transition.duration}}"></label>
+          <label>{{label.filmMusic}}<select data-hive-field="transition.music">{{#each inspector.hive.transition.music}}<option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>{{/each}}</select></label>
+        </div>
+        <label class="lf-insp-label">{{label.hiveTransitionAudio}}<input type="number" min="0" step="100" data-hive-field="transition.crossfade" value="{{inspector.hive.transition.crossfade}}"></label>
+        {{#if inspector.hive.transition.isFilm}}
+        <label class="lf-insp-label lf-insp-check"><input type="checkbox" data-hive-field="transition.caption" {{#if inspector.hive.transition.caption}}checked{{/if}}> {{label.hiveCaption}}</label>
+        {{/if}}
+      </div>
+      <div class="lf-trans-card">
+        <h4 class="lf-trans-title"><i class="fa-solid fa-film"></i> {{label.hiveExitTransition}}</h4>
+        <select data-hive-field="exit.type">
+          {{#each inspector.hive.exit.options}}
+          <optgroup label="{{this.group}}">
+            {{#each this.items}}<option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>{{/each}}
+          </optgroup>
+          {{/each}}
+        </select>
+        {{#if inspector.hive.exit.isVideo}}
+        <label class="lf-insp-label">{{label.filmVideoFile}}</label>
+        <div class="lf-pick-row">
+          <input type="text" id="lf-hive-video-out" data-hive-field="exit.videoSrc" value="{{inspector.hive.exit.video.src}}" placeholder="stinger.webm">
+          <button type="button" data-insp-action="pick-video" data-pick-for="#lf-hive-video-out" title="{{label.filmVideoFile}}"><i class="fa-solid fa-folder-open"></i></button>
+        </div>
+        <div class="lf-trans-row">
+          <label>{{label.filmCutAt}}<input type="number" min="0" step="50" data-hive-field="exit.cutAt" value="{{inspector.hive.exit.video.cutAt}}"></label>
+          <label class="lf-insp-check"><input type="checkbox" data-hive-field="exit.videoSound" {{#if inspector.hive.exit.video.sound}}checked{{/if}}> {{label.filmVideoSound}}</label>
+        </div>
+        {{/if}}
+        <div class="lf-trans-row">
+          <label>{{label.duration}} (ms)<input type="number" min="0" step="100" data-hive-field="exit.duration" value="{{inspector.hive.exit.duration}}"></label>
+          <label>{{label.filmMusic}}<select data-hive-field="exit.music">{{#each inspector.hive.exit.music}}<option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>{{/each}}</select></label>
+        </div>
+        <label class="lf-insp-label">{{label.hiveTransitionAudio}}<input type="number" min="0" step="100" data-hive-field="exit.crossfade" value="{{inspector.hive.exit.crossfade}}"></label>
+        {{#if inspector.hive.exit.isFilm}}
+        <label class="lf-insp-label lf-insp-check"><input type="checkbox" data-hive-field="exit.caption" {{#if inspector.hive.exit.caption}}checked{{/if}}> {{label.hiveCaption}}</label>
+        {{/if}}
+        <p class="lf-insp-p lf-film-note"><i class="fa-solid fa-eye-slash"></i> {{label.filmPlayersOnly}}</p>
+      </div>
+      {{#if inspector.hive.pending.length}}
+      <label class="lf-insp-label">{{label.hivePending}}</label>
+      <p class="lf-insp-p">{{label.hivePendingHint}}</p>
+      <ul class="lf-hive-pending">
+        {{#each inspector.hive.pending}}
+        <li>
+          <span class="lf-hive-name">{{this.kindLabel}}: {{this.label}}</span>
+          <select data-hive-relink="{{this.nodeId}}">
+            {{#each this.options}}<option value="{{this.id}}">{{this.name}}</option>{{/each}}
+          </select>
+          <button data-insp-action="hive-relink" data-node-id="{{this.nodeId}}">{{../label.hiveRelink}}</button>
+        </li>
+        {{/each}}
+      </ul>
+      {{/if}}
+      <div class="lf-insp-actions"><button class="danger" data-insp-action="hive-unmark">{{label.hiveUnmark}}</button></div>
+      {{else}}
+      <div class="lf-insp-actions"><button data-insp-action="hive-mark">{{label.hiveMark}}</button></div>
+      {{/if}}
+      <label class="lf-insp-label">{{label.hiveLibrary}}</label>
+      {{#if inspector.hive.library.length}}
+      <ul class="lf-hive-library">
+        {{#each inspector.hive.library}}
+        <li draggable="true" data-hive-drag="{{this.id}}">
+          <span class="lf-hive-name"><i class="fa-solid fa-cubes"></i> {{this.name}} <small>{{this.rooms}} {{../label.hiveRooms}}</small></span>
+          {{#if this.usedIn}}<small class="lf-hive-used">{{../label.hiveUsedIn}}: {{this.usedIn}}</small>{{/if}}
+          <span class="lf-hive-btns">
+            {{#unless this.isCurrent}}
+            <button data-insp-action="hive-insert" data-hive-id="{{this.id}}">{{../label.hiveInsert}}</button>
+            <button data-insp-action="hive-open" data-hive-id="{{this.id}}">{{../label.hiveOpen}}</button>
+            {{/unless}}
+            <button data-insp-action="hive-export" data-hive-id="{{this.id}}">{{../label.hiveExport}}</button>
+          </span>
+        </li>
+        {{/each}}
+      </ul>
+      {{else}}
+      <p class="lf-insp-p">{{label.hiveLibraryEmpty}}</p>
+      {{/if}}
+      <div class="lf-insp-actions"><button data-insp-action="hive-import">{{label.hiveImport}}</button></div>
+      {{/if}}
       {{#if inspector.audioNodeIndex.length}}
       <label class="lf-insp-label">{{label.audioNodes}}</label>
       <ul class="lf-insp-edges lf-audio-node-index">

@@ -6,6 +6,7 @@ import { LumennCompat, SOCKET_NAME } from './foundry-compat.mjs';
 import { LumennGraphApp, lumennClientSceneFade } from './storyboard-app.mjs';
 import { registerHandlebarsHelpers } from './handlebars-helpers.mjs';
 import { registerLumennTransitions } from './custom-transitions.mjs';
+import { filmIn, filmNotifyReady, filmOut, filmPrepare } from './film-transitions.mjs';
 const MODULE_ID = 'lumenn-frame';
 Hooks.once('init', () => {
     registerLumennTransitions();
@@ -57,7 +58,23 @@ Hooks.once('ready', () => {
     }
     LumennCompat.socketOn((payload) => {
         if (!payload?.type) return;
-        if (LumennCompat.isGM()) return;
+        if (LumennCompat.isGM()) {
+            if (payload.type === 'film-ready') filmNotifyReady(payload);
+            return;
+        }
+        // Stinger de vídeo: carrega antes e avisa o mestre que está pronto.
+        if (payload.type === 'film-prepare') {
+            filmPrepare(payload).then((ok) =>
+                LumennCompat.socketEmit({ type: 'film-ready', src: payload.src, userId: game.user.id, ok })
+            );
+            return;
+        }
+        // Transição de cinema: só jogadores (o GM já saiu acima).
+        if (payload.type === 'film') {
+            if (payload.phase === 'in') filmIn(payload);
+            else filmOut(payload);
+            return;
+        }
         if (payload.type === 'transition:start') {
             const scope = payload.scope ?? 'both';
             if ((scope === 'scene' || scope === 'both') && LumennSettings.get('playerSceneFade')) {

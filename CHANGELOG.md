@@ -4,6 +4,10 @@ As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver
 
 ## [Unreleased]
 
+## [0.0.32] - 2026-11-09
+
+> Hive v3 compatível: núcleo puro e store aditivo, foco/zoom no editor e Journal de uso. **Gates estáticos verdes; runtime Foundry continua pendente.**
+
 ### Added
 
 - Núcleo puro da Hive v3: ciclos, portas, trilha de navegação, casamento de recursos por nome e validação de exportação (`scripts/hive-runtime.mjs`), com 5 testes Node.

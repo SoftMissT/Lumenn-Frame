@@ -4,6 +4,31 @@ As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver
 
 ## [Unreleased]
 
+## [0.0.33] - 2026-11-10
+
+> Hive de verdade na interface: Grupo vira Hive, entrar e sair no Ao Vivo, biblioteca, transições de cinema e stinger de vídeo. **79 testes Node verdes; fluxo exercitado num Foundry 14.367 isolado com mestre e jogador, via Playwright. Validação no mundo real, com jogadores de verdade e no Foundry 13.350, continua pendente.**
+
+### Added
+
+- **Virar Hive.** O Grupo vira um storyboard inteiro, entra na Biblioteca e fica como um nó Hive no pai. Portas automáticas: FLOW de fora vira entrada, FLOW para fora vira saída; a música só do grupo vai junto.
+- **Entrar e sair.** Botão Entrar no nó; no Ao Vivo, a câmera entra no nó e a transição de entrada roda. Barra de trilha com Sair por porta, trilha persistida no storyboard-pai (sobrevive ao F5), sala ativa da Hive nunca gravada no grafo dela. Na Edição, Entrar abre a Hive por dentro com Voltar.
+- **Encontro** (dentro de Hive): toca a música própria sem trocar de cena; novo clique volta à música da sala.
+- **Biblioteca de Hives** fixa no canvas (arrastar ou Adicionar ao canvas), exportar/importar em arquivo com cenas e áudios casados pelo nome e lista de Pendentes para religar; entrada bloqueada enquanto houver pendente.
+- **Navegação entre storyboards:** seletor em tela cheia com filtros e cartões, voltar/avançar, legenda recolhível.
+- **Transições de cinema, só para jogadores:** cutscene de filme, íris, varredura, cortinas, persiana, flash, sonho e película queimando; a tela do mestre não escurece e a música só muda se configurada. Prévia na seta.
+- **Stinger de vídeo (.webm):** arquivo pelo FilePicker, ponto de corte, pré-carga com confirmação dos jogadores e som opcional.
+- Guia v4 com a pipeline e a receita de exportação do vídeo.
+
+### Fixed
+
+- Rótulos vazios no Inspector (`curve`, `preview`, `v14Native`, `fallbackMode`) e nomes das salas do Grupo ilegíveis.
+- Excluir Hive em uso agora avisa onde ela é usada; adicionar Encontro fora de Hive e ciclos avisam o motivo em vez de falhar calado.
+- Núcleo da Hive lia `data.hiveId` e portas no formato errado; agora usa `data.graphId` e `graph.hive.ports`.
+
+### Not tested
+
+- Vídeo com transparência, cliente de jogador em sessão real, Foundry 13.350, Safari.
+
 ## [0.0.32] - 2026-11-09
 
 > Hive v3 compatível: núcleo puro e store aditivo, foco/zoom no editor e Journal de uso. **Gates estáticos verdes; runtime Foundry continua pendente.**

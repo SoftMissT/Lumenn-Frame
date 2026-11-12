@@ -4,6 +4,111 @@ As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-12
+
+> Primeira versão validada em runtime real (Foundry 14.367, GM + jogador). Reúne as entregas de 0.0.34 e 0.0.35, que não chegaram a ser publicadas, mais o que segue.
+>
+> Neural Hive v3: Fase 1 (pré-load com estados), HUD de Destinos refeito e Fase 4 (pedidos de visita), mais transições novas, título de cutscene, fontes, link nos dois sentidos, barra enxuta, stingers de vídeo e compêndio de transições. **170/170 testes Node verdes. Runtime verificado no Foundry 14.367 isolado (:30001) com 2 clientes, GM + jogador.** Foundry 13.350, Electron e responsivo (375/768) não testados.
+
+### Added
+
+- **Transições novas e escolha rápida.** Shaders `lumenn-bounce-in` (entra quicando), `lumenn-slide` (empurra para o lado) e `lumenn-pixelate` (pixel retrô de RPG), e o efeito de cinema **Batalha RPG** (`film:battle`, espiral e flash). A lista de 26 itens virou grupos (Movimento de câmera, Jogo / RPG, Cinema, Efeitos do Foundry) e o Inspector ganhou 8 atalhos de um clique: Dissolver, Zoom in, Zoom out, Bounce, Cutscene, Batalha, Pixel, Corte. Cross dissolve e zoom in/out já existiam, mas estavam escondidos na lista.
+- **Título da cutscene configurável.** Na Cutscene de filme o título aparece no **meio da tela**; o GM escolhe texto, subtítulo, fonte, tamanho (16–200 px) e cor na própria aresta (`transition.scene.title`, aditivo). Sem texto, usa o nome do destino como antes. Fonte, cor e tamanho passam por validação antes de virar CSS (`filmTitle`, 2 testes).
+- **Fontes do módulo.** Orbitron (títulos), Rajdhani (texto), Bebas Neue e Noto Serif JP (Bold) embutidas em `assets/fonts/` com as licenças OFL, registradas em `CONFIG.fontDefinitions` (aparecem também no editor de texto do Foundry) e usadas na interface do editor.
+- **"+ Hive" no topo.** Cria a Hive no centro da vista.
+- **6 stingers de vídeo prontos** em `assets/stingers/` (WebM VP9 com transparência, 1280×720, 57–770 KB): Tinta, Filme queimado, Luz vazada, Corte de espada, Glitch e Hiperespaço. Cobrem a tela 100% exatamente na metade, que é o corte padrão, e a cena troca por baixo. Renderizados quadro a quadro por `tools/stingers/render.mjs` + FFmpeg (reproduzível, sem editor de vídeo). No Inspector, o modo Stinger ganhou atalho próprio e uma fileira de stingers prontos (ligação, entrada e saída da Hive); sem arquivo escolhido, toca a Tinta.
+- **Compêndio "Lumenn Frame: Transições"** (`packs/lumenn-transitions`, Macro): 16 transições prontas (6 stingers, Cutscene com título, Batalha, Íris, Cortina, Dissolver cruzado, Zoom in/out, Bounce, Deslizar, Pixel retrô). Selecione uma ligação no editor e rode a macro: a transição é gravada nela. API nova `api.applyTransition(id)`; catálogo puro em `scripts/transition-presets.mjs` (3 testes); `tools/stingers/build-pack.js` reconstrói o pacote.
+- **HUD com contexto (Neural Hive v3, Fase 2).** Grupo **Recentes** no topo (últimos 5 saltos pelo HUD, por cliente, setting oculto `recentDestinations`) e selos de parentesco em cada grupo: **Dentro daqui** (Hive filha), **Nível acima** e **Ao lado** (irmã). A ordem dos grupos segue o parentesco: aqui → dentro → acima → ao lado → resto. Modelo puro (`graphRelations`, `pushRecent`) com 6 testes novos. Verificado no Foundry 14.367 isolado.
+- **Editor visual da rede (Neural Hive v3, Fase 3).** Responde às três perguntas do blueprint:
+  - **Onde estou:** o Inspector do grafo ganhou o painel "Onde estou" (endereço, tipo Storyboard/Hive, contagens de cenas/áudios/Hives, sinapses e portas, INTRO/OUTPUT com "em outro nível", destinos e botão para abrir o HUD). Substitui o texto fixo em inglês "N nodes · N edges · Schema v2 · graph editor". Modelo puro em `scripts/neural-context.mjs`.
+  - **Que destinos existem:** a migalha da Edição agora é clicável (ancestrais viram atalho, o nível atual fica como texto); a lista "Saem do nó ativo" mostra as sinapses que partem do nó ativo.
+  - **O que o clique faz:** cada nó tem dica (`data-tooltip`) com o que o clique vai fazer, por modo e tipo ("Clique: ir direto a esta cena", "Você está aqui", "Sem ligação a partir daqui"…). **O clique, o escurecimento e a dica leem da mesma função** (`scripts/node-intent.mjs`, ADR-005).
+  - **Sinapses:** as que saem do nó ativo (Ao Vivo) ou tocam o nó selecionado ganham um pulso pontilhado (teto de 24, respeita `prefers-reduced-motion`); portas ligadas ganham halo.
+  - **Rótulos de aresta:** encurtados ao espaço livre real entre os cards (0 px cobertos no runtime), com o texto completo na dica da aresta (ADR-002 mantida).
+- **22 testes novos:** `tests/node-intent.test.mjs` (8), `tests/neural-context.test.mjs` (6), mais 7 em `tests/edge-label.test.mjs`. Total **155/155**.
+- **Pedidos de visita com aprovação do GM (Neural Hive v3, Fase 4).** O GM marca uma cena como **Visitável pelos jogadores** no Inspector (`data.visitable`, aditivo, desligado por padrão; `SCHEMA_VERSION` segue 2). O jogador abre "Pedir visita" (ferramenta nova nos controles de cena, só para não-GM), escolhe uma cena liberada e envia o pedido; o GM recebe uma notificação e uma janela de fila que **não rouba o foco**, e aprova ou recusa. Aprovada, a visita abre **só para quem pediu**: uma janela com a imagem da cena e a faixa "visita privada", sem trocar o canvas nem ativar a cena para a mesa. Se o GM ativar outra cena, a visita fecha e o jogador acompanha a mesa. Um pedido pendente por jogador (o novo cancela o anterior); expira em 2 min; o jogador pode cancelar; só o GM ativo responde. Respostas vão só ao jogador (`socket` com `recipients`).
+- **Por que não `Scene#view()`:** o spike mostrou canvas preto para jogador sem token com visão ligada ("There is no Token in this Scene…"). O preview é uma janela do módulo.
+- **Escopo honesto:** é fluxo de experiência, não controle de acesso; o core já entrega o documento da cena a todo cliente. O remetente é validado pelo `senderUserId` do servidor, e pedido em nome de outro usuário, resultado forjado e cancelamento alheio são descartados.
+- **Módulos novos:** `scripts/visit-requests.mjs` (estados, fila, validação; puro) e `scripts/visit-ui.mjs` (janelas e socket); 8 testes em `tests/visit-requests.test.mjs`.
+- **Pré-load com estados (`scripts/preload-tracker.mjs`).** `idle/loading/ready/error/cancelled` por cena, deduplicação de cargas simultâneas, cancelamento que descarta o resultado atrasado e nova tentativa depois de erro ou cancelamento. O estado sobrevive ao fechar o HUD.
+- **HUD de Destinos refeito (`scripts/neural-hud.mjs` + `scripts/neural-hud-model.mjs`).** Janela `ApplicationV2` própria; destinos agrupados por Hive com o grafo atual primeiro ("Aqui"); filtros Todos/Cenas/Hives/Áudio/Outros com contagem; busca por palavras em qualquer ordem ("hive sala 2"); chip de estado e botão único Pré-carregar/Cancelar/Tentar de novo; foco por linha com ↑/↓, Enter entra, P pré-carrega, Esc fecha e devolve o foco ao canvas; região `aria-live`; `prefers-reduced-motion`; uma janela só.
+- **22 testes novos:** 13 em `tests/preload-tracker.test.mjs` e 9 em `tests/neural-hud-model.test.mjs`.
+
+### Changed
+
+- **Link vale nos dois sentidos.** Uma ligação A→B já leva de B para A no Ao Vivo, no salto e na entrada da Hive; o botão "Adicionar retorno" saiu e o Inspector mostra "Vale nos dois sentidos" (`scripts/links.mjs`, 4 testes).
+- **Barra lateral enxuta (conceito 07).** Ficam só Selecionar e Enquadrar (mais Encontro dentro da Hive). Saíram Mover (use espaço ou botão do meio), Conectar (o link sai da porta), Adicionar Cena e Áudio (arraste da barra lateral do Foundry), Adicionar Nota (não funcionava) e Adicionar Grupo (virou "+ Hive").
+
+### Fixed
+
+- **Exportação no app desktop.** O download virava um link `blob:` que o Windows não abria ("Obter um aplicativo para abrir este link"). No desktop o arquivo agora vai só pelo upload para `worlds/<mundo>/lumenn-exports/`; no navegador usa o `saveDataToFile` do core. Reexportar a mesma Hive atualiza a entrada do compêndio em vez de duplicar; falha de arquivo ou compêndio aparece como aviso na tela. Compêndio acessado por `foundry.documents.collections.CompendiumCollection` (o global foi depreciado).
+- **Editor de transição.** Números cortados ("10(" no lugar de 1000) por um `max-width` geral; agora cada tempo mostra o valor inteiro com a unidade `ms`. Transição de Cena e de Áudio em cartões separados; os tempos de áudio somem quando o modo é Manter ou Corte.
+- **Escurecimento mentia para o GM.** No Ao Vivo o GM salta para qualquer nó, mas o editor apagava os que não tinham ligação com o nó ativo (3 de 5 cards na Hive de teste). O GM nunca mais é escurecido; só o jogador, onde o clique é realmente bloqueado.
+- **Dica da aresta com "?".** O separador "→" tinha virado "?" no texto da dica da aresta.
+- **HUD de Destinos não abria (desde a 0.0.35).** `DialogV2` sem `buttons` lança erro no Foundry 14; o botão Destinos e "Abrir HUD" não faziam nada.
+- **Pré-load era no-op.** `LumennCompat.preloadScene` chamava `scene.preload()`, que não existe no documento `Scene`; o HUD anunciava "Cena pronta" sem carregar nada, e a transição também não pré-carregava. Agora usa `game.scenes.preload(id, { broadcast: false })` (v14) ou `push = false` (v13), só no cliente do GM.
+- **Fundo 404 aparecia como pronto.** O core engole falha de textura (`allSettled` + `console.warn`); o HUD agora confere o cache do fundo e mostra "Falhou".
+- **`Scene#background` depreciado no v14.** Três leituras de capa no editor passam por `LumennCompat.sceneBackgroundSrc`, sem o aviso de compatibilidade.
+- **Capa quebrada.** Card cuja imagem não carrega mostra placeholder em vez do ícone quebrado com o texto alternativo por cima.
+- **Zoom mostrava "100%" duas vezes.** O botão de reset virou "1:1".
+- **Biblioteca de Hives cobria o canvas.** O dock reabria a cada render; agora começa recolhido e lembra o estado.
+- **Cabeçalho do editor.** O título ficava vazio (`title` na raiz, formato v1; a `ApplicationV2` lê `window.title`) e virava uma linha vermelha solta; a classe legada `window-app` encolhia o cabeçalho para 25 px e cortava os controles ⋮/✕ (32 px) acima da janela. Agora mostra "Lumenn Frame" com ícone, 36 px, controles inteiros.
+- **HUD sobrevivia ao editor.** Fechar o storyboard fecha o HUD junto.
+
+### Security
+
+- **Socket valida o remetente.** O core entrega `(payload, senderUserId)`: `film-ready` só vale quando `payload.userId` é quem enviou, e jogadores só obedecem a cinema/transição vindos de um GM. Verificado no runtime: `film-ready` forjado em nome de outro usuário é descartado.
+
+## [0.0.35] - 2026-11-11
+
+> Navegação neural: endereço global, salto direto de qualquer nó para qualquer nó, INTRO/OUTPUT na raiz, menu de botão direito e HUD de destinos. **104 testes Node verdes (90 anteriores + 14 novos) e `node --check` limpo; QA de runtime no isolado :30001 fica pendente.**
+
+### Added
+
+- **Endereço neural aditivo.** `graph.kind`, `graph.address`, `graph.anchors { intro, output }` e `node.address`; sem bump de schema e sem migração. Grafo antigo abre sem endereço/âncora: o endereço é derivado do nome, e uma Hive herda o caminho do pai via `hive-ref`.
+- **Resolver puro (`scripts/neural-address.mjs`).** `buildAddressIndex`, `resolveAddress`, `listDestinations`, `parentGraphId`, `rootGraphId`, `anchorOf` e `planJump`; ID sempre resolve, endereço normaliza caixa/acento/espaço, duplicado não apaga ninguém (primeiro vence, repetido marcado) e nada é avaliado como código.
+- **Salto direto `#jumpTo`.** Qualquer nó para qualquer nó, 0 intermediários e 0 links criados. Monta a trilha inteira pela cadeia de `hive-ref`, entra na Hive pela porta de entrada, ativa cena, toca áudio/Encontro ou só seleciona nota/grupo; uma transição só, configurada ou padrão.
+- **Mouse.** Clique esquerdo no Ao Vivo salta direto (GM), sem confirmação e sem popup; em Edição seleciona. Clique direito abre menu contextual com Entrar agora, Configurar transição, Definir/Remover INTRO e OUTPUT, Abrir Hive (`hive-ref`), Copiar endereço neural e Abrir HUD; o menu não navega sozinho.
+- **INTRO/OUTPUT/Destinos no topo.** Botões do GM saltam para as âncoras da raiz; `Destinos` abre o HUD (DialogV2) com breadcrumb, busca por nome/endereço, lista de grafos e nós, `Entrar` e `Pré-carregar`. `Esc` fecha e o foco volta ao canvas.
+- **Badge de âncora no card.** Nós marcados mostram `INTRO`/`OUTPUT`.
+- **Export/import preserva** `kind`, `address`, `anchors` e o `address` de cada nó, além do que a 0.0.34 já preservava.
+
+### Removed
+
+- **Confirmação no caminho de navegação.** `#confirmGo` saiu de `#navigateTo` e `#enterHive`; a confirmação fica só para ações destrutivas. O setting `confirmSceneTransition` e as chaves de confirmação foram removidos.
+
+### Security
+
+- Endereço é dado, não instrução: sem `eval`, sem `Function`, sem abrir URL a partir do texto. O resolver só enxerga IDs/endereços do próprio mundo.
+- Exportação usa nome de arquivo sanitizado para o download e para `worlds/<world>/lumenn-exports`, sem path traversal.
+- Âncoras, salto e HUD são GM-only; jogador não ganha atalho e continua seguindo o GM.
+
+### Not tested
+
+- QA de runtime no Foundry isolado (`D:\FoundryData-Test`, :30001), app desktop Electron, diálogo do HUD com teclado/foco e pré-carregamento de cena. Nenhum gate de runtime foi exercitado nesta entrega.
+
+## [0.0.34] - 2026-11-11
+
+> Quatro correções de uso: portas da Hive no card, ligação em série, exportação que não se perde e música + SFX convivendo. **90 testes Node verdes (79 anteriores + 11 novos) e `node --check` limpo; runtime em Foundry real e no app desktop continua pendente.**
+
+### Added
+
+- **Hub de portas no card da Hive.** Entradas à esquerda, saídas à direita, cada uma com contador de ligações; cinco visíveis e o resto rola. Variante popover (botão Portas) para testar as duas, no setting de cliente `portHubStyle` (`rail` padrão | `popover`).
+- **Porta de saída na aresta.** A FLOW que sai de um nó Hive guarda `exitPortId` (aditivo; legado fica sem). Arrastar de um soquete de saída já cria a aresta com a porta certa, e o Inspector da aresta tem o select "Porta de saída" para reparar arestas antigas.
+- **Ligação em série.** Clique (sem arrastar) numa saída arma a porta e o ghost segue o cursor; clique na entrada cria e desarma; Shift+clique cria e continua armado; Ctrl+clique alterna a aresta daquela entrada com a saída armada, sem sair do modo; Esc ou clique no vazio desarma.
+- **Exportação em arquivo e em compêndio.** Além do `.json` baixado, o app desktop agora sobe o arquivo via FilePicker para `worlds/<world>/lumenn-exports/<hive>-<timestamp>.json` (o download de `blob:` não vira arquivo no Electron) e toda exportação cria uma entrada no compêndio de mundo `world.lumenn-frame-hives`, com o payload inteiro na flag e uma página de texto legível.
+
+### Fixed
+
+- **Exportar Hive perdia a transição de saída.** `hive.exit` agora vai no arquivo e volta na importação; as portas ganham ids novos no import e as arestas (`portId`, `exitPortId`) passam a apontar para eles em vez de ficar órfãs no arquivo.
+- **Alvo obsoleto ao soltar a ligação.** No `pointerup`, o hit test do ponto final vence o alvo guardado durante o arrasto.
+- **Música forçava exclusividade dentro da Playlist.** Ao iniciar música, o módulo parava as outras faixas na mão; agora respeita o `mode` do core (Sequential/Simultaneous). Ao parar uma Playlist, para só os sons que ele mesmo iniciou — nunca `stopAll()`.
+- **Loop do SFX.** `data.loop` (já existente no nó de áudio) agora chega ao `repeat` do `PlaylistSound` e volta ao valor do usuário ao parar; padrão música `true`, SFX `false`, aplicado na criação do nó e ao trocar o papel no Inspector. SFX e música em playlists separadas coexistem, e trocar a música não corta mais o SFX.
+
+### Not tested
+
+- Runtime em Foundry 14.367 com mestre e jogador, app desktop Electron, Foundry 13.350. Nenhum destes gates foi exercitado nesta entrega.
+
 ## [0.0.33] - 2026-11-10
 
 > Hive de verdade na interface: Grupo vira Hive, entrar e sair no Ao Vivo, biblioteca, transições de cinema e stinger de vídeo. **79 testes Node verdes; fluxo exercitado num Foundry 14.367 isolado com mestre e jogador, via Playwright. Validação no mundo real, com jogadores de verdade e no Foundry 13.350, continua pendente.**

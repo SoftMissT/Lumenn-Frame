@@ -159,11 +159,20 @@ export function filmNotifyReady({ src, userId } = {}) {
     waiters.get(src)?.(userId);
 }
 
-function overlay() {
-    let el = document.getElementById(OVERLAY_ID);
+/**
+ * Overlay de cinema. Sem `host`: o da tela cheia (#lumenn-film), único. Com `host`: um por
+ * monitor do estúdio, do tamanho da janela e reduzido em escala, para a prévia sair igual à mesa.
+ */
+function overlay(host = null) {
+    let el = host ? host.querySelector(':scope > .lff-root') : document.getElementById(OVERLAY_ID);
     if (el) return el;
     el = document.createElement('div');
-    el.id = OVERLAY_ID;
+    if (host) el.dataset.base = 'lff-root lff-contained';
+    else {
+        el.id = OVERLAY_ID;
+        el.dataset.base = 'lff-root';
+    }
+    el.className = el.dataset.base;
     el.setAttribute('aria-hidden', 'true');
     const strips = Array.from(
         {
@@ -172,8 +181,17 @@ function overlay() {
         (_, i) => `<i style="--i:${i}"></i>`
     ).join('');
     el.innerHTML = `<div class="lff-veil"></div><div class="lff-panel lff-left"></div><div class="lff-panel lff-right"></div><div class="lff-blinds">${strips}</div><div class="lff-stage"></div><div class="lff-swirl"></div><div class="lff-bar lff-top"></div><div class="lff-bar lff-bottom"></div><div class="lff-grain"></div><div class="lff-caption"><strong></strong><span></span></div>`;
-    document.body.appendChild(el);
+    (host ?? document.body).appendChild(el);
     return el;
+}
+/** Monitor do estúdio: overlay do tamanho da janela, reduzido para caber no `host`. */
+function fitToHost(el, host) {
+    if (!host) return;
+    const w = window.innerWidth || 1;
+    const h = window.innerHeight || 1;
+    el.style.width = `${w}px`;
+    el.style.height = `${h}px`;
+    el.style.transform = `scale(${host.clientWidth / w})`;
 }
 async function playVideo(el, { src, sound = false, volume = 0.8 }) {
     const stage = el.querySelector('.lff-stage');
@@ -208,16 +226,18 @@ export async function filmIn({
     titleFont = '',
     titleColor = '',
     titleSize = 0,
+    host = null,
 } = {}) {
     if (!IDS.has(effect)) return 0;
-    const el = overlay();
+    const el = overlay(host);
+    fitToHost(el, host);
     // Título configurável: valores já validados por filmTitle; vazio volta ao padrão do CSS.
     const captionEl = el.querySelector('.lff-caption');
     captionEl.style.setProperty('--lff-title-font', SAFE_FONT.test(titleFont) ? `'${titleFont}'` : '');
     captionEl.style.setProperty('--lff-title-color', SAFE_COLOR.test(titleColor) ? titleColor : '');
     captionEl.style.setProperty('--lff-title-size', Number(titleSize) > 0 ? `${Number(titleSize)}px` : '');
     const half = filmHalf(duration, effect);
-    el.className = `lff-effect-${effect}`;
+    el.className = `${el.dataset.base} lff-effect-${effect}`;
     el.dataset.start = String(performance.now());
     el.dataset.total = String(totalOf(duration, effect));
     el.style.setProperty('--lff-ms', `${half}ms`);
@@ -242,15 +262,15 @@ export async function filmIn({
     await sleep(half);
     return half;
 }
-export async function filmOut({ effect, duration } = {}) {
-    const el = document.getElementById(OVERLAY_ID);
+export async function filmOut({ effect, duration, host = null } = {}) {
+    const el = host ? host.querySelector(':scope > .lff-root') : document.getElementById(OVERLAY_ID);
     if (!el || !IDS.has(effect)) return;
     if (effect === 'video') {
         const elapsed = performance.now() - Number(el.dataset.start || 0);
         await sleep(Math.max(0, Number(el.dataset.total || 0) - elapsed));
         el.querySelector('.lff-stage video')?.pause();
         el.querySelector('.lff-stage')?.replaceChildren();
-        el.className = '';
+        el.className = el.dataset.base;
         return;
     }
     const half = filmHalf(duration, effect);
@@ -258,7 +278,7 @@ export async function filmOut({ effect, duration } = {}) {
     el.classList.remove('lff-in');
     el.classList.add('lff-out');
     await sleep(half);
-    el.className = '';
+    el.className = el.dataset.base;
 }
 export async function filmPreview(options) {
     await filmIn(options);

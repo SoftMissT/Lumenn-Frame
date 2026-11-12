@@ -5,7 +5,7 @@ import { FILM_EFFECTS, STINGERS, filmEffectOf, stingerSrc } from '../scripts/fil
 
 test('presets: ids únicos e todo tipo de cena existe no catálogo', () => {
     assert.equal(new Set(TRANSITION_PRESETS.map((p) => p.id)).size, TRANSITION_PRESETS.length);
-    const shaders = ['lumenn-cross-dissolve', 'lumenn-zoom-in', 'lumenn-zoom-out', 'lumenn-bounce-in', 'lumenn-slide', 'lumenn-pixelate'];
+    const shaders = ['lumenn-cross-dissolve', 'lumenn-zoom-in', 'lumenn-zoom-out', 'lumenn-bounce-in', 'lumenn-slide', 'lumenn-pixelate', 'lumenn-dip-black', 'lumenn-dip-white', 'lumenn-glitch'];
     for (const p of TRANSITION_PRESETS) {
         const t = p.scene.type;
         assert.ok(filmEffectOf(t) || shaders.includes(t), `${p.id}: tipo ${t} desconhecido`);

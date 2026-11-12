@@ -55,23 +55,28 @@ import {
     parentMap,
 } from './graph-groups.mjs';
 import { parentGraphId, planJump } from './neural-address.mjs';
-import { linkBetween, linkedFrom } from './links.mjs';
+import { flowTwins, linkBetween, linkedFrom } from './links.mjs';
+import { hiveMap } from './hive-map.mjs';
+import { LumennStudioPanel } from './transition-studio.mjs';
 import { TITLE_FONTS } from './fonts.mjs';
 /** Grupos do seletor de transição por intenção (ids que não existirem no Foundry somem sozinhos). */
 const TRANSITION_GROUPS = Object.freeze({
     motion: [
         'cut',
         'fade',
+        'lumenn-dip-black',
+        'lumenn-dip-white',
         'lumenn-cross-dissolve',
         'lumenn-zoom-in',
         'lumenn-zoom-out',
         'lumenn-bounce-in',
         'lumenn-slide',
     ],
-    rpg: ['film:battle', 'lumenn-pixelate', 'glitch', 'hologram', 'swirl', 'holeSwirl'],
+    rpg: ['film:battle', 'lumenn-glitch', 'lumenn-pixelate', 'hologram', 'swirl', 'holeSwirl'],
 });
 /** Atalhos: [id, ícone, rótulo curto]. O nome completo vai na dica. */
 const QUICK_TRANSITIONS = Object.freeze([
+    ['lumenn-dip-black', 'fa-circle-half-stroke', 'DipBlack'],
     ['lumenn-cross-dissolve', 'fa-clone', 'Dissolve'],
     ['lumenn-zoom-in', 'fa-magnifying-glass-plus', 'ZoomIn'],
     ['lumenn-zoom-out', 'fa-magnifying-glass-minus', 'ZoomOut'],
@@ -79,6 +84,7 @@ const QUICK_TRANSITIONS = Object.freeze([
     ['film:cutscene', 'fa-film', 'Cutscene'],
     ['film:battle', 'fa-burst', 'Battle'],
     ['film:video', 'fa-clapperboard', 'Stinger'],
+    ['lumenn-glitch', 'fa-bolt', 'Glitch'],
     ['lumenn-pixelate', 'fa-chess-board', 'Pixel'],
     ['cut', 'fa-scissors', 'Cut'],
 ]);
@@ -128,7 +134,7 @@ const NODE_SIZES = {
     },
 };
 const COLORS = [
-    '#f0a321',
+    '#c8a84b',
     '#2dd4bf',
     '#e45656',
     '#7aa2f7',
@@ -204,6 +210,8 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #graphId = null;
     #mode = 'edit';
     #tool = 'select';
+    /** "Ver Hive" aberto: o storyboard atual visto como mapa de Hives. */
+    #mapOpen = false;
     #collapsedGroups = new Set();
     #lockedGroups = new Set();
     #trail = [];
@@ -762,7 +770,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 clickIntent: click.intent,
                 hint: L(intentHintKey(click)),
                 position,
-                color: normalizeHexColor(n.color, defaultColors[n.type] ?? '#73707c'),
+                // Âmbar era o padrão antigo da cena: desenha com o dourado da marca, sem regravar o nó.
+                color: normalizeHexColor(
+                    String(n.color ?? '').toLowerCase() === '#f0a321' ? defaultColors[n.type] : n.color,
+                    defaultColors[n.type] ?? '#73707c'
+                ),
                 width: w,
                 height: h,
                 isActive: n.type === 'group' ? groupActive : n.id === activeGraph.activeNodeId,
@@ -798,6 +810,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         ? L('LUMENN_FRAME.Beat.InvalidScene')
                         : L('LUMENN_FRAME.Beat.NoScene'));
                 out.sceneThumb = scene?.thumbnail || LumennCompat.sceneBackgroundSrc(scene) || null;
+                // Selo do pré-load (só o mestre carrega): idle não aparece, o resto sim.
+                out.sceneId = scene?.id ?? '';
+                const preload = scene && LumennCompat.isGM() ? this.#preloads.state(scene.id) : 'idle';
+                out.preloadState = preload && preload !== 'idle' ? preload : '';
+                out.preloadLabel = out.preloadState ? L(`LUMENN_FRAME.Studio.State.${out.preloadState}`) : '';
             } else if (n.type === 'audio') {
                 const label = this.#audioLabel(n.data);
                 out.audioLabel = label.name;
@@ -892,6 +909,15 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             activeGraph,
             isHiveGraph: activeGraph?.isHive === true,
             browser: this.#browserView(graphs, activeGraph?.id),
+            workspace: this.#workspace,
+            workspaces: [
+                { id: 'graph', icon: 'fa-diagram-project', label: L('LUMENN_FRAME.Workspace.Graph') },
+                { id: 'transition', icon: 'fa-film', label: L('LUMENN_FRAME.Workspace.Transition') },
+                { id: 'scene', icon: 'fa-image', label: L('LUMENN_FRAME.Workspace.Scene') },
+            ].map((ws) => ({ ...ws, on: ws.id === this.#workspace })),
+            hiveMap: this.#mapOpen && activeGraph
+                ? hiveMap(activeGraph, (id) => LumennGraphStore.getGraph(id), (node) => this.#nodeLabel(node))
+                : null,
             canBack: this.#history.length > 0,
             canForward: this.#future.length > 0,
             trail,
@@ -930,6 +956,23 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 addNote: L('LUMENN_FRAME.Tool.AddNote'),
                 addGroup: L('LUMENN_FRAME.Tool.AddGroup'),
                 addHive: L('LUMENN_FRAME.Tool.AddHive'),
+                addStoryboard: L('LUMENN_FRAME.Tool.AddStoryboard'),
+                viewHive: L('LUMENN_FRAME.Map.ViewHive'),
+                viewHiveHint: L('LUMENN_FRAME.Map.ViewHiveHint'),
+                more: L('LUMENN_FRAME.Tool.More'),
+                zoomReset: L('LUMENN_FRAME.Tool.ZoomReset'),
+                mapHives: L('LUMENN_FRAME.Map.Hives'),
+                mapPlaces: L('LUMENN_FRAME.Map.Places'),
+                mapEntries: L('LUMENN_FRAME.Map.Entries'),
+                mapExits: L('LUMENN_FRAME.Map.Exits'),
+                mapMissing: L('LUMENN_FRAME.Map.Missing'),
+                mapOpen: L('LUMENN_FRAME.Map.Open'),
+                mapEmpty: L('LUMENN_FRAME.Map.Empty'),
+                mapLive: L('LUMENN_FRAME.Map.Live'),
+                twinFound: L('LUMENN_FRAME.Edge.TwinFound'),
+                twinMerge: L('LUMENN_FRAME.Edge.TwinMerge'),
+                openStudio: L('LUMENN_FRAME.Studio.Open'),
+                openStudioHint: L('LUMENN_FRAME.Studio.OpenHint'),
                 addHiveHint: L('LUMENN_FRAME.Tool.AddHiveHint'),
                 fit: L('LUMENN_FRAME.Tool.Fit'),
                 addEncounter: L('LUMENN_FRAME.Tool.AddEncounter'),
@@ -1139,6 +1182,140 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     _onClose(options) {
         super._onClose(options);
         this.#destinationsHud?.close();
+        this.#studio?.destroy();
+        this.#studio = null;
+    }
+    /* -- Workspaces: Grafo / Transição / Cena (como Premiere e DaVinci) ------------- */
+    #workspace = 'graph';
+    #studio = null;
+    #studioRef = null;
+    #studioShown = null;
+    /** Abre o workspace Transição na ligação de fluxo `edgeId` (duplo clique, Inspector). */
+    async openStudio(edgeId, workspace = 'transition') {
+        if (!LumennCompat.isGM()) return;
+        const edge = LumennGraphStore.getEdge(this.#graphId, edgeId);
+        if (!edge || edge.type !== 'flow') return;
+        this.#studioRef = { graphId: this.#graphId, edgeId };
+        this.#selected = { kind: 'edge', id: edgeId };
+        this.#workspace = workspace;
+        return this.render();
+    }
+    /** Ligações de fluxo do storyboard aberto, para a coluna da esquerda do estúdio. */
+    #studioLinks() {
+        const graph = this.#graph();
+        if (!graph) return [];
+        const twins = flowTwins(graph.edges);
+        const catalog = this.#transitionCatalog();
+        const label = (id) => {
+            const node = graph.nodes.find((candidate) => candidate.id === id);
+            return node ? this.#nodeLabel(node) : '?';
+        };
+        return (graph.edges ?? [])
+            .filter((edge) => edge.type === 'flow' && !twins.has(edge.id))
+            .map((edge) => ({
+                id: edge.id,
+                from: label(edge.from),
+                to: label(edge.to),
+                effect: catalog.get(edge.transition?.scene?.type ?? 'cut') ?? edge.transition?.scene?.type ?? '',
+                on: this.#studioRef?.graphId === graph.id && this.#studioRef?.edgeId === edge.id,
+            }));
+    }
+    #studioPanel() {
+        this.#studio ??= new LumennStudioPanel({
+            data: () => this.#studioData(),
+            links: () => this.#studioLinks(),
+            select: (edgeId) => this.openStudio(edgeId, this.#workspace === 'graph' ? 'transition' : this.#workspace),
+            patchEdge: async (patch) => {
+                const ref = this.#studioRef;
+                const current = ref && LumennGraphStore.getEdge(ref.graphId, ref.edgeId);
+                if (!current) return;
+                await LumennGraphStore.updateEdge(ref.graphId, ref.edgeId, this.#mergeEdgePatch(current, patch));
+                this.render();
+            },
+            patchNode: async (nodeId, patch) => {
+                const ref = this.#studioRef;
+                const node = ref && LumennGraphStore.getNode(ref.graphId, nodeId);
+                if (!node) return;
+                await LumennGraphStore.updateNode(ref.graphId, nodeId, {
+                    ...patch,
+                    data: { ...node.data, ...(patch.data ?? {}) },
+                });
+                this.render();
+            },
+            preloads: this.#preloads,
+        });
+        return this.#studio;
+    }
+    /** Depois de cada render: encaixa o painel no workspace e troca a ligação se mudou. */
+    async #mountWorkspace(root) {
+        const host = root.querySelector('.lf-workspace');
+        if (!host || this.#workspace === 'graph') return;
+        const panel = this.#studioPanel();
+        const fresh = await panel.mount(host, this.#workspace);
+        const key = this.#studioRef ? `${this.#studioRef.graphId}/${this.#studioRef.edgeId}` : '';
+        if (fresh) this.#studioShown = key;
+        else if (key !== this.#studioShown) {
+            this.#studioShown = key;
+            await panel.showEdge();
+        } else panel.refreshLinks();
+    }
+    /** Lado A ou B do estúdio: cena (ou a primeira cena da Hive), fundo, pré-load e trilhas. */
+    #studioSide(graph, node) {
+        if (!node) return { label: '?', sceneId: null, src: null, nodeId: null, kind: null, audio: [] };
+        let sceneNode = node;
+        if (node.type === 'hive-ref') {
+            const hive = LumennGraphStore.getGraph(node.data?.graphId);
+            sceneNode = hive?.nodes?.find((candidate) => candidate.type === 'scene') ?? null;
+        }
+        const scene = sceneNode?.data?.sceneId ? game.scenes.get(sceneNode.data.sceneId) : null;
+        const audio = (graph.edges ?? [])
+            .filter((edge) => edge.type === 'audio' && edge.to === node.id)
+            .map((edge) => graph.nodes.find((candidate) => candidate.id === edge.from))
+            .filter(Boolean)
+            .map((audioNode) => ({
+                role: audioNode.data?.audioRole === 'sfx' ? 'sfx' : 'music',
+                label: this.#nodeLabel(audioNode),
+            }));
+        return {
+            label: this.#nodeLabel(node),
+            nodeId: node.id,
+            kind: node.type,
+            sceneId: scene?.id ?? null,
+            sceneName: scene?.name ?? null,
+            src: scene ? scene.thumbnail || LumennCompat.sceneBackgroundSrc(scene) || null : null,
+            visitable: node.data?.visitable === true,
+            audio,
+        };
+    }
+    #studioData() {
+        const ref = this.#studioRef;
+        // Trocou de storyboard: a ligação antiga não vale aqui; o estúdio pede outra na lista.
+        if (!ref || ref.graphId !== this.#graphId) return null;
+        const graph = LumennGraphStore.getGraph(ref.graphId);
+        const edge = graph?.edges?.find((candidate) => candidate.id === ref.edgeId);
+        if (!edge) return null;
+        const scene = edge.transition?.scene ?? { type: 'cut' };
+        const type = scene.type ?? 'cut';
+        const film = filmEffectOf(type);
+        const defaultMs = film
+            ? (FILM_EFFECTS.find((effect) => effect.id === film)?.duration ?? 1600)
+            : (CONFIG.Canvas?.sceneTransitions?.[type]?.defaultDuration ?? 1000);
+        return {
+            edgeId: edge.id,
+            graphName: graph.name ?? '',
+            from: this.#studioSide(graph, graph.nodes.find((node) => node.id === edge.from)),
+            to: this.#studioSide(graph, graph.nodes.find((node) => node.id === edge.to)),
+            scene,
+            audio: edge.transition?.audio ?? {},
+            scope: ['scene', 'audio', 'both'].includes(edge.transition?.scope) ? edge.transition.scope : 'both',
+            sceneColor: normalizeHexColor(scene.color, '#000000'),
+            titleColor: normalizeHexColor(scene.title?.color, '#f4efe6'),
+            fonts: TITLE_FONTS,
+            stingers: this.#stingerChips(scene.video?.src),
+            groups: this.#transitionOptions(type),
+            defaultMs,
+            videoSrc: film === 'video' ? scene.video?.src || DEFAULT_STINGER : '',
+        };
     }
     async _onRender(context, options) {
         await super._onRender(context, options);
@@ -1146,6 +1323,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#groupDragOverrides = null;
         this.#dragDrop.forEach((d) => d.bind(this.element));
         const root = this.element;
+        this.#mountWorkspace(root);
         // Dock da biblioteca: começa recolhido e lembra o estado entre renders.
         const dock = root.querySelector('.lf-library-dock');
         if (dock) {
@@ -1234,6 +1412,18 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             el.addEventListener('change', (e) => this.#inspectorChange(e))
         );
         // Chips de atalho: escolhem no select da transição e disparam o mesmo `change` (um caminho só para gravar).
+        // Duplo clique numa ligação de fluxo abre o estúdio de transição.
+        root.querySelector('.lf-edges')?.addEventListener('dblclick', (ev) => {
+            const hit = ev.target.closest?.('.lf-edge-hit');
+            if (hit?.dataset.edgeId) this.openStudio(hit.dataset.edgeId);
+        });
+        // Menu "Mais": fecha ao escolher um item ou ao clicar fora dele.
+        const more = root.querySelector('.lf-more');
+        more?.querySelector('.lf-more-menu')?.addEventListener('click', () => more.classList.remove('is-open'));
+        // No .lf-root (recriado a cada render), não no elemento da janela: sem acumular ouvintes.
+        root.querySelector('.lf-root')?.addEventListener('pointerdown', (ev) => {
+            if (more?.classList.contains('is-open') && !more.contains(ev.target)) more.classList.remove('is-open');
+        });
         root.querySelectorAll('[data-tr-pick]').forEach((chip) =>
             chip.addEventListener('click', () => {
                 const select = chip
@@ -1926,7 +2116,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const nodeRects = (graph?.nodes ?? [])
             .map((node) => this.#nodeBounds(node.id, null, graph))
             .filter(Boolean);
+        // Volta gravada em dobro (antes da 0.1.0): desenha só uma; o Inspector oferece unificar.
+        const twins = flowTwins(graph?.edges);
         for (const e of graph?.edges ?? []) {
+            if (twins.has(e.id)) continue;
             const from = graph.nodes.find((node) => node.id === e.from);
             const to = graph.nodes.find((node) => node.id === e.to);
             if (!from || !to) continue;
@@ -1978,10 +2171,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         childrenOf(graph.nodes, ids.from).some(
                             (kid) => kid.id === graph.activeNodeId
                         );
-                    start.setAttribute('stop-color', fromActive ? '#ffd166' : '#f0a321');
+                    start.setAttribute('stop-color', fromActive ? '#7de7ff' : '#00d4f5');
                     const end = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
                     end.setAttribute('offset', '100%');
-                    end.setAttribute('stop-color', '#8b6a28');
+                    end.setAttribute('stop-color', '#0b5a6b');
                     gradient.append(start, end);
                     const defs =
                         svg.querySelector('defs') ??
@@ -2058,7 +2251,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     text.setAttribute('font-size', '11');
                     text.setAttribute('font-family', 'var(--lf-font-body)');
                     text.style.fill = 'var(--lf-text)';
-                    text.style.stroke = '#101014';
+                    text.style.stroke = '#080a0f';
                     text.setAttribute('stroke-width', '3');
                     text.setAttribute('stroke-linejoin', 'round');
                     text.setAttribute('paint-order', 'stroke');
@@ -2179,10 +2372,8 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!t) return null;
         const L = (k) => game.i18n.localize(k);
         const type = t.scene?.type ?? 'cut';
-        const sceneName =
-            type === 'cut'
-                ? L('LUMENN_FRAME.Edge.Cut')
-                : (LumennCompat.getSceneTransitions().find((d) => d.id === type)?.label ?? type);
+        // Catálogo completo (Foundry + Lumenn + cinema): nunca mostra o id cru ("film:video").
+        const sceneName = this.#transitionCatalog().get(type) ?? type;
         return formatEdgeLabel(t, {
             L,
             sceneName,
@@ -2465,13 +2656,38 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
         if (action === 'workspace-toggle') return this.#toggleWorkspace(root);
         if (action === 'open-guide') return openLumennGuide();
+        if (action === 'workspace') {
+            const ws = event.currentTarget.dataset.ws;
+            this.#workspace = ['graph', 'transition', 'scene'].includes(ws) ? ws : 'graph';
+            if (this.#workspace !== 'graph' && !this.#studioRef && this.#selected.kind === 'edge')
+                this.#studioRef = { graphId: this.#graphId, edgeId: this.#selected.id };
+            return this.render();
+        }
+        if (action === 'more-toggle') {
+            this.element?.querySelector('.lf-more')?.classList.toggle('is-open');
+            return;
+        }
+        if (action === 'hive-map') {
+            this.#mapOpen = !this.#mapOpen;
+            return this.render();
+        }
+        if (action === 'map-open') {
+            // Ao Vivo: o mapa só mostra; entrar numa Hive daqui moveria a mesa.
+            if (this.#mode !== 'edit') return;
+            this.#mapOpen = false;
+            return this.#hiveEnterButton(event.currentTarget.dataset.ref);
+        }
         if (action === 'add-hive') {
-            // "+ Hive" do topo: cria o Grupo-Hive no centro da vista atual.
-            const viewport = this.element.querySelector('.lf-viewport');
-            const r = viewport?.getBoundingClientRect();
-            if (!r || !this.#editable()) return;
-            const center = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
-            return this.#createNodeAt('group', this.#clientToCanvas(center, viewport));
+            // "+ Hive" do topo: cria uma Hive de verdade (storyboard marcado, na biblioteca)
+            // e põe o nó dela no centro da vista. Não é Grupo.
+            if (!this.#editable()) return;
+            const name = game.i18n.format('LUMENN_FRAME.Hive.NewName', {
+                n: LumennGraphStore.getHives().length + 1,
+            });
+            const graph = await LumennGraphStore.createGraph(name);
+            if (!graph) return;
+            await LumennGraphStore.markHive(graph.id);
+            return this.#insertHive(graph.id);
         }
         if (action === 'jump-intro') return this.#jumpAnchor('intro');
         if (action === 'jump-output') return this.#jumpAnchor('output');
@@ -2617,6 +2833,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         ...(edge?.transition?.scene?.video ?? {}),
                         ...(patch.transition.scene?.video ?? {}),
                     },
+                    // Título também em profundidade: mudar só o texto não apaga fonte, cor e tamanho.
+                    title: {
+                        ...(edge?.transition?.scene?.title ?? {}),
+                        ...(patch.transition.scene?.title ?? {}),
+                    },
                 },
                 audio: {
                     ...(edge?.transition?.audio ?? {}),
@@ -2638,6 +2859,9 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             return;
         let val =
             e.currentTarget.type === 'checkbox' ? e.currentTarget.checked : e.currentTarget.value;
+        // Tempo em segundos na tela, milissegundos no dado.
+        if (e.currentTarget.dataset.unit === 's' && val !== '')
+            val = String(Math.round(Number(val) * 1000));
         if (typeof val === 'string' && /Duration|volume|fadeIn|fadeOut|duration|cutAt/.test(path))
             val = Number.isFinite(Number(val)) ? Number(val) : null;
         if (typeof val === 'number' && path.endsWith('cutAt'))
@@ -2893,6 +3117,13 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     }
                 });
             }
+        } else if (action === 'merge-twin') {
+            // Unificar: apaga só a volta gravada em dobro; a ligação selecionada (ida) fica.
+            const twinId = e.currentTarget.dataset.twin;
+            if (twinId && twinId !== this.#selected.id)
+                LumennGraphStore.deleteEdge(this.#graphId, twinId).then(() => this.render());
+        } else if (action === 'open-studio') {
+            if (this.#selected.kind === 'edge') this.openStudio(this.#selected.id);
         } else if (action === 'preview-transition') {
             if (this.#previewing) return;
             const edge = LumennGraphStore.getEdge(this.#graphId, this.#selected.id);
@@ -3738,6 +3969,15 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     #onPreloadChange(sceneId, state, error) {
         this.#destinationsHud?.paintScene(sceneId, state);
+        this.#studio?.paintPreload(sceneId);
+        // Selo no card da cena, sem redesenhar o editor inteiro.
+        this.element?.querySelectorAll(`.lf-node-preload[data-scene-id="${CSS.escape(sceneId)}"]`).forEach((badge) => {
+            const shown = state && state !== 'idle' ? state : '';
+            badge.dataset.state = shown;
+            const text = shown ? game.i18n.localize(`LUMENN_FRAME.Studio.State.${shown}`) : '';
+            badge.title = text;
+            badge.setAttribute('aria-label', text);
+        });
         if (state !== 'error') return;
         const name = game.scenes.get(sceneId)?.name ?? sceneId;
         console.error('Lumenn Frame: pré-load falhou.', error);
@@ -4187,8 +4427,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         } else {
             const root = this.element;
             const field = (name) => root.querySelector(`[data-hive-field="${name}"]`);
+            // Campo em segundos na tela (data-unit="s") vira milissegundos no dado.
+            const msOf = (el) => Math.round(Number(el?.value) * (el?.dataset.unit === 's' ? 1000 : 1));
             const num = (name, fallback) => {
-                const value = Number(field(name)?.value);
+                const value = msOf(field(name));
                 return Number.isFinite(value) ? Math.max(0, Math.min(1e4, value)) : fallback;
             }; // Entrada (transition) e saída (exit) têm os mesmos campos: tipo, duração, música e legenda.
             const build = (kind, defaults, current) => {
@@ -4210,7 +4452,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                             cutAt: field(`${kind}.cutAt`)
                                 ? Math.max(
                                       0,
-                                      Math.min(6e4, Number(field(`${kind}.cutAt`).value) || 0)
+                                      Math.min(6e4, msOf(field(`${kind}.cutAt`)) || 0)
                                   )
                                 : (current?.scene?.video?.cutAt ?? null),
                             sound: field(`${kind}.videoSound`)
@@ -4648,6 +4890,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     stingers: this.#stingerChips(edge.transition?.scene?.video?.src),
                     isFilm: !!filmEffectOf(edge.transition?.scene?.type),
                     isVideo: filmEffectOf(edge.transition?.scene?.type) === 'video',
+                    twinId: [...flowTwins(graph?.edges)].find(([, keeper]) => keeper === edge.id)?.[0] ?? null,
                     // Título do filme (cutscene e afins): texto, subtítulo, fonte, cor e tamanho.
                     title: edge.transition?.scene?.title ?? {},
                     titleColor: normalizeHexColor(edge.transition?.scene?.title?.color, '#f4efe6'),

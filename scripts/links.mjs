@@ -11,7 +11,10 @@
  */
 export function linkBetween(edges, from, to, { types = ['flow'] } = {}) {
     if (!from || !to || from === to) return null;
-    const list = edges ?? [];
+    // Volta gravada em dobro (dado antigo) não vale: a ligação que o mestre vê e edita
+    // é a mesma nos dois sentidos (lição 23: a interface não pode mentir sobre o clique).
+    const twins = flowTwins(edges);
+    const list = (edges ?? []).filter((edge) => !twins.has(edge?.id));
     return (
         list.find((edge) => types.includes(edge?.type) && edge.from === from && edge.to === to) ??
         list.find((edge) => edge?.type === 'flow' && edge.from === to && edge.to === from) ??
@@ -29,4 +32,26 @@ export function linkedFrom(edges, nodeId, { types = ['flow', 'audio'] } = {}) {
     }
     set.delete(nodeId);
     return set;
+}
+
+/**
+ * Ligações de fluxo gravadas em dobro (A → B e B → A, de antes da 0.1.0). Para cada par,
+ * a primeira gravada vale; a outra é a "gêmea" que o editor esconde e o Inspector unifica.
+ * @returns {Map<string, string>} id da gêmea escondida → id da ligação que fica
+ */
+export function flowTwins(edges) {
+    const twins = new Map();
+    const seen = new Map();
+    for (const edge of edges ?? []) {
+        if (edge?.type !== 'flow' || !edge.from || !edge.to) continue;
+        const keeper = seen.get(`${edge.to}>${edge.from}`);
+        if (keeper && !twins.has(keeper)) twins.set(edge.id, keeper);
+        else seen.set(`${edge.from}>${edge.to}`, edge.id);
+    }
+    return twins;
+}
+
+/** A ligação de fluxo já gravada no sentido contrário de `from → to`, ou null. */
+export function reverseFlow(edges, from, to) {
+    return (edges ?? []).find((edge) => edge?.type === 'flow' && edge.from === to && edge.to === from) ?? null;
 }

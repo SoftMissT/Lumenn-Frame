@@ -4,6 +4,7 @@ import { LumennSettings } from './settings.mjs';
 import { childrenOf, GROUP_COLOR } from './graph-groups.mjs';
 import { detectHiveCycles } from './hive-runtime.mjs';
 import { planGroupToHive, sanitizeHivePorts } from './hive-io.mjs';
+import { reverseFlow } from './links.mjs';
 import {
     anchorOf,
     buildAddressIndex,
@@ -13,7 +14,7 @@ import {
     rootGraphId as findRootGraphId,
 } from './neural-address.mjs';
 const DEFAULT_COLORS = {
-    scene: '#f0a321',
+    scene: '#c8a84b',
     audio: '#2dd4bf',
     note: '#73707c',
 };
@@ -521,6 +522,9 @@ export class LumennGraphStore {
             (e) => e.type === edge.type && e.from === edge.from && e.to === edge.to
         );
         if (dup || edge.from === edge.to) return null;
+        // Fluxo é ida e volta: pedir B → A com A → B gravada devolve a existente, sem gravar outra.
+        const back = edge.type === 'flow' ? reverseFlow(graph.edges, edge.from, edge.to) : null;
+        if (back) return back;
         if (edge.type === 'flow' && !edge.transition) {
             const t = LumennSettings.getTransitionDefaults();
             edge.transition = {

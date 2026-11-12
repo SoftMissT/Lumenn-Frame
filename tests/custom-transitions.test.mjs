@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-test('custom transition registry exposes the six Lumenn effects', async () => {
+test('custom transition registry exposes the nine Lumenn effects', async () => {
     globalThis.PIXI = {
         TextureMatrix: class {},
         Matrix: class {},
@@ -17,6 +17,9 @@ test('custom transition registry exposes the six Lumenn effects', async () => {
         'lumenn-bounce-in',
         'lumenn-slide',
         'lumenn-pixelate',
+        'lumenn-dip-black',
+        'lumenn-dip-white',
+        'lumenn-glitch',
     ]);
     // Cada tipo mapeia para um índice distinto no shader e volta igual.
     const Filter = CONFIG.Canvas.sceneTransitions['lumenn-bounce-in'].filterClass;

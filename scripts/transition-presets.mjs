@@ -28,7 +28,7 @@ export const TRANSITION_PRESETS = Object.freeze([
         scene: {
             type: 'film:cutscene',
             duration: 2600,
-            title: { font: 'Orbitron', color: '#ffd166', size: 96 },
+            title: { font: 'Bebas Neue', color: '#eef2ff', size: 110 },
         },
     },
     { id: 'battle', name: 'RPG · Batalha', img: `${ICONS}/combat.svg`, scene: { type: 'film:battle', duration: 1600 } },
@@ -45,6 +45,10 @@ export const TRANSITION_PRESETS = Object.freeze([
     { id: 'bounce-in', name: 'Câmera · Bounce in', img: `${ICONS}/sun.svg`, scene: { type: 'lumenn-bounce-in', duration: 1100 } },
     { id: 'slide', name: 'Câmera · Deslizar', img: `${ICONS}/wing.svg`, scene: { type: 'lumenn-slide', duration: 900 } },
     { id: 'pixelate', name: 'RPG · Pixel retrô', img: `${ICONS}/dice-target.svg`, scene: { type: 'lumenn-pixelate', duration: 1200 } },
+    // Só acrescentar no fim: a posição define o _id fixo da macro no compêndio.
+    { id: 'dip-black', name: 'Câmera · Dip to Black', img: `${ICONS}/blind.svg`, scene: { type: 'lumenn-dip-black', duration: 1200 } },
+    { id: 'dip-white', name: 'Câmera · Dip to White', img: `${ICONS}/light.svg`, scene: { type: 'lumenn-dip-white', duration: 1200 } },
+    { id: 'glitch', name: 'RPG · Glitch Lumenn', img: `${ICONS}/lightning.svg`, scene: { type: 'lumenn-glitch', duration: 1000 } },
 ]);
 
 export const presetById = (id) => TRANSITION_PRESETS.find((p) => p.id === id) ?? null;

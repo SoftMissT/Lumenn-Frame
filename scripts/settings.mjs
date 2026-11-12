@@ -142,7 +142,7 @@ export class LumennSettings {
             scope: 'world',
             config: true,
             type: String,
-            default: '#f0a321',
+            default: '#c8a84b',
         });
         game.settings.register(MODULE_ID, 'defaultAudioColor', {
             name: L('LUMENN_FRAME.Settings.AudioColor.Name'),

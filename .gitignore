@@ -18,3 +18,4 @@ CLAUDE.md
 /.playwright-cli
 !/assets/fonts/
 !/assets/stingers/
+!/assets/brand/

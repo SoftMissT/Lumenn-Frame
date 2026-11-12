@@ -13,6 +13,7 @@
     {{#if isGM}}
     <button class="lf-top-btn" data-action="create-graph" title="{{label.createGraph}}">+</button>
     {{#if editable}}
+      <button type="button" class="lf-top-btn lf-add-hive" data-action="add-hive" title="{{label.addHiveHint}}"><i class="fa-solid fa-cubes"></i> {{label.addHive}}</button>
       <div class="lf-top-actions" aria-label="{{label.graph}}">
         <button class="lf-top-btn" data-action="sort-graphs" title="{{label.sortGraphs}}"><i class="fa-solid fa-arrow-down-a-z"></i> A–Z</button>
         <button class="lf-top-btn" data-action="rename-graph" title="{{label.renameGraph}}"><i class="fa-solid fa-pen"></i></button>
@@ -24,11 +25,18 @@
       <button class="{{#if (lumenn-eq mode 'edit')}}active{{/if}}" data-action="toggle-mode">{{label.editMode}}</button>
       <button class="{{#if (lumenn-eq mode 'live')}}active{{/if}}" data-action="toggle-mode">{{label.liveMode}}</button>
     </div>
+    {{#if isGM}}
+    <div class="lf-top-actions lf-neural-actions" role="group" aria-label="{{label.neuralDestinations}}">
+      <button type="button" class="lf-top-btn" data-action="jump-intro" title="{{label.neuralIntroHint}}">{{label.neuralIntro}}</button>
+      <button type="button" class="lf-top-btn" data-action="jump-output" title="{{label.neuralOutputHint}}">{{label.neuralOutput}}</button>
+      <button type="button" class="lf-top-btn" data-action="open-destinations" title="{{label.neuralDestinationsHint}}"><i class="fa-solid fa-diagram-project"></i> {{label.neuralDestinations}}</button>
+    </div>
+    {{/if}}
     <span class="lf-topbar-spacer"></span>
     <div class="lf-camera-controls">
       <button data-camera="zoom-out" title="Zoom out">-</button>
       <span class="lf-camera-percent" data-camera-percent>100%</span>
-      <button data-camera="reset" title="100%">100%</button>
+      <button data-camera="reset" title="Zoom 100%" aria-label="Zoom 100%">1:1</button>
       <button data-camera="zoom-in" title="Zoom in">+</button>
       <button data-camera="fit" title="Fit All">Fit</button>
     </div>
@@ -40,12 +48,8 @@
     <div class="lf-toolbar-left">
       {{#if editable}}
       <button class="lf-tool{{#if (lumenn-eq tool 'select')}} active{{/if}}" data-tool="select" title="{{label.select}}"><i class="fa-solid fa-mouse-pointer"></i></button>
-      <button class="lf-tool{{#if (lumenn-eq tool 'hand')}} active{{/if}}" data-tool="hand" title="{{label.hand}}"><i class="fa-solid fa-hand"></i></button>
-      <button class="lf-tool{{#if (lumenn-eq tool 'connect')}} active{{/if}}" data-tool="connect" title="{{label.connect}}"><i class="fa-solid fa-share-nodes"></i></button>
-      <button class="lf-tool{{#if (lumenn-eq tool 'scene')}} active{{/if}}" data-tool="scene" title="{{label.addScene}}"><i class="fa-solid fa-image"></i></button>
-      <button class="lf-tool{{#if (lumenn-eq tool 'audio')}} active{{/if}}" data-tool="audio" title="{{label.addAudio}}"><i class="fa-solid fa-music"></i></button>
-      <button class="lf-tool{{#if (lumenn-eq tool 'note')}} active{{/if}}" data-tool="note" title="{{label.addNote}}"><i class="fa-solid fa-note-sticky"></i></button>
-      <button class="lf-tool{{#if (lumenn-eq tool 'group')}} active{{/if}}" data-tool="group" title="{{label.addGroup}}"><i class="fa-solid fa-object-group"></i></button>
+      {{!-- Barra enxuta (conceito 07): cena e áudio chegam arrastando da sidebar; link sai da porta; mover = espaço ou botão do meio; Hive nasce no "+ Hive" do topo. --}}
+      <button class="lf-tool" data-camera="fit" title="{{label.fit}}" aria-label="{{label.fit}}"><i class="fa-solid fa-expand"></i></button>
       {{#if isHiveGraph}}
       <button class="lf-tool{{#if (lumenn-eq tool 'encounter')}} active{{/if}}" data-tool="encounter" title="{{label.addEncounter}}"><i class="fa-solid fa-bolt"></i></button>
       {{/if}}
@@ -90,17 +94,21 @@
       {{#if editTrail}}
       <div class="lf-trail" aria-label="{{label.trailLabel}}">
         <button type="button" class="lf-top-btn" data-action="edit-back"><i class="fa-solid fa-arrow-left"></i> {{label.editBack}} {{editTrail.back}}</button>
-        {{#each editTrail.crumbs}}<span class="lf-trail-crumb">{{this.name}}</span>{{#unless @last}}<span class="lf-trail-sep">&rsaquo;</span>{{/unless}}{{/each}}
+        {{#each editTrail.crumbs}}{{#if @last}}<span class="lf-trail-crumb" aria-current="location">{{this.name}}</span>{{else}}<button type="button" class="lf-trail-crumb lf-trail-link" data-action="edit-goto" data-index="{{@index}}" data-tooltip="{{../label.trailGoto}}">{{this.name}}</button><span class="lf-trail-sep">&rsaquo;</span>{{/if}}{{/each}}
       </div>
       {{/if}}
       <div class="lf-camera">
         <svg class="lf-edges"></svg>
         {{#each nodes}}
-        <div class="lf-node lf-node-{{this.type}}{{#if (lumenn-eq this.type 'group')}} lf-group-{{#if this.groupOpen}}open{{else}}closed{{/if}}{{/if}}{{#if (lumenn-eq this.type 'audio')}} lf-audio-role-{{this.audioRole}}{{/if}}{{#if this.isActive}} active{{/if}}{{#if this.isNavigable}} navigable{{/if}}{{#if this.isPlayable}} playable{{/if}}{{#if this.isPlaying}} playing{{/if}}{{#if this.isDimmed}} dimmed{{/if}}{{#if this.selected}} selected{{/if}}{{#if this.targetHi}} target-hi{{/if}}"
+        <div class="lf-node lf-node-{{this.type}}{{#if (lumenn-eq this.type 'group')}} lf-group-{{#if this.groupOpen}}open{{else}}closed{{/if}}{{/if}}{{#if (lumenn-eq this.type 'audio')}} lf-audio-role-{{this.audioRole}}{{/if}}{{#if this.isActive}} active{{/if}}{{#if this.isNavigable}} navigable{{/if}}{{#if this.isPlayable}} playable{{/if}}{{#if this.isPlaying}} playing{{/if}}{{#if this.isDimmed}} dimmed{{/if}}{{#if this.selected}} selected{{/if}}{{#if this.targetHi}} target-hi{{/if}}{{#if this.armed}} armed{{/if}}"
              data-id="{{this.id}}"
              data-type="{{this.type}}"
              data-parent-id="{{this.parentId}}"
+             data-intent="{{this.clickIntent}}"
+             data-tooltip="{{this.hint}}" data-tooltip-direction="UP"
              style="left:{{this.position.x}}px;top:{{this.position.y}}px;width:{{this.width}}px;height:{{this.height}}px;--node-color:{{this.color}};">
+          {{#if this.anchorIntro}}<span class="lf-anchor-badge lf-anchor-intro">{{../label.neuralIntro}}</span>{{/if}}
+          {{#if this.anchorOutput}}<span class="lf-anchor-badge lf-anchor-output">{{../label.neuralOutput}}</span>{{/if}}
           <div class="lf-node-content">
             <div class="lf-node-head"></div>
             {{#if (lumenn-eq this.type 'group')}}
@@ -147,6 +155,22 @@
             <div class="lf-node-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
             {{/if}}
           </div>
+          {{#if (lumenn-eq this.type 'hive-ref')}}
+          {{#if this.portHub}}
+          {{#if this.portHubPopover}}<details class="lf-port-hub is-pop"><summary title="{{../label.hivePorts}}"><i class="fa-solid fa-plug"></i> {{../label.hivePorts}} <b>{{this.portHub.entries.length}}/{{this.portHub.exits.length}}</b>{{#if this.portHub.orphanCount}} <span class="lf-hub-orphan" title="{{../label.hivePortOrphan}}">!</span>{{/if}}</summary>{{else}}<div class="lf-port-hub">{{/if}}
+            <ul class="lf-hub-side lf-hub-in">
+              {{#each this.portHub.entries}}
+              <li class="lf-hub-port{{#if this.links}} is-linked{{/if}}" data-port="{{this.socket}}" data-node="{{../id}}" data-entry-port="{{this.id}}" title="{{this.title}}"><i class="lf-hub-ring"></i><span class="lf-hub-name">{{this.name}}</span><b>{{this.links}}</b></li>
+              {{/each}}
+            </ul>
+            <ul class="lf-hub-side lf-hub-out">
+              {{#each this.portHub.exits}}
+              <li class="lf-hub-port{{#if this.links}} is-linked{{/if}}" data-port="{{this.socket}}" data-node="{{../id}}" data-exit-port="{{this.id}}" title="{{this.title}}"><span class="lf-hub-name">{{this.name}}</span><b>{{this.links}}</b><i class="lf-hub-ring"></i></li>
+              {{/each}}
+            </ul>
+          {{#if this.portHubPopover}}</details>{{else}}</div>{{/if}}
+          {{/if}}
+          {{/if}}
           <div class="lf-ports">
             {{#if (lumenn-eq this.type 'encounter')}}
             <span class="lf-port lf-port-in lf-port-audio" data-port="audio-in" data-node="{{this.id}}" title="AUDIO IN"></span>
@@ -173,7 +197,7 @@
       <div class="lf-connect-hint">{{connectHint}}</div>
       {{/if}}
       {{#if editable}}
-      <details class="lf-library-dock" open>
+      <details class="lf-library-dock">
         <summary><i class="fa-solid fa-cubes"></i> {{label.hiveLibrary}} ({{library.length}})</summary>
         {{#if library.length}}
         <ul>
@@ -230,6 +254,7 @@
           <option value="{{this.id}}" {{#if (lumenn-eq this.id ../inspector.node.data.sceneId)}}selected{{/if}}>{{this.name}}</option>
           {{/each}}
         </select>
+        <label class="lf-insp-label lf-insp-check" title="{{label.visitableHint}}"><input type="checkbox" data-insp="data.visitable" {{#if inspector.node.data.visitable}}checked{{/if}}> {{label.visitable}}</label>
         {{/if}}
         {{#if inspector.hasConnections}}
         <h3 class="lf-insp-title">{{label.connections}}</h3>
@@ -402,14 +427,28 @@
         {{#if (lumenn-eq inspector.edgeType 'flow')}}
         <h3 class="lf-insp-title">{{label.flowEdge}} <span class="lf-insp-native">{{#if inspector.hasNativeTransitions}}{{label.v14Native}}{{else}}{{label.fallbackMode}}{{/if}}</span></h3>
         <p class="lf-insp-p">{{label.from}}: {{inspector.fromLabel}} &rarr; {{label.to}}: {{inspector.toLabel}}</p>
+        {{#if editable}}
+        {{#if inspector.hasExitPorts}}
+        <label class="lf-insp-label">{{label.hiveExitPort}}</label>
+        <select data-insp="exitPortId">
+          <option value="">{{label.hiveExitPortNone}}</option>
+          {{#each inspector.exitPorts}}<option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>{{/each}}
+        </select>
+        {{/if}}
+        {{#if inspector.exitPortOrphan}}<p class="lf-insp-p lf-insp-warn"><i class="fa-solid fa-triangle-exclamation"></i> {{label.hiveExitPortOrphan}}</p>{{/if}}
+        {{/if}}
         <label class="lf-insp-label">{{label.transitionScope}}</label>
         <select data-insp="transition.scope">
           <option value="audio" {{#if (lumenn-eq inspector.transitionScope 'audio')}}selected{{/if}}>{{label.audioOnly}}</option>
           <option value="scene" {{#if (lumenn-eq inspector.transitionScope 'scene')}}selected{{/if}}>{{label.sceneOnly}}</option>
           <option value="both" {{#if (lumenn-eq inspector.transitionScope 'both')}}selected{{/if}}>{{label.beatBoth}}</option>
         </select>
-        <label class="lf-insp-label">{{label.sceneTrans}}</label>
-        <select data-insp="transition.scene.type" {{#if inspector.liveAudioEditing}}disabled{{/if}}>
+        <section class="lf-tr-card lf-tr-scene" aria-label="{{label.sceneTrans}}">
+        <h4 class="lf-tr-head"><i class="fa-solid fa-film" aria-hidden="true"></i>{{label.sceneTrans}}</h4>
+        <div class="lf-tr-chips" role="group" aria-label="{{label.sceneTrans}}">
+          {{#each inspector.quickTransitions}}<button type="button" class="lf-tr-chip{{#if this.selected}} is-on{{/if}}" data-tr-pick="{{this.id}}" data-tooltip="{{this.title}}" aria-pressed="{{#if this.selected}}true{{else}}false{{/if}}" {{#if ../inspector.liveAudioEditing}}disabled{{/if}}><i class="fa-solid {{this.icon}}" aria-hidden="true"></i><span>{{this.label}}</span></button>{{/each}}
+        </div>
+        <select data-insp="transition.scene.type" aria-label="{{label.sceneTrans}}" {{#if inspector.liveAudioEditing}}disabled{{/if}}>
           {{#each inspector.transitionGroups}}
           <optgroup label="{{this.group}}">
             {{#each this.items}}<option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>{{/each}}
@@ -417,23 +456,43 @@
           {{/each}}
         </select>
         {{#if inspector.isFilm}}<p class="lf-insp-p lf-film-note"><i class="fa-solid fa-eye-slash"></i> {{label.filmPlayersOnly}}</p>{{/if}}
+        {{#if inspector.isFilm}}{{#unless inspector.isVideo}}
+        <div class="lf-tr-title">
+          <label class="lf-tr-field"><span>{{label.titleText}}</span><input type="text" data-insp="transition.scene.title.text" value="{{inspector.title.text}}" placeholder="{{label.titleAuto}}"></label>
+          <label class="lf-tr-field"><span>{{label.titleSub}}</span><input type="text" data-insp="transition.scene.title.subtitle" value="{{inspector.title.subtitle}}"></label>
+          <label class="lf-tr-field"><span>{{label.titleFont}}</span>
+            <select data-insp="transition.scene.title.font">
+              <option value="">Orbitron ({{label.titleDefault}})</option>
+              {{#each inspector.titleFonts}}<option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.id}}</option>{{/each}}
+            </select></label>
+          <div class="lf-tr-row">
+            <label class="lf-tr-field"><span>{{label.titleSize}}</span><span class="lf-tr-unit"><input type="number" min="16" max="200" step="2" data-insp="transition.scene.title.size" value="{{inspector.title.size}}" placeholder="64"><em>px</em></span></label>
+            <label class="lf-tr-field lf-tr-color"><span>{{label.titleColor}}</span><input type="color" data-insp="transition.scene.title.color" value="{{inspector.titleColor}}"></label>
+          </div>
+        </div>
+        {{/unless}}{{/if}}
         {{#if inspector.isVideo}}
         <label class="lf-insp-label">{{label.filmVideoFile}}</label>
         <div class="lf-pick-row">
           <input type="text" id="lf-edge-video" data-insp="transition.scene.video.src" value="{{inspector.edge.transition.scene.video.src}}" placeholder="stinger.webm">
           <button type="button" data-insp-action="pick-video" data-pick-for="#lf-edge-video" title="{{label.filmVideoFile}}"><i class="fa-solid fa-folder-open"></i></button>
         </div>
+        <div class="lf-tr-chips lf-stinger-chips" role="group" aria-label="{{label.stingerReady}}">
+          {{#each inspector.stingers}}<button type="button" class="lf-tr-chip{{#if this.on}} is-on{{/if}}" data-stinger-src="{{this.src}}" data-stinger-for="#lf-edge-video"><i class="fa-solid {{this.icon}}"></i> {{this.label}}</button>{{/each}}
+        </div>
         <label class="lf-insp-label">{{label.filmCutAt}}</label>
-        <input type="number" min="0" step="50" data-insp="transition.scene.video.cutAt" value="{{inspector.edge.transition.scene.video.cutAt}}">
+        <span class="lf-tr-unit"><input type="number" min="0" step="50" data-insp="transition.scene.video.cutAt" value="{{inspector.edge.transition.scene.video.cutAt}}" placeholder="{{label.filmCutAuto}}"><em>ms</em></span>
         <label class="lf-insp-label lf-insp-check"><input type="checkbox" data-insp="transition.scene.video.sound" {{#if inspector.edge.transition.scene.video.sound}}checked{{/if}}> {{label.filmVideoSound}}</label>
         <p class="lf-insp-p lf-film-note">{{label.filmVideoHint}}</p>
         {{/if}}
-        <label class="lf-insp-label">{{label.duration}} (ms)</label>
-        <input type="number" min="0" step="100" data-insp="transition.scene.duration" value="{{inspector.edge.transition.scene.duration}}" {{#if inspector.liveAudioEditing}}disabled{{/if}}>
-        <label class="lf-insp-label">{{label.color}}</label>
-        <input type="color" data-insp="transition.scene.color" value="{{inspector.sceneColor}}" {{#if inspector.liveAudioEditing}}disabled{{/if}}>
-        <label class="lf-insp-label">{{label.audioTrans}}</label>
-        <select data-insp="transition.audio.mode">
+        <div class="lf-tr-row">
+          <label class="lf-tr-field"><span>{{label.duration}}</span><span class="lf-tr-unit"><input type="number" min="0" step="100" data-insp="transition.scene.duration" value="{{inspector.edge.transition.scene.duration}}" {{#if inspector.liveAudioEditing}}disabled{{/if}}><em>ms</em></span></label>
+          <label class="lf-tr-field lf-tr-color"><span>{{label.color}}</span><input type="color" data-insp="transition.scene.color" value="{{inspector.sceneColor}}" {{#if inspector.liveAudioEditing}}disabled{{/if}}></label>
+        </div>
+        </section>
+        <section class="lf-tr-card lf-tr-audio" data-mode="{{inspector.edge.transition.audio.mode}}" aria-label="{{label.audioTrans}}">
+        <h4 class="lf-tr-head"><i class="fa-solid fa-music" aria-hidden="true"></i>{{label.audioTrans}}</h4>
+        <select data-insp="transition.audio.mode" aria-label="{{label.audioTrans}}">
           <option value="auto" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'auto')}}selected{{/if}}>{{label.auto}}</option>
           <option value="keep" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'keep')}}selected{{/if}}>{{label.keep}}</option>
           <option value="cut" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'cut')}}selected{{/if}}>{{label.cut}}</option>
@@ -441,28 +500,26 @@
           <option value="fadeout" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'fadeout')}}selected{{/if}}>{{label.fadeout}}</option>
           <option value="fadein" {{#if (lumenn-eq inspector.edge.transition.audio.mode 'fadein')}}selected{{/if}}>{{label.fadein}}</option>
         </select>
-        <label class="lf-insp-label">{{label.crossfadeDur}} (ms)</label>
-        <input type="number" min="0" step="100" data-insp="transition.audio.crossfadeDuration" value="{{inspector.edge.transition.audio.crossfadeDuration}}">
-        <label class="lf-insp-label">{{label.fadeIn}} (ms)</label>
-        <input type="number" min="0" step="100" data-insp="transition.audio.fadeInDuration" value="{{inspector.edge.transition.audio.fadeInDuration}}">
-        <label class="lf-insp-label">{{label.fadeOut}} (ms)</label>
-        <input type="number" min="0" step="100" data-insp="transition.audio.fadeOutDuration" value="{{inspector.edge.transition.audio.fadeOutDuration}}">
-        <label class="lf-insp-label">{{label.curve}}</label>
-        <select data-insp="transition.audio.curve">
-          {{#each inspector.curveOptions}}
-          <option value="{{this}}" {{#if (lumenn-eq this ../inspector.edge.transition.audio.curve)}}selected{{/if}}>{{this}}</option>
-          {{/each}}
-        </select>
+        <div class="lf-tr-timed">
+          <div class="lf-tr-row lf-tr-row-3">
+            <label class="lf-tr-field"><span>{{label.crossfadeDur}}</span><span class="lf-tr-unit"><input type="number" min="0" step="100" data-insp="transition.audio.crossfadeDuration" value="{{inspector.edge.transition.audio.crossfadeDuration}}"><em>ms</em></span></label>
+            <label class="lf-tr-field"><span>{{label.fadeIn}}</span><span class="lf-tr-unit"><input type="number" min="0" step="100" data-insp="transition.audio.fadeInDuration" value="{{inspector.edge.transition.audio.fadeInDuration}}"><em>ms</em></span></label>
+            <label class="lf-tr-field"><span>{{label.fadeOut}}</span><span class="lf-tr-unit"><input type="number" min="0" step="100" data-insp="transition.audio.fadeOutDuration" value="{{inspector.edge.transition.audio.fadeOutDuration}}"><em>ms</em></span></label>
+          </div>
+          <label class="lf-tr-field"><span>{{label.curve}}</span>
+          <select data-insp="transition.audio.curve">
+            {{#each inspector.curveOptions}}
+            <option value="{{this}}" {{#if (lumenn-eq this ../inspector.edge.transition.audio.curve)}}selected{{/if}}>{{this}}</option>
+            {{/each}}
+          </select></label>
+        </div>
+        </section>
         {{#if editable}}
         {{#if inspector.canPreviewTransition}}
         <div class="lf-insp-actions"><button data-insp-action="preview-transition">{{label.preview}}</button></div>
         {{/if}}
         <div class="lf-insp-actions">
-          {{#if inspector.reverse}}
-          <button disabled>{{label.bidirectional}}</button>
-          {{else}}
-          <button data-insp-action="add-return">{{label.addReturn}}</button>
-          {{/if}}
+          <p class="lf-tr-both"><i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i>{{label.bothWays}}</p>
           <button class="danger" data-insp-action="delete-edge">{{label.delete}}</button>
         </div>
         {{/if}}
@@ -498,10 +555,28 @@
       {{/if}}
 
       {{#if (lumenn-eq inspector.kind 'graph')}}
-      <h3 class="lf-insp-title">{{label.graph}}</h3>
-      <p class="lf-insp-p">{{activeGraph.name}}</p>
-      <p class="lf-insp-p">{{nodes.length}} nodes &middot; {{edgeCount}} edges</p>
-      <p class="lf-insp-p">Schema v2 &middot; graph editor</p>
+      <h3 class="lf-insp-title">{{label.whereAmI}}</h3>
+      {{#if neural.found}}
+      <div class="lf-where">
+        <p class="lf-where-addr"><i class="fa-solid fa-location-dot" aria-hidden="true"></i><span>{{neural.address}}</span><b class="lf-where-kind">{{neural.kindLabel}}</b></p>
+        <ul class="lf-where-stats">
+          <li><b>{{neural.cells.scene}}</b><span>{{label.cellScenes}}</span></li>
+          <li><b>{{neural.cells.audio}}</b><span>{{label.cellAudio}}</span></li>
+          <li><b>{{neural.cells.hive}}</b><span>{{label.cellHives}}</span></li>
+          <li><b>{{neural.links.total}}</b><span>{{label.synapses}}</span></li>
+          {{#if neural.isHive}}<li><b>{{neural.ports.entry}}/{{neural.ports.exit}}</b><span>{{label.membranes}}</span></li>{{/if}}
+        </ul>
+        <dl class="lf-where-anchors">
+          <dt>{{label.neuralIntro}}</dt><dd class="{{#if neural.introSet}}is-set{{/if}}">{{neural.introText}}</dd>
+          <dt>{{label.neuralOutput}}</dt><dd class="{{#if neural.outputSet}}is-set{{/if}}">{{neural.outputText}}</dd>
+        </dl>
+        {{#if neural.outgoing.length}}
+        <p class="lf-where-label">{{label.neuralOutgoing}}</p>
+        <ul class="lf-where-out">{{#each neural.outgoing}}<li class="lf-where-{{this.type}}"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i>{{this.name}}</li>{{/each}}</ul>
+        {{/if}}
+        <button type="button" class="lf-where-hud" data-action="open-destinations"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i><span>{{neural.destinationsText}}</span></button>
+      </div>
+      {{/if}}
       {{#if editable}}
       <h3 class="lf-insp-title">{{label.hiveSection}}</h3>
       {{#if inspector.hive.isHive}}
@@ -539,6 +614,9 @@
           <input type="text" id="lf-hive-video-in" data-hive-field="transition.videoSrc" value="{{inspector.hive.transition.video.src}}" placeholder="stinger.webm">
           <button type="button" data-insp-action="pick-video" data-pick-for="#lf-hive-video-in" title="{{label.filmVideoFile}}"><i class="fa-solid fa-folder-open"></i></button>
         </div>
+        <div class="lf-tr-chips lf-stinger-chips" role="group" aria-label="{{label.stingerReady}}">
+          {{#each inspector.hive.transition.stingers}}<button type="button" class="lf-tr-chip{{#if this.on}} is-on{{/if}}" data-stinger-src="{{this.src}}" data-stinger-for="#lf-hive-video-in"><i class="fa-solid {{this.icon}}"></i> {{this.label}}</button>{{/each}}
+        </div>
         <div class="lf-trans-row">
           <label>{{label.filmCutAt}}<input type="number" min="0" step="50" data-hive-field="transition.cutAt" value="{{inspector.hive.transition.video.cutAt}}"></label>
           <label class="lf-insp-check"><input type="checkbox" data-hive-field="transition.videoSound" {{#if inspector.hive.transition.video.sound}}checked{{/if}}> {{label.filmVideoSound}}</label>
@@ -567,6 +645,9 @@
         <div class="lf-pick-row">
           <input type="text" id="lf-hive-video-out" data-hive-field="exit.videoSrc" value="{{inspector.hive.exit.video.src}}" placeholder="stinger.webm">
           <button type="button" data-insp-action="pick-video" data-pick-for="#lf-hive-video-out" title="{{label.filmVideoFile}}"><i class="fa-solid fa-folder-open"></i></button>
+        </div>
+        <div class="lf-tr-chips lf-stinger-chips" role="group" aria-label="{{label.stingerReady}}">
+          {{#each inspector.hive.exit.stingers}}<button type="button" class="lf-tr-chip{{#if this.on}} is-on{{/if}}" data-stinger-src="{{this.src}}" data-stinger-for="#lf-hive-video-out"><i class="fa-solid {{this.icon}}"></i> {{this.label}}</button>{{/each}}
         </div>
         <div class="lf-trans-row">
           <label>{{label.filmCutAt}}<input type="number" min="0" step="50" data-hive-field="exit.cutAt" value="{{inspector.hive.exit.video.cutAt}}"></label>

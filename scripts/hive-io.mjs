@@ -47,12 +47,18 @@ export function normalizeHiveTransition(config, fallback) {
  * - áudio que só toca dentro do Grupo vai junto; áudio usado dentro e fora é copiado.
  * Puro: devolve { hive, parent, refNode, entries, exits } ou null se o Grupo não existe ou está vazio.
  */
-export function planGroupToHive(graph, groupId, { newId, labelOf = (node) => node?.data?.title ?? node?.id }) {
+export function planGroupToHive(
+    graph,
+    groupId,
+    { newId, labelOf = (node) => node?.data?.title ?? node?.id }
+) {
     const nodes = graph?.nodes ?? [];
     const edges = graph?.edges ?? [];
     const group = nodes.find((node) => node.id === groupId && node.type === 'group');
     if (!group) return null;
-    const members = new Set(nodes.filter((node) => node.parentId === groupId).map((node) => node.id));
+    const members = new Set(
+        nodes.filter((node) => node.parentId === groupId).map((node) => node.id)
+    );
     if (!members.size) return null;
     const moved = new Set();
     const copies = new Map();
@@ -62,7 +68,9 @@ export function planGroupToHive(graph, groupId, { newId, labelOf = (node) => nod
             if (members.has(node.id)) moved.add(node.id);
             continue;
         }
-        const targets = edges.filter((edge) => edge.type === 'audio' && edge.from === node.id).map((edge) => edge.to);
+        const targets = edges
+            .filter((edge) => edge.type === 'audio' && edge.from === node.id)
+            .map((edge) => edge.to);
         const inside = targets.some((id) => members.has(id));
         const outside = targets.some((id) => !members.has(id));
         if (inside && outside) copies.set(node.id, newId('node'));
@@ -72,7 +80,12 @@ export function planGroupToHive(graph, groupId, { newId, labelOf = (node) => nod
     const hiveIdOf = (id) => copies.get(id) ?? id;
     const hiveNodes = nodes
         .filter((node) => inHive(node.id))
-        .map((node) => ({ ...node, id: hiveIdOf(node.id), parentId: null, data: { ...(node.data ?? {}) } }));
+        .map((node) => ({
+            ...node,
+            id: hiveIdOf(node.id),
+            parentId: null,
+            data: { ...(node.data ?? {}) },
+        }));
     const minX = Math.min(...hiveNodes.map((node) => node.position?.x ?? 0));
     const minY = Math.min(...hiveNodes.map((node) => node.position?.y ?? 0));
     for (const node of hiveNodes) {
@@ -91,7 +104,8 @@ export function planGroupToHive(graph, groupId, { newId, labelOf = (node) => nod
         const fromIn = inHive(edge.from);
         const toIn = moved.has(edge.to);
         if (edge.type === 'audio' && copies.has(edge.from)) {
-            if (members.has(edge.to)) hiveEdges.push({ ...edge, id: newId('edge'), from: hiveIdOf(edge.from) });
+            if (members.has(edge.to))
+                hiveEdges.push({ ...edge, id: newId('edge'), from: hiveIdOf(edge.from) });
             else parentEdges.push(edge);
             continue;
         }
@@ -100,13 +114,23 @@ export function planGroupToHive(graph, groupId, { newId, labelOf = (node) => nod
         } else if (!fromIn && members.has(edge.to) && edge.type === 'flow') {
             let port = entries.get(edge.to);
             if (!port) {
-                port = { id: newId('port'), name: String(labelOf(nodes.find((n) => n.id === edge.to)) ?? ''), direction: 'entry', nodeId: edge.to };
+                port = {
+                    id: newId('port'),
+                    name: String(labelOf(nodes.find((n) => n.id === edge.to)) ?? ''),
+                    direction: 'entry',
+                    nodeId: edge.to,
+                };
                 entries.set(edge.to, port);
             }
             parentEdges.push({ ...edge, to: refId, portId: port.id });
         } else if (members.has(edge.from) && !inHive(edge.to) && edge.type === 'flow') {
             const target = nodes.find((n) => n.id === edge.to);
-            const port = { id: newId('port'), name: String(labelOf(target) ?? ''), direction: 'exit', nodeId: edge.from };
+            const port = {
+                id: newId('port'),
+                name: String(labelOf(target) ?? ''),
+                direction: 'exit',
+                nodeId: edge.from,
+            };
             exits.push(port);
             parentEdges.push({ ...edge, from: refId, exitPortId: port.id });
         } else if (!fromIn && !inHive(edge.to)) {
@@ -114,7 +138,11 @@ export function planGroupToHive(graph, groupId, { newId, labelOf = (node) => nod
         }
     }
     const entryPorts = [...entries.values()];
-    const firstRoom = entryPorts[0]?.nodeId ?? hiveNodes.find((node) => node.type === 'scene')?.id ?? hiveNodes[0]?.id ?? null;
+    const firstRoom =
+        entryPorts[0]?.nodeId ??
+        hiveNodes.find((node) => node.type === 'scene')?.id ??
+        hiveNodes[0]?.id ??
+        null;
     const anchor = group.position ?? { x: minX, y: minY };
     const refNode = {
         id: refId,
@@ -161,7 +189,9 @@ export function planGroupToHive(graph, groupId, { newId, labelOf = (node) => nod
  * a única aresta de saída serve. Devolve a aresta ou null (aí volta ao próprio nó Hive).
  */
 export function resolveHiveExitEdge(parentGraph, refNodeId, portId) {
-    const outgoing = (parentGraph?.edges ?? []).filter((edge) => edge.type === 'flow' && edge.from === refNodeId);
+    const outgoing = (parentGraph?.edges ?? []).filter(
+        (edge) => edge.type === 'flow' && edge.from === refNodeId
+    );
     const byPort = portId ? outgoing.find((edge) => edge.exitPortId === portId) : null;
     return byPort ?? (outgoing.length === 1 ? outgoing[0] : null);
 }
@@ -181,6 +211,72 @@ export function hiveEntryPort(hive, portRef = null) {
 /** Portas de saída que moram na sala informada. */
 export function hiveExitPortsAt(hive, nodeId) {
     return portsOf(hive).filter((port) => port?.direction === 'exit' && port.nodeId === nodeId);
+}
+
+/**
+ * Trilho de portas do card do nó Hive: entradas e saídas com o contador de arestas ligadas.
+ * `edges` são as arestas do storyboard-pai, onde mora o nó `hive-ref`.
+ */
+export function portHubView(hive, edges, refNodeId) {
+    const ports = portsOf(hive);
+    const directionOf = (port) => (port?.direction === 'exit' ? 'exit' : 'entry');
+    // Aresta legada sem `portId` entra pela porta padrão, como `hiveEntryPort` faz.
+    const fallbackEntry =
+        ports.find((port) => directionOf(port) === 'entry' && port.nodeId)?.id ?? null;
+    const counts = { entry: new Map(), exit: new Map() };
+    const bump = (map, id) => {
+        if (id) map.set(id, (map.get(id) ?? 0) + 1);
+    };
+    for (const edge of edges ?? []) {
+        if (edge?.type !== 'flow') continue;
+        if (edge.to === refNodeId) bump(counts.entry, edge.portId ?? fallbackEntry);
+        if (edge.from === refNodeId && edge.exitPortId) bump(counts.exit, edge.exitPortId);
+    }
+    const side = (direction) =>
+        ports
+            .filter((port) => directionOf(port) === direction)
+            .map((port) => ({
+                id: port.id,
+                name: port.name ?? '',
+                direction,
+                socket: direction === 'exit' ? 'flow-out' : 'flow-in',
+                nodeId: port.nodeId ?? null,
+                links: counts[direction].get(port.id) ?? 0,
+            }));
+    return { entries: side('entry'), exits: side('exit') };
+}
+
+/** Arestas de saída do nó Hive cuja porta já não existe (arestas órfãs). */
+export function orphanExitEdges(hive, edges, refNodeId) {
+    const ids = new Set(portsOf(hive).map((port) => port?.id));
+    return (edges ?? []).filter(
+        (edge) =>
+            edge?.type === 'flow' &&
+            edge.from === refNodeId &&
+            !!edge.exitPortId &&
+            !ids.has(edge.exitPortId)
+    );
+}
+
+/**
+ * Intenção de um clique numa porta depois de armar uma saída:
+ * simples cria e desarma; Shift cria e continua; Ctrl alterna (cria/remove) e continua.
+ */
+export function connectIntent({ target, ctrlKey = false, shiftKey = false }) {
+    if (!target) return { action: 'disarm', keepArmed: false };
+    if (ctrlKey) return { action: 'toggle', keepArmed: true };
+    return { action: 'create', keepArmed: shiftKey === true };
+}
+
+/** Nome do arquivo exportado: `<hive>-<timestamp>.json`, sem acento nem separador proibido. */
+export function hiveExportFileName(name, date = new Date()) {
+    const slug = String(name ?? 'hive')
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\p{L}\p{N}_-]+/gu, '-')
+        .replace(/^-+|-+$/g, '');
+    const stamp = date.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    return `${slug || 'hive'}-${stamp}.json`;
 }
 
 /** Normaliza as portas gravadas: id garantido, direção válida, sala existente ou nula. */
@@ -249,9 +345,18 @@ export function buildHiveExport(graph, resolvers) {
                 id: graph.id,
                 name: graph.name,
                 activeNodeId: graph.activeNodeId ?? null,
+                kind: graph.kind ?? (graph.isHive ? 'hive' : 'storyboard'),
+                address: graph.address ?? null,
+                anchors: graph.anchors
+                    ? {
+                          intro: graph.anchors.intro ?? null,
+                          output: graph.anchors.output ?? null,
+                      }
+                    : null,
                 hive: {
                     ports: portsOf(graph).map((port) => ({ ...port })),
                     transition: graph.hive?.transition ?? null,
+                    exit: graph.hive?.exit ?? null,
                 },
                 nodes,
                 edges: (graph.edges ?? []).map((edge) => ({ ...edge })),
@@ -305,26 +410,51 @@ export function planHiveImport(hiveData, world, newId) {
         nodes.push({ ...node, id, parentId: mapNode(node.parentId), data });
     }
     const keep = new Set(nodes.map((node) => node.id));
+    // Portas ganham ids novos: as arestas precisam apontar para os ids novos, não para o arquivo.
+    const portIds = new Map(
+        portsOf(hiveData)
+            .filter((port) => port?.id)
+            .map((port) => [port.id, newId('port')])
+    );
     const edges = (hiveData?.edges ?? [])
         .map((edge) => ({
             ...edge,
             id: newId('edge'),
             from: mapNode(edge.from),
             to: mapNode(edge.to),
+            ...(edge.portId ? { portId: portIds.get(edge.portId) ?? null } : {}),
+            ...(edge.exitPortId ? { exitPortId: portIds.get(edge.exitPortId) ?? null } : {}),
         }))
         .filter((edge) => keep.has(edge.from) && keep.has(edge.to));
     const ports = sanitizeHivePorts(
-        portsOf(hiveData).map((port) => ({ ...port, id: newId('port'), nodeId: mapNode(port.nodeId) })),
+        portsOf(hiveData).map((port) => ({
+            ...port,
+            id: portIds.get(port?.id) ?? newId('port'),
+            nodeId: mapNode(port.nodeId),
+        })),
         nodes,
         newId
     );
+    const anchors = hiveData?.anchors
+        ? {
+              intro: mapNode(hiveData.anchors.intro),
+              output: mapNode(hiveData.anchors.output),
+          }
+        : null;
     return {
         graph: {
             id: newId('graph'),
             name: hiveData?.name || 'Hive',
             activeNodeId: mapNode(hiveData?.activeNodeId),
             isHive: true,
-            hive: { ports, transition: hiveData?.hive?.transition ?? null },
+            ...(hiveData?.kind ? { kind: String(hiveData.kind) } : {}),
+            ...(hiveData?.address ? { address: String(hiveData.address) } : {}),
+            ...(anchors && (anchors.intro || anchors.output) ? { anchors } : {}),
+            hive: {
+                ports,
+                transition: hiveData?.hive?.transition ?? null,
+                exit: hiveData?.hive?.exit ?? null,
+            },
             nodes,
             edges,
         },

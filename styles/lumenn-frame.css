@@ -1,3 +1,40 @@
+/* Fontes do módulo (SIL OFL 1.1; licença ao lado de cada arquivo em assets/fonts/). */
+@font-face {
+    font-display: swap;
+    font-family: 'Orbitron';
+    font-weight: 400 900;
+    src: url('../assets/fonts/orbitron/Orbitron-VariableFont_wght.ttf') format('truetype');
+}
+@font-face {
+    font-display: swap;
+    font-family: 'Rajdhani';
+    font-weight: 400;
+    src: url('../assets/fonts/rajdhani/Rajdhani-Regular.ttf') format('truetype');
+}
+@font-face {
+    font-display: swap;
+    font-family: 'Rajdhani';
+    font-weight: 600;
+    src: url('../assets/fonts/rajdhani/Rajdhani-SemiBold.ttf') format('truetype');
+}
+@font-face {
+    font-display: swap;
+    font-family: 'Rajdhani';
+    font-weight: 700;
+    src: url('../assets/fonts/rajdhani/Rajdhani-Bold.ttf') format('truetype');
+}
+@font-face {
+    font-display: swap;
+    font-family: 'Bebas Neue';
+    font-weight: 400;
+    src: url('../assets/fonts/bebas-neue/BebasNeue-Regular.ttf') format('truetype');
+}
+@font-face {
+    font-display: swap;
+    font-family: 'Noto Serif JP';
+    font-weight: 700;
+    src: url('../assets/fonts/noto-serif-jp/NotoSerifJP-Bold.ttf') format('truetype');
+}
 .lumenn-frame {
     --lf-ink: #0c0c0f;
     --lf-surface: #16161a;
@@ -29,8 +66,9 @@
     --lf-danger-solid: #c2414b;
     --lf-shadow: 0 2px 10px #00000060;
     --lf-shadow-lift: 0 4px 16px #00000080;
-    --lf-font-display: 'Modesto Condensed', 'Signika', sans-serif;
-    --lf-font-body: 'Signika', sans-serif;
+    /* Títulos em Orbitron; texto corrido em Rajdhani (par sci-fi legível em tamanho pequeno). */
+    --lf-font-display: 'Orbitron', 'Bruno Ace', 'Signika', sans-serif;
+    --lf-font-body: 'Rajdhani', 'Signika', sans-serif;
     --lf-fs-xs: 11px;
     --lf-fs-sm: 12px;
     --lf-fs-md: 13px;
@@ -55,7 +93,16 @@
     background: var(--lf-panel);
     border-bottom: 1px solid var(--lf-hairline);
 }
+/* A classe legada `window-app` força o cabeçalho v1 (25px); os controles v14 têm 32px
+   e ficavam cortados acima da janela. Volta à altura do core. */
+.lumenn-frame.graph-editor .window-header {
+    align-items: center;
+    flex: 0 0 var(--header-height, 36px);
+    padding-block: 0;
+}
 .lumenn-frame .window-header .window-title {
+    /* O tema pinta borda em todo h1; no cabeçalho ela virava uma linha vermelha solta. */
+    border: 0;
     color: var(--lf-amber);
     font-family: var(--lf-font-display);
     letter-spacing: 0.04em;
@@ -1029,6 +1076,9 @@
     opacity: 0.88;
     overflow-wrap: anywhere;
 }
+.lf-insp-p.lf-insp-warn {
+    color: #ef4444;
+}
 .lf-audio-routing-note {
     border-left: 2px solid var(--lf-output);
     color: #f3f4f6;
@@ -1438,6 +1488,106 @@ details.lf-audio-legend:not([open]) {
 .lf-hive-enter:hover {
     background: #7c3aed;
 }
+/* Hub de portas do card Hive: entradas à esquerda, saídas à direita; 5 visíveis e o resto rola. */
+.lf-port-hub {
+    display: flex;
+    font-size: var(--lf-fs-xs);
+    gap: 6px;
+    inset: 46px -12px 10px;
+    justify-content: space-between;
+    pointer-events: none;
+    position: absolute;
+    z-index: 4;
+}
+.lf-hub-side {
+    align-content: flex-start;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    list-style: none;
+    margin: 0;
+    max-height: 100px;
+    overflow-y: auto;
+    padding: 0;
+    pointer-events: none;
+    scrollbar-width: thin;
+    width: 108px;
+}
+.lf-hub-out {
+    align-items: flex-end;
+}
+.lf-hub-port {
+    align-items: center;
+    background: var(--lf-panel);
+    border: 1px solid var(--lf-hairline);
+    border-radius: 9px;
+    cursor: crosshair;
+    display: flex;
+    gap: 4px;
+    max-width: 100%;
+    padding: 0 5px;
+    pointer-events: auto;
+}
+.lf-hub-port:hover {
+    border-color: var(--lf-flow-out);
+}
+.lf-hub-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lf-hub-port b {
+    color: var(--lf-muted);
+    font-weight: 600;
+}
+.lf-hub-ring {
+    border: 1px dashed var(--lf-flow-in);
+    border-radius: 50%;
+    flex: 0 0 auto;
+    height: 9px;
+    width: 9px;
+}
+.lf-hub-out .lf-hub-ring {
+    border-color: var(--lf-flow-out);
+}
+.lf-hub-in .lf-hub-port.is-linked .lf-hub-ring {
+    background: var(--lf-flow-in);
+    border-style: solid;
+}
+.lf-hub-out .lf-hub-port.is-linked .lf-hub-ring {
+    background: var(--lf-flow-out);
+    border-style: solid;
+}
+.lf-hub-orphan {
+    color: #ef4444;
+    font-weight: 700;
+}
+.lf-port-hub.is-pop {
+    background: var(--lf-panel);
+    border: 1px solid var(--lf-hairline);
+    border-radius: var(--lf-radius);
+    display: block;
+    inset: auto 6px 34px;
+    padding: 4px 6px;
+    pointer-events: auto;
+    position: absolute;
+}
+.lf-port-hub.is-pop summary {
+    cursor: pointer;
+    font-size: var(--lf-fs-xs);
+    list-style: none;
+}
+.lf-port-hub.is-pop .lf-hub-side {
+    margin-top: 4px;
+    max-height: 100px;
+    width: 100%;
+}
+.lf-node.armed {
+    border-color: var(--lf-teal);
+    box-shadow:
+        0 0 0 2px var(--lf-teal),
+        var(--lf-shadow);
+}
 .lf-camera.lf-camera-in {
     animation: lf-camera-in 420ms ease-out;
 }
@@ -1473,7 +1623,13 @@ details.lf-audio-legend:not([open]) {
     bottom: 0;
     width: 50.5%;
     background:
-        repeating-linear-gradient(90deg, #00000055 0 2px, transparent 2px 38px, #ffffff0d 38px 40px, transparent 40px 76px),
+        repeating-linear-gradient(
+            90deg,
+            #00000055 0 2px,
+            transparent 2px 38px,
+            #ffffff0d 38px 40px,
+            transparent 40px 76px
+        ),
         linear-gradient(180deg, #6e1119, #3a070c 70%, #1c0306);
     box-shadow: 0 0 60px #000c;
     display: none;
@@ -1532,8 +1688,9 @@ details.lf-audio-legend:not([open]) {
     transform: translateY(12px);
 }
 #lumenn-film .lff-caption strong {
-    font-family: 'Modesto Condensed', 'Signika', serif;
-    font-size: clamp(28px, 4.2vw, 64px);
+    color: var(--lff-title-color, inherit);
+    font-family: var(--lff-title-font, 'Orbitron'), 'Bruno Ace', 'Signika', sans-serif;
+    font-size: var(--lff-title-size, clamp(28px, 4.2vw, 64px));
     font-weight: 400;
     letter-spacing: 0.14em;
     text-transform: uppercase;
@@ -1548,7 +1705,6 @@ details.lf-audio-legend:not([open]) {
 #lumenn-film .lff-caption span:empty {
     display: none;
 }
-
 /* Tempos: entrar (lff-in) cobre a tela; sair (lff-out) revela a cena nova. */
 #lumenn-film.lff-in .lff-veil,
 #lumenn-film.lff-out .lff-veil {
@@ -1558,8 +1714,13 @@ details.lf-audio-legend:not([open]) {
         backdrop-filter var(--lff-ms) var(--lff-ease),
         background-size var(--lff-ms) var(--lff-ease);
 }
-
 /* Cutscene: faixas de cinema entram, a tela escurece, o título aparece. */
+/* Cutscene: o título fica no meio da tela, entre as faixas de cinema. */
+#lumenn-film.lff-effect-cutscene .lff-caption {
+    bottom: auto;
+    top: 50%;
+    transform: translateY(calc(-50% + 12px));
+}
 #lumenn-film.lff-effect-cutscene .lff-grain {
     opacity: 0.35;
 }
@@ -1573,7 +1734,7 @@ details.lf-audio-legend:not([open]) {
 }
 #lumenn-film.lff-effect-cutscene.lff-in .lff-caption {
     opacity: 1;
-    transform: none;
+    transform: translateY(-50%);
     transition:
         opacity calc(var(--lff-ms) * 0.5) ease calc(var(--lff-ms) * 0.5),
         transform calc(var(--lff-ms) * 0.5) ease calc(var(--lff-ms) * 0.5);
@@ -1587,13 +1748,17 @@ details.lf-audio-legend:not([open]) {
 }
 #lumenn-film.lff-effect-cutscene.lff-out .lff-bar {
     height: 13vh;
-    animation: lff-bars-out calc(var(--lff-ms) * 0.5) var(--lff-ease) calc(var(--lff-ms) * 0.5) forwards;
+    animation: lff-bars-out calc(var(--lff-ms) * 0.5) var(--lff-ease) calc(var(--lff-ms) * 0.5)
+        forwards;
 }
-
 /* Íris: o mundo fecha num círculo e reabre na cena nova. */
 #lumenn-film.lff-effect-iris .lff-veil {
     opacity: 1;
-    background: radial-gradient(circle at 50% 50%, transparent 0 var(--lff-r, 75%), var(--lff-color, #000) calc(var(--lff-r, 75%) + 0.5%));
+    background: radial-gradient(
+        circle at 50% 50%,
+        transparent 0 var(--lff-r, 75%),
+        var(--lff-color, #000) calc(var(--lff-r, 75%) + 0.5%)
+    );
     --lff-r: 75%;
 }
 #lumenn-film.lff-effect-iris.lff-in .lff-veil {
@@ -1604,7 +1769,6 @@ details.lf-audio-legend:not([open]) {
     --lff-r: 75%;
     transition: --lff-r var(--lff-ms) var(--lff-ease);
 }
-
 /* Wipe: a tela é varrida da esquerda para a direita e sai pela direita. */
 #lumenn-film.lff-effect-wipe .lff-veil {
     opacity: 1;
@@ -1617,7 +1781,6 @@ details.lf-audio-legend:not([open]) {
 #lumenn-film.lff-effect-wipe.lff-out .lff-veil {
     transform: translateX(101%);
 }
-
 /* Cortinas de teatro. */
 #lumenn-film.lff-effect-curtain .lff-panel {
     display: block;
@@ -1626,18 +1789,17 @@ details.lf-audio-legend:not([open]) {
 #lumenn-film.lff-effect-curtain.lff-in .lff-panel {
     transform: translateX(0);
 }
-
 /* Persiana. */
 #lumenn-film.lff-effect-blinds .lff-blinds {
     display: flex;
 }
 #lumenn-film.lff-effect-blinds .lff-blinds i {
-    transition: transform calc(var(--lff-ms) * 0.6) var(--lff-ease) calc(var(--i) * var(--lff-ms) * 0.05);
+    transition: transform calc(var(--lff-ms) * 0.6) var(--lff-ease)
+        calc(var(--i) * var(--lff-ms) * 0.05);
 }
 #lumenn-film.lff-effect-blinds.lff-in .lff-blinds i {
     transform: scaleY(1.02);
 }
-
 /* Flash branco. */
 #lumenn-film.lff-effect-flash .lff-veil {
     background: #fff;
@@ -1645,7 +1807,6 @@ details.lf-audio-legend:not([open]) {
 #lumenn-film.lff-effect-flash.lff-in .lff-veil {
     opacity: 1;
 }
-
 /* Sonho: desfoque e névoa clara. */
 #lumenn-film.lff-effect-dream .lff-veil {
     background: #f3eefc00;
@@ -1664,19 +1825,25 @@ details.lf-audio-legend:not([open]) {
         background var(--lff-ms) ease,
         backdrop-filter var(--lff-ms) ease;
 }
-
 /* Película queimando: um buraco de fogo abre e engole a tela. */
 #lumenn-film.lff-effect-burn .lff-grain {
     opacity: 0.4;
 }
 #lumenn-film.lff-effect-burn .lff-veil {
     opacity: 1;
-    background: radial-gradient(circle at 50% 55%, #000 0 34%, #3b0a04 40%, #c2410c 45%, #fbbf24 48%, transparent 53%) center / 0% 0% no-repeat;
+    background: radial-gradient(
+            circle at 50% 55%,
+            #000 0 34%,
+            #3b0a04 40%,
+            #c2410c 45%,
+            #fbbf24 48%,
+            transparent 53%
+        )
+        center / 0% 0% no-repeat;
 }
 #lumenn-film.lff-effect-burn.lff-in .lff-veil {
     background-size: 420% 420%;
 }
-
 @property --lff-r {
     syntax: '<percentage>';
     inherits: true;
@@ -1976,4 +2143,1053 @@ details.lf-audio-legend:not([open]) {
     width: auto;
     flex: 0 0 auto;
     padding: 0 10px;
+}
+
+/* Endereço neural: âncoras do card, menu do botão direito e HUD de destinos. */
+.lf-anchor-badge {
+    background: var(--lf-ink);
+    border: 1px solid var(--lf-amber-dim);
+    border-radius: 3px;
+    color: var(--lf-amber);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    line-height: 1.6;
+    padding: 0 5px;
+    pointer-events: none;
+    position: absolute;
+    top: 8px;
+    z-index: 3;
+}
+.lf-anchor-intro {
+    left: 8px;
+}
+.lf-anchor-output {
+    border-color: var(--lf-output);
+    color: var(--lf-output);
+    right: 8px;
+}
+.lf-context-menu {
+    background: #1d1d23;
+    border: 1px solid #3b3c44;
+    border-radius: 4px;
+    box-shadow: 0 6px 22px #00000099;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 200px;
+    padding: 4px;
+    position: fixed;
+    z-index: 100000;
+}
+.lf-context-menu button {
+    align-items: center;
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    color: #e0ddd4;
+    cursor: pointer;
+    display: flex;
+    font-family: 'Signika', sans-serif;
+    font-size: 12px;
+    gap: 8px;
+    height: 28px;
+    padding: 0 8px;
+    text-align: left;
+    width: 100%;
+}
+.lf-context-menu button:hover,
+.lf-context-menu button:focus-visible {
+    background: #2b2c33;
+    color: #ffd166;
+}
+.lf-context-menu i {
+    color: #f0a321;
+    flex: 0 0 14px;
+    text-align: center;
+}
+/* ===== HUD de Destinos (ApplicationV2) ===== */
+.lf-hud-dialog {
+    --lf-hud-bg: #16161a;
+    --lf-hud-panel: #1d1d23;
+    --lf-hud-line: #3b3c44;
+    --lf-hud-text: #e0ddd4;
+    --lf-hud-strong: #f2efe6;
+    --lf-hud-muted: #9a97a6;
+    --lf-hud-amber: #f0a321;
+    --lf-hud-gold: #ffd166;
+    --lf-hud-green: #6fcf97;
+    --lf-hud-red: #ff9a9a;
+}
+.lf-hud-dialog .window-content {
+    background: var(--lf-hud-bg);
+    color: var(--lf-hud-text);
+    padding: 0;
+}
+.lf-hud-dialog .lf-hud {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: 100%;
+    min-height: 0;
+    position: relative;
+}
+.lf-hud-dialog .lf-hud-head {
+    background: var(--lf-hud-panel);
+    border-bottom: 1px solid var(--lf-hud-line);
+    display: grid;
+    gap: 10px;
+    padding: 12px 14px;
+}
+.lf-hud-dialog .lf-hud-crumb {
+    align-items: center;
+    color: var(--lf-hud-strong);
+    display: flex;
+    font-size: 13px;
+    font-weight: 600;
+    gap: 8px;
+    margin: 0;
+    min-width: 0;
+}
+.lf-hud-dialog .lf-hud-crumb > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lf-hud-dialog .lf-hud-crumb-label {
+    color: var(--lf-hud-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.lf-hud-dialog .lf-hud-crumb i {
+    color: var(--lf-hud-amber);
+}
+.lf-hud-dialog .lf-hud-searchbox {
+    align-items: center;
+    background: var(--lf-hud-bg);
+    border: 1px solid var(--lf-hud-line);
+    border-radius: 6px;
+    display: flex;
+    gap: 8px;
+    padding: 0 10px;
+}
+.lf-hud-dialog .lf-hud-searchbox:focus-within {
+    border-color: var(--lf-hud-gold);
+}
+.lf-hud-dialog .lf-hud-searchbox i {
+    color: var(--lf-hud-muted);
+}
+.lf-hud-dialog .lf-hud-search {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    color: var(--lf-hud-strong);
+    flex: 1 1 auto;
+    font-size: 13px;
+    height: 34px;
+    outline: none;
+    padding: 0;
+}
+/* Um anel só: o da caixa (`:focus-within`), não o do input do core. */
+.lf-hud-dialog .lf-hud-searchbox .lf-hud-search:focus,
+.lf-hud-dialog .lf-hud-searchbox .lf-hud-search:focus-visible {
+    box-shadow: none;
+    outline: none;
+}
+.lf-hud-dialog .lf-hud-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.lf-hud-dialog .lf-hud-chip {
+    align-items: center;
+    background: transparent;
+    border: 1px solid var(--lf-hud-line);
+    border-radius: 999px;
+    color: var(--lf-hud-text);
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: 11px;
+    gap: 6px;
+    height: 26px;
+    line-height: 1;
+    padding: 0 10px;
+    width: auto;
+}
+.lf-hud-dialog .lf-hud-chip b {
+    color: var(--lf-hud-muted);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+.lf-hud-dialog .lf-hud-chip:hover:not(:disabled) {
+    border-color: var(--lf-hud-muted);
+}
+.lf-hud-dialog .lf-hud-chip[aria-selected='true'] {
+    background: var(--lf-hud-amber);
+    border-color: var(--lf-hud-amber);
+    color: #16161a;
+    font-weight: 700;
+}
+.lf-hud-dialog .lf-hud-chip[aria-selected='true'] b {
+    color: #16161a;
+}
+.lf-hud-dialog .lf-hud-chip:disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+.lf-hud-dialog .lf-hud-list {
+    list-style: none;
+    margin: 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 8px 10px 12px;
+}
+.lf-hud-dialog .lf-hud-list ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.lf-hud-dialog .lf-hud-group {
+    border: 1px solid transparent;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    padding: 4px;
+}
+.lf-hud-dialog .lf-hud-group.is-current {
+    background: #f0a3210d;
+    border-color: #f0a32133;
+}
+.lf-hud-dialog .lf-hud-group-title {
+    align-items: center;
+    color: var(--lf-hud-strong);
+    display: flex;
+    gap: 8px;
+    padding: 6px 8px 4px 10px;
+}
+.lf-hud-dialog .lf-hud-group-title i {
+    color: var(--lf-hud-amber);
+    text-align: center;
+    width: 18px;
+}
+.lf-hud-dialog .lf-hud-here {
+    background: var(--lf-hud-amber);
+    border-radius: 999px;
+    color: #16161a;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    margin-left: auto;
+    padding: 2px 8px;
+    text-transform: uppercase;
+}
+/* Linha = célula da rede: ícone · nome/endereço · estado · ações. */
+.lf-hud-dialog .lf-hud-row {
+    --lf-hud-accent: transparent;
+    align-items: center;
+    border-radius: 6px;
+    box-shadow: inset 3px 0 0 var(--lf-hud-accent);
+    cursor: pointer;
+    display: grid;
+    gap: 10px;
+    /* Colunas fixas para Entrar alinhar em todas as linhas. */
+    grid-template-columns: 18px minmax(0, 1fr) 96px auto;
+    outline: none;
+    padding: 6px 8px 6px 10px;
+    transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+.lf-hud-dialog .lf-hud-row:not(.lf-hud-row--graph) {
+    margin-left: 14px;
+}
+.lf-hud-dialog .lf-hud-row:hover,
+.lf-hud-dialog .lf-hud-row:focus-visible,
+.lf-hud-dialog .lf-hud-row:focus-within {
+    --lf-hud-accent: var(--lf-hud-amber);
+    background: #ffffff0d;
+}
+.lf-hud-dialog .lf-hud-row:focus-visible {
+    box-shadow: inset 3px 0 0 var(--lf-hud-accent), 0 0 0 1px var(--lf-hud-gold);
+}
+.lf-hud-dialog .lf-hud-row[data-state='ready'] {
+    --lf-hud-accent: var(--lf-hud-green);
+}
+.lf-hud-dialog .lf-hud-row[data-state='error'] {
+    --lf-hud-accent: #ff7a7a;
+}
+.lf-hud-dialog .lf-hud-kind {
+    color: var(--lf-hud-amber);
+    text-align: center;
+}
+.lf-hud-dialog .lf-hud-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+.lf-hud-dialog .lf-hud-name {
+    color: var(--lf-hud-strong);
+    font-size: 13px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lf-hud-dialog .lf-hud-row--graph .lf-hud-name {
+    font-size: 14px;
+}
+.lf-hud-dialog .lf-hud-addr {
+    color: var(--lf-hud-muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+/* Chip de estado: guarda a coluna mesmo vazio. */
+.lf-hud-dialog .lf-hud-state {
+    align-items: center;
+    border-radius: 999px;
+    display: inline-flex;
+    font-size: 10px;
+    font-weight: 700;
+    gap: 5px;
+    justify-self: end;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.lf-hud-dialog .lf-hud-state:empty {
+    visibility: hidden;
+}
+.lf-hud-dialog [data-state='loading'] .lf-hud-state {
+    background: #f0a3211f;
+    color: var(--lf-hud-gold);
+}
+.lf-hud-dialog [data-state='loading'] .lf-hud-state::before {
+    animation: lf-hud-spin 0.8s linear infinite;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+    border-right-color: transparent;
+    content: '';
+    height: 8px;
+    width: 8px;
+}
+.lf-hud-dialog [data-state='ready'] .lf-hud-state {
+    background: #6fcf971f;
+    color: var(--lf-hud-green);
+}
+.lf-hud-dialog [data-state='ready'] .lf-hud-state::before {
+    content: '✓';
+}
+.lf-hud-dialog [data-state='error'] .lf-hud-state {
+    background: #ff7a7a1f;
+    color: var(--lf-hud-red);
+}
+.lf-hud-dialog [data-state='cancelled'] .lf-hud-state {
+    background: #ffffff0f;
+    color: var(--lf-hud-muted);
+}
+@keyframes lf-hud-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+.lf-hud-dialog .lf-hud-actions {
+    display: flex;
+    gap: 6px;
+}
+.lf-hud-dialog .lf-hud-actions button {
+    align-items: center;
+    background: transparent;
+    border: 1px solid var(--lf-hud-line);
+    border-radius: 5px;
+    color: var(--lf-hud-text);
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 11px;
+    gap: 6px;
+    height: 28px;
+    justify-content: center;
+    line-height: 1;
+    padding: 0 10px;
+    /* O core anima `all` em 0.5s: o botão "sumido" ficava visível meio segundo. */
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    white-space: nowrap;
+    width: auto;
+}
+.lf-hud-dialog .lf-hud-actions button:hover:not(:disabled) {
+    border-color: var(--lf-hud-muted);
+    color: var(--lf-hud-gold);
+}
+.lf-hud-dialog .lf-hud-preload {
+    min-width: 116px;
+}
+/* Sem cena ou já pronta: some, mas guarda a coluna. */
+.lf-hud-dialog .lf-hud-preload:disabled {
+    visibility: hidden;
+}
+.lf-hud-dialog [data-state='loading'] .lf-hud-preload {
+    border-color: #f0a32166;
+    color: var(--lf-hud-gold);
+}
+.lf-hud-dialog .lf-hud-actions .lf-hud-enter {
+    background: var(--lf-hud-amber);
+    border-color: var(--lf-hud-amber);
+    color: #16161a;
+    font-weight: 700;
+}
+.lf-hud-dialog .lf-hud-actions .lf-hud-enter:hover {
+    background: var(--lf-hud-gold);
+    border-color: var(--lf-hud-gold);
+    color: #16161a;
+}
+.lf-hud-dialog [data-state='ready'] .lf-hud-enter {
+    box-shadow: 0 0 0 2px #6fcf9766;
+}
+.lf-hud-dialog .lf-hud-chip:focus-visible,
+.lf-hud-dialog .lf-hud-actions button:focus-visible {
+    outline: 2px solid var(--lf-hud-gold);
+    outline-offset: 2px;
+}
+.lf-hud-dialog .lf-hud-empty {
+    align-items: center;
+    color: var(--lf-hud-muted);
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+    gap: 8px;
+    inset: 160px 0 auto;
+    margin: 0;
+    position: absolute;
+    text-align: center;
+}
+.lf-hud-dialog .lf-hud-empty[hidden] {
+    display: none;
+}
+.lf-hud-dialog .lf-hud-empty i {
+    font-size: 22px;
+}
+.lf-hud-dialog .lf-hud-keys {
+    background: var(--lf-hud-panel);
+    border-top: 1px solid var(--lf-hud-line);
+    color: var(--lf-hud-muted);
+    font-size: 11px;
+    padding: 8px 14px;
+}
+.lf-hud-dialog .lf-hud-keys kbd {
+    background: #2b2c33;
+    border: 1px solid var(--lf-hud-line);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    color: var(--lf-hud-text);
+    font: inherit;
+    margin-right: 2px;
+    padding: 0 5px;
+}
+.lf-hud-dialog .lf-hud-live {
+    clip-path: inset(50%);
+    height: 1px;
+    margin: 0;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+    .lf-hud-dialog .lf-hud-row {
+        transition: none;
+    }
+    .lf-hud-dialog [data-state='loading'] .lf-hud-state::before {
+        animation: none;
+    }
+}
+
+/* ===== Visitas privadas (Fase 4) ===== */
+.lf-visit-dialog .window-content {
+    background: #16161a;
+    color: #e0ddd4;
+    padding: 0;
+}
+.lf-visit {
+    display: grid;
+    gap: 10px;
+    padding: 12px 14px;
+}
+.lf-visit-hint,
+.lf-visit-status {
+    color: #9a97a6;
+    font-size: 12px;
+    margin: 0;
+}
+.lf-visit-status:empty {
+    display: none;
+}
+.lf-visit-list {
+    display: grid;
+    gap: 4px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.lf-visit-list li {
+    align-items: center;
+    border-radius: 6px;
+    box-shadow: inset 3px 0 0 transparent;
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    padding: 6px 8px 6px 10px;
+}
+.lf-visit-list li:hover,
+.lf-visit-list li.is-waiting {
+    background: #ffffff0d;
+    box-shadow: inset 3px 0 0 #f0a321;
+}
+.lf-visit-who {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+}
+.lf-visit-who b {
+    color: #f2efe6;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lf-visit-who i {
+    color: #f0a321;
+}
+/* Fila do GM: nomes longos quebram em vez de virar "QA Jog…". */
+.lf-visit-queue .lf-visit-who {
+    flex-wrap: wrap;
+    row-gap: 2px;
+}
+.lf-visit-queue .lf-visit-who b {
+    white-space: normal;
+}
+.lf-visit-empty {
+    color: #9a97a6;
+    justify-content: center !important;
+}
+.lf-visit-actions {
+    display: flex;
+    gap: 6px;
+}
+.lf-visit button {
+    align-items: center;
+    background: transparent;
+    border: 1px solid #3b3c44;
+    border-radius: 5px;
+    color: #e0ddd4;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 11px;
+    gap: 6px;
+    height: 28px;
+    line-height: 1;
+    padding: 0 10px;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    white-space: nowrap;
+    width: auto;
+}
+.lf-visit button:hover:not(:disabled) {
+    border-color: #9a97a6;
+    color: #ffd166;
+}
+.lf-visit button:disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+.lf-visit button:focus-visible {
+    outline: 2px solid #ffd166;
+    outline-offset: 2px;
+}
+.lf-visit .lf-visit-approve,
+.lf-visit [data-ask]:not(:disabled) {
+    background: #f0a321;
+    border-color: #f0a321;
+    color: #16161a;
+    font-weight: 700;
+}
+.lf-visit .lf-visit-approve:hover {
+    background: #ffd166;
+    border-color: #ffd166;
+    color: #16161a;
+}
+.lf-visit-stage {
+    gap: 8px;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: 100%;
+}
+.lf-visit-banner {
+    align-items: center;
+    background: #f0a3211f;
+    border: 1px solid #f0a32155;
+    border-radius: 6px;
+    color: #ffd166;
+    display: flex;
+    font-size: 12px;
+    gap: 8px;
+    margin: 0;
+    padding: 6px 10px;
+}
+.lf-visit-art {
+    align-items: center;
+    background: #0e0e12;
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
+}
+.lf-visit-art img {
+    border: 0;
+    height: 100%;
+    object-fit: contain;
+    width: 100%;
+}
+.lf-visit-noart {
+    color: #9a97a6;
+    display: grid;
+    font-size: 12px;
+    gap: 6px;
+    justify-items: center;
+}
+@media (prefers-reduced-motion: reduce) {
+    .lf-visit button {
+        transition: none;
+    }
+}
+/* ===== Fase 3: onde estou, trilha, sinapses ===== */
+.lf-where {
+    display: grid;
+    gap: 10px;
+}
+.lf-where-addr {
+    align-items: center;
+    color: var(--lf-text, #e0ddd4);
+    display: flex;
+    font-size: 12px;
+    font-weight: 600;
+    gap: 8px;
+    margin: 0;
+    min-width: 0;
+}
+.lf-where-addr i {
+    color: var(--lf-amber, #f0a321);
+}
+.lf-where-addr span {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.lf-where-kind {
+    background: #f0a3211f;
+    border-radius: 999px;
+    color: #ffd166;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.lf-where-stats {
+    display: grid;
+    gap: 6px;
+    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.lf-where-stats li {
+    background: #ffffff0a;
+    border: 1px solid #ffffff12;
+    border-radius: 6px;
+    display: grid;
+    gap: 1px;
+    padding: 6px 8px;
+}
+.lf-where-stats b {
+    color: #f2efe6;
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+.lf-where-stats span {
+    color: #9a97a6;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.lf-where-anchors {
+    display: grid;
+    gap: 4px 10px;
+    grid-template-columns: auto 1fr;
+    margin: 0;
+}
+.lf-where-anchors dt {
+    color: #9a97a6;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+.lf-where-anchors dd {
+    color: #9a97a6;
+    font-size: 12px;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+.lf-where-anchors dd.is-set {
+    color: #f2efe6;
+    font-weight: 600;
+}
+.lf-where-label {
+    color: #9a97a6;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    margin: 0;
+    text-transform: uppercase;
+}
+.lf-where-out {
+    display: grid;
+    gap: 3px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.lf-where-out li {
+    align-items: center;
+    color: #e0ddd4;
+    display: flex;
+    font-size: 12px;
+    gap: 8px;
+}
+.lf-where-out i {
+    color: var(--lf-amber, #f0a321);
+}
+.lf-where-out .lf-where-audio i {
+    color: #ef4444;
+}
+.lf-where-hud {
+    align-items: center;
+    background: transparent;
+    border: 1px solid #3b3c44;
+    border-radius: 5px;
+    color: #e0ddd4;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 12px;
+    gap: 8px;
+    height: 30px;
+    justify-content: center;
+    width: 100%;
+}
+.lf-where-hud:hover {
+    border-color: #9a97a6;
+    color: #ffd166;
+}
+.lf-where-hud:focus-visible {
+    outline: 2px solid #ffd166;
+    outline-offset: 2px;
+}
+/* Migalha da Edição: ancestrais viram atalho; o nível atual fica como texto. */
+.lf-trail-link {
+    background: transparent;
+    border: 0;
+    border-bottom: 1px dashed #f0a32188;
+    border-radius: 0;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    height: auto;
+    padding: 0 1px;
+    width: auto;
+}
+.lf-trail-link:hover {
+    border-bottom-style: solid;
+    color: #ffd166;
+}
+.lf-trail-link:focus-visible {
+    outline: 2px solid #ffd166;
+    outline-offset: 2px;
+}
+/* Sinapse quente: pontos de luz correm no sentido da ligação. Só nas arestas do nó ativo/selecionado. */
+.lf-edge-pulse {
+    animation: lf-pulse 1.1s linear infinite;
+    fill: none;
+    opacity: 0.95;
+    pointer-events: none;
+    stroke: #fff3c4;
+    stroke-dasharray: 2 16;
+    stroke-linecap: round;
+    stroke-width: 2px;
+    vector-effect: non-scaling-stroke;
+}
+.lf-edge-pulse-audio {
+    stroke: #ffd2d2;
+}
+@keyframes lf-pulse {
+    to {
+        stroke-dashoffset: -18;
+    }
+}
+/* Membrana: porta ligada ganha um halo discreto. */
+.lf-hub-port.is-linked .lf-hub-ring {
+    box-shadow: 0 0 0 3px #f0a32140;
+}
+@media (prefers-reduced-motion: reduce) {
+    .lf-edge-pulse {
+        animation: none;
+    }
+}
+/* ===== Fase 2: HUD com recentes e parentesco ===== */
+.lf-hud-dialog .lf-hud-rel {
+    border: 1px solid #ffffff26;
+    border-radius: 999px;
+    color: #9a97a6;
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    margin-left: 8px;
+    padding: 1px 7px;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+.lf-hud-dialog .lf-hud-rel-child {
+    border-color: #6fcf9766;
+    color: #6fcf97;
+}
+.lf-hud-dialog .lf-hud-rel-parent {
+    border-color: #ffd16666;
+    color: #ffd166;
+}
+.lf-hud-dialog .lf-hud-recent {
+    border-color: #ffffff14;
+}
+.lf-hud-dialog .lf-hud-recent .lf-hud-group-title i {
+    color: #9a97a6;
+}
+/* ===== Editor de transição: cartões Cena / Áudio ===== */
+.lf-tr-card {
+    background: #ffffff08;
+    border: 1px solid #ffffff14;
+    border-radius: 8px;
+    display: grid;
+    gap: 8px;
+    margin: 10px 0 4px;
+    padding: 10px;
+}
+.lf-tr-head {
+    align-items: center;
+    border: 0;
+    color: #f2efe6;
+    display: flex;
+    font-size: 12px;
+    font-weight: 700;
+    gap: 8px;
+    letter-spacing: 0.06em;
+    margin: 0;
+    text-transform: uppercase;
+}
+.lf-tr-scene .lf-tr-head i {
+    color: #f0a321;
+}
+.lf-tr-audio .lf-tr-head i {
+    color: #a78bfa;
+}
+.lf-tr-row {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) 72px;
+}
+.lf-tr-row-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.lf-tr-field {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+.lf-tr-field > span:first-child {
+    color: #9a97a6;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+/* Número inteiro visível + unidade dentro do campo (antes: "10(" cortado). */
+.lf-tr-unit {
+    align-items: center;
+    background: #16161a;
+    border: 1px solid #3b3c44;
+    border-radius: 5px;
+    display: flex;
+    min-width: 0;
+    padding-right: 7px;
+}
+.lf-tr-unit:focus-within {
+    border-color: #ffd166;
+}
+.lf-tr-unit input {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    color: #f2efe6;
+    flex: 1 1 auto;
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+    outline: none;
+    padding: 0 6px;
+    width: 100%;
+}
+/* Uma regra geral de input[type=number] fixava max-width 35px e cortava "1000" em "10(". */
+.lf-inspector .lf-tr-unit input[type='number'] {
+    background: transparent;
+    border: 0;
+    max-width: none;
+    padding: 0 6px;
+    width: 100%;
+}
+/* Ponto de corte da Hive (entrada/saída): mesmo problema do max-width geral de 35 px. */
+.lf-inspector input[data-hive-field$='cutAt'] {
+    max-width: none;
+    width: 100%;
+}
+.lf-stinger-chips {
+    margin: 6px 0 2px;
+}
+.lf-tr-unit em {
+    color: #9a97a6;
+    font-size: 10px;
+    font-style: normal;
+}
+.lf-tr-color input[type='color'] {
+    border: 1px solid #3b3c44;
+    border-radius: 5px;
+    height: 28px;
+    padding: 2px;
+    width: 100%;
+}
+/* Manter/Corte não usam tempo: os campos de tempo somem. */
+/* Lê o select ao vivo: o Inspector não redesenha ao trocar o modo. */
+.lf-tr-audio:has(select[data-insp='transition.audio.mode'] option[value='keep']:checked) .lf-tr-timed,
+.lf-tr-audio:has(select[data-insp='transition.audio.mode'] option[value='cut']:checked) .lf-tr-timed {
+    display: none;
+}
+.lf-tr-timed {
+    display: grid;
+    gap: 8px;
+}
+/* Batalha RPG: dois flashes, a espiral gira e fecha a tela; sai abrindo. */
+#lumenn-film .lff-swirl {
+    background: repeating-conic-gradient(from 0deg, var(--lff-color, #000) 0 18deg, transparent 18deg 36deg);
+    inset: -60vmax;
+    opacity: 0;
+    transform: scale(0.05) rotate(0deg);
+}
+#lumenn-film.lff-effect-battle.lff-in .lff-swirl {
+    opacity: 1;
+    transform: scale(1) rotate(420deg);
+    transition:
+        transform var(--lff-ms) cubic-bezier(0.55, 0, 0.85, 0.45),
+        opacity 60ms linear;
+}
+#lumenn-film.lff-effect-battle.lff-in .lff-veil {
+    opacity: 1;
+    transition: opacity calc(var(--lff-ms) * 0.3) ease calc(var(--lff-ms) * 0.7);
+}
+#lumenn-film.lff-effect-battle.lff-in .lff-grain {
+    animation: lff-battle-flash calc(var(--lff-ms) * 0.4) steps(1, end);
+    background: #fff;
+    inset: 0;
+    mix-blend-mode: normal;
+}
+#lumenn-film.lff-effect-battle.lff-out .lff-swirl {
+    opacity: 0;
+    transform: scale(2.4) rotate(540deg);
+    transition:
+        transform var(--lff-ms) ease-out,
+        opacity var(--lff-ms) ease-out;
+}
+#lumenn-film.lff-effect-battle.lff-out .lff-veil {
+    opacity: 0;
+    transition: opacity calc(var(--lff-ms) * 0.6) ease;
+}
+@keyframes lff-battle-flash {
+    0% { opacity: 0.85; }
+    25% { opacity: 0; }
+    50% { opacity: 0.85; }
+    75% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #lumenn-film.lff-effect-battle .lff-swirl {
+        display: none;
+    }
+    #lumenn-film.lff-effect-battle.lff-in .lff-grain {
+        animation: none;
+    }
+}
+/* ===== Seletor de transição: chips de atalho, título do filme, ida e volta ===== */
+.lf-tr-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+.lumenn-frame .lf-tr-chip {
+    align-items: center;
+    background: #16161a;
+    border: 1px solid #3b3c44;
+    border-radius: 999px;
+    color: #e0ddd4;
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-family: var(--lf-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    gap: 5px;
+    height: 24px;
+    line-height: 1;
+    padding: 0 9px;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    width: auto;
+}
+.lumenn-frame .lf-tr-chip i {
+    color: #9a97a6;
+    font-size: 10px;
+}
+.lumenn-frame .lf-tr-chip:hover:not(:disabled) {
+    border-color: #9a97a6;
+    color: #ffd166;
+}
+.lumenn-frame .lf-tr-chip.is-on {
+    background: #f0a321;
+    border-color: #f0a321;
+    color: #16161a;
+}
+.lumenn-frame .lf-tr-chip.is-on i {
+    color: #16161a;
+}
+.lumenn-frame .lf-tr-chip:focus-visible {
+    outline: 2px solid #ffd166;
+    outline-offset: 2px;
+}
+.lf-tr-title {
+    border-top: 1px dashed #ffffff1f;
+    display: grid;
+    gap: 8px;
+    padding-top: 8px;
+}
+.lf-tr-both {
+    align-items: center;
+    color: #6fcf97;
+    display: flex;
+    flex: 1 1 100%;
+    font-size: 12px;
+    gap: 8px;
+    margin: 0 0 6px;
 }

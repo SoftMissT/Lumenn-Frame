@@ -19,9 +19,9 @@ test('foco centraliza os bounds e conserva o alvo no zoom solicitado', () => {
             { panX: 0, panY: 0, zoom: 1 },
             { width: 800, height: 600 },
             { x: 100, y: 50, width: 200, height: 100 },
-            1.5,
+            1.5
         ),
-        { panX: 100, panY: 150, zoom: 1.5 },
+        { panX: 100, panY: 150, zoom: 1.5 }
     );
 });
 test('connection follows the relative direction around the node perimeter', () => {

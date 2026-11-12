@@ -14,18 +14,9 @@ import {
 test('detecta ciclo direto e indireto entre Hives', () => {
     assert.deepEqual(
         detectHiveCycles([
-            {
-                id: 'a',
-                references: ['a'],
-            },
-            {
-                id: 'b',
-                references: ['c'],
-            },
-            {
-                id: 'c',
-                references: ['b'],
-            },
+            { id: 'a', references: ['a'] },
+            { id: 'b', references: ['c'] },
+            { id: 'c', references: ['b'] },
         ]),
         [
             ['a', 'a'],
@@ -35,30 +26,15 @@ test('detecta ciclo direto e indireto entre Hives', () => {
 });
 test('resolve porta por nome sem perder a sala interna', () => {
     const hive = {
-        nodes: [
-            {
-                id: 'gym',
-                type: 'scene',
-            },
-        ],
-        ports: [
-            {
-                id: 'p1',
-                name: 'Ginásio',
-                direction: 'entry',
-                nodeId: 'gym',
-            },
-        ],
+        nodes: [{ id: 'gym', type: 'scene' }],
+        ports: [{ id: 'p1', name: 'Ginásio', direction: 'entry', nodeId: 'gym' }],
     };
     assert.deepEqual(resolveHivePort(hive, 'ginásio'), {
         id: 'p1',
         name: 'Ginásio',
         direction: 'entry',
         nodeId: 'gym',
-        node: {
-            id: 'gym',
-            type: 'scene',
-        },
+        node: { id: 'gym', type: 'scene' },
     });
 });
 test('trilha empilha, atualiza a sala ativa e desempilha sem mutar a original', () => {
@@ -81,34 +57,12 @@ test('trilha empilha, atualiza a sala ativa e desempilha sem mutar a original', 
 });
 test('casamento por nome separa match único, pendente ausente e ambíguo', () => {
     const result = matchNamedResources(
+        [{ name: 'Entrada' }, { name: 'Som' }, { name: 'Duplicado' }],
         [
-            {
-                name: 'Entrada',
-            },
-            {
-                name: 'Som',
-            },
-            {
-                name: 'Duplicado',
-            },
-        ],
-        [
-            {
-                id: 'scene-1',
-                name: 'entrada',
-            },
-            {
-                id: 'audio-1',
-                name: 'Som',
-            },
-            {
-                id: 'a',
-                name: 'Duplicado',
-            },
-            {
-                id: 'b',
-                name: 'Duplicado',
-            },
+            { id: 'scene-1', name: 'entrada' },
+            { id: 'audio-1', name: 'Som' },
+            { id: 'a', name: 'Duplicado' },
+            { id: 'b', name: 'Duplicado' },
         ]
     );
     assert.deepEqual(
@@ -126,33 +80,13 @@ test('validação rejeita porta órfã, direção inválida e ciclo', () => {
             {
                 id: 'a',
                 references: ['b'],
-                nodes: [
-                    {
-                        id: 'scene',
-                        type: 'scene',
-                    },
-                ],
+                nodes: [{ id: 'scene', type: 'scene' }],
                 ports: [
-                    {
-                        id: 'in',
-                        name: 'Entrada',
-                        direction: 'entry',
-                        nodeId: 'missing',
-                    },
-                    {
-                        id: 'out',
-                        name: 'Entrada',
-                        direction: 'side',
-                        nodeId: 'scene',
-                    },
+                    { id: 'in', name: 'Entrada', direction: 'entry', nodeId: 'missing' },
+                    { id: 'out', name: 'Entrada', direction: 'side', nodeId: 'scene' },
                 ],
             },
-            {
-                id: 'b',
-                references: ['a'],
-                nodes: [],
-                ports: [],
-            },
+            { id: 'b', references: ['a'], nodes: [], ports: [] },
         ],
     });
     assert.equal(result.valid, false);

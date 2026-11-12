@@ -5,7 +5,6 @@ function normalizeName(value) {
         .trim()
         .toLocaleLowerCase();
 }
-
 /** Portas da Hive: o store guarda em `graph.hive.ports`; exportações antigas, em `ports`. */
 export function portsOf(hive) {
     if (Array.isArray(hive?.hive?.ports)) return hive.hive.ports;

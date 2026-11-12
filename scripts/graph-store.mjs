@@ -4,6 +4,14 @@ import { LumennSettings } from './settings.mjs';
 import { childrenOf, GROUP_COLOR } from './graph-groups.mjs';
 import { detectHiveCycles } from './hive-runtime.mjs';
 import { planGroupToHive, sanitizeHivePorts } from './hive-io.mjs';
+import {
+    anchorOf,
+    buildAddressIndex,
+    listDestinations,
+    parentGraphId as findParentGraphId,
+    resolveAddress as resolveNeuralAddress,
+    rootGraphId as findRootGraphId,
+} from './neural-address.mjs';
 const DEFAULT_COLORS = {
     scene: '#f0a321',
     audio: '#2dd4bf',
@@ -77,6 +85,61 @@ export class LumennGraphStore {
                     nodeId: node.id,
                 }))
         );
+    }
+    /* -- Endereço neural (aditivo, sem migração) ---------------------- */
+    /** Raiz da campanha: sobe por `hive-ref` até o grafo sem pai. */
+    static rootGraphId(graphId, graphs = this.getAll()) {
+        return findRootGraphId(graphs, graphId);
+    }
+    /** Grafo pai derivado dos `hive-ref`; null na raiz. */
+    static parentGraphId(graphId, graphs = this.getAll()) {
+        return findParentGraphId(graphs, graphId);
+    }
+    /** Destino pelo id ou pelo endereço humano, sem criar link nem mudar cena. */
+    static resolveAddress(addressOrId, labelOf) {
+        return resolveNeuralAddress(
+            buildAddressIndex(this.getAll(), {
+                labelOf,
+            }),
+            addressOrId
+        );
+    }
+    /** Lista para o HUD: grafos e nós do próprio mundo. */
+    static listDestinations({ excludeGraphId = null, labelOf } = {}) {
+        return listDestinations(
+            buildAddressIndex(this.getAll(), {
+                labelOf,
+            }),
+            {
+                excludeGraphId,
+            }
+        );
+    }
+    /** Âncora INTRO/OUTPUT da raiz, mesmo quando o grafo atual é uma Hive. */
+    static anchorOf(graphId, kind) {
+        return anchorOf(this.getAll(), graphId, kind);
+    }
+    /** Grava a âncora na raiz; o nó precisa pertencer à raiz. */
+    static async setAnchor(graphId, kind, nodeId = null) {
+        if (!game.user.isGM) return null;
+        if (kind !== 'intro' && kind !== 'output') return null;
+        const graphs = this.getAll();
+        const rootId = findRootGraphId(graphs, graphId);
+        if (!rootId) return null;
+        const data = foundry.utils.duplicate(
+            game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
+        );
+        const root = data.graphs.find((graph) => graph.id === rootId);
+        if (!root) return null;
+        if (nodeId && !(root.nodes ?? []).some((node) => node.id === nodeId)) return null;
+        root.anchors = {
+            intro: null,
+            output: null,
+            ...(root.anchors ?? {}),
+            [kind]: nodeId || null,
+        };
+        await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
+        return root.anchors;
     }
     static #wouldCreateHiveCycle(graphs, ownerGraphId, targetGraphId, replacingNodeId = null) {
         if (!targetGraphId || targetGraphId === ownerGraphId) return true;
@@ -343,6 +406,9 @@ export class LumennGraphStore {
                           }
                         : {}),
         };
+        // `loop` segue o papel quando ninguém define: música repete, SFX toca uma vez.
+        if (n.type === 'audio' && n.data && n.data.loop === undefined)
+            n.data.loop = n.data.audioRole !== 'sfx';
         graph.nodes.push(n);
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
         return n;

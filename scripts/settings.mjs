@@ -203,13 +203,6 @@ export class LumennSettings {
             type: Boolean,
             default: true,
         });
-        game.settings.register(MODULE_ID, 'confirmSceneTransition', {
-            name: L('LUMENN_FRAME.Settings.ConfirmTransition.Name'),
-            scope: 'world',
-            config: true,
-            type: Boolean,
-            default: false,
-        });
         game.settings.register(MODULE_ID, 'playerSceneFade', {
             name: L('LUMENN_FRAME.Settings.PlayerSceneFade.Name'),
             scope: 'world',
@@ -223,6 +216,18 @@ export class LumennSettings {
             config: true,
             type: Boolean,
             default: true,
+        });
+        game.settings.register(MODULE_ID, 'portHubStyle', {
+            name: L('LUMENN_FRAME.Settings.PortHubStyle.Name'),
+            hint: L('LUMENN_FRAME.Settings.PortHubStyle.Hint'),
+            scope: 'client',
+            config: true,
+            type: String,
+            choices: {
+                rail: L('LUMENN_FRAME.Settings.PortHubStyle.Rail'),
+                popover: L('LUMENN_FRAME.Settings.PortHubStyle.Popover'),
+            },
+            default: 'rail',
         });
         game.settings.register(MODULE_ID, 'recursiveFolderImport', {
             name: L('LUMENN_FRAME.Settings.RecursiveFolder.Name'),
@@ -272,9 +277,19 @@ export class LumennSettings {
             type: Boolean,
             default: false,
         });
+        // Destinos recentes do HUD: por cliente (cada GM tem os seus), fora do menu de configuração.
+        game.settings.register(MODULE_ID, 'recentDestinations', {
+            scope: 'client',
+            config: false,
+            type: Array,
+            default: [],
+        });
     }
     static get(key) {
         return game.settings.get(MODULE_ID, key);
+    }
+    static set(key, value) {
+        return game.settings.set(MODULE_ID, key, value);
     }
     static getTransitionDefaults() {
         return {
@@ -314,7 +329,6 @@ export class LumennSettings {
         return {
             dim: this.get('dimUnreachable'),
             labels: this.get('showTransitionLabels'),
-            confirm: this.get('confirmSceneTransition'),
             playerFade: this.get('playerSceneFade'),
             playerAudio: this.get('playerAudioSync'),
         };

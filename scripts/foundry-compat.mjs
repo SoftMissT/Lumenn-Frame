@@ -72,9 +72,36 @@ export const LumennCompat = {
         }
         return null;
     },
+    /**
+     * Carrega texturas e o primeiro som da cena só neste cliente.
+     * `Scene` não tem `preload()`: a API é `game.scenes.preload(id, …)`.
+     * v14 recebe `{broadcast}`; v13 recebe `push` booleano. Nunca transmite.
+     */
     preloadScene(scene) {
-        if (scene?.preload) return Promise.resolve(scene.preload());
+        if (!scene?.id) return Promise.resolve(null);
+        const scenes = game.scenes;
+        if (typeof scenes?.preload === 'function')
+            return Promise.resolve(scenes.preload(scene.id, this.isV14() ? { broadcast: false } : false));
+        if (typeof scene.preload === 'function') return Promise.resolve(scene.preload());
         return Promise.resolve(null);
+    },
+    /** Fundo principal da cena: v14 mora no nível inicial; v13 no próprio documento. */
+    sceneBackgroundSrc(scene) {
+        if (!scene) return '';
+        // v14 depreciou `Scene#background` (some no v16): não tocar o getter lá.
+        if (this.isV14()) return scene.initialLevel?.background?.src ?? '';
+        return scene.background?.src ?? '';
+    },
+    /**
+     * O core engole falha de textura (`allSettled` + `console.warn`): sem esta checagem,
+     * fundo 404 apareceria como "pronto". Lança se o fundo não entrou no cache.
+     */
+    assertScenePreloaded(scene) {
+        const src = this.sceneBackgroundSrc(scene);
+        if (!src) return;
+        const loader = foundry.canvas?.TextureLoader?.loader;
+        if (typeof loader?.getCache !== 'function') return;
+        if (!loader.getCache(src)) throw new Error(`Lumenn Frame: fundo não carregou (${src}).`);
     },
     async updatePlaylistSound(sound, data) {
         if (!sound?.update) return null;
@@ -98,9 +125,11 @@ export const LumennCompat = {
         }
         return false;
     },
-    socketEmit(payload) {
+    /** `options.recipients` (ids de usuário) entrega só a eles; sem isso, vai a todos. */
+    socketEmit(payload, options) {
         if (game.socket?.emit) {
-            game.socket.emit(SOCKET_NAME, payload);
+            if (options) game.socket.emit(SOCKET_NAME, payload, options);
+            else game.socket.emit(SOCKET_NAME, payload);
             return true;
         }
         return false;

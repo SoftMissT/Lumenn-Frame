@@ -8,6 +8,8 @@ export class LumennInvalidAudioSourceError extends Error {
 export class LumennAudioEngine {
     #transitioning = false;
     #savedFades = new Map();
+    #savedRepeats = new Map();
+    #started = new Map();
     #restoreTimer = null;
     get isTransitioning() {
         return this.#transitioning;
@@ -133,94 +135,128 @@ export class LumennAudioEngine {
             })
         );
     }
-    async #start(doc, duration, exclusive = true) {
+    async #start(doc, duration, exclusive = true, loop) {
         if (doc.documentName === 'PlaylistSound') {
             this.#saveFade(doc);
             if (!exclusive) {
+                await this.#applyRepeat(doc, loop);
                 await doc.update({
                     fade: duration,
                     playing: true,
                 });
+                if (doc.parent?.update && !doc.parent.playing)
+                    await doc.parent.update({
+                        playing: true,
+                    });
+                this.#markStarted(doc);
                 return;
             }
             await doc.update({
                 fade: duration,
             });
+            await this.#applyRepeat(doc, loop);
             const playlist = doc.parent;
-            const competing =
-                playlist?.sounds?.filter((sound) => sound.id !== doc.id && sound.playing) ?? [];
-            if (competing.length && playlist?.updateEmbeddedDocuments) {
-                await playlist.updateEmbeddedDocuments(
-                    'PlaylistSound',
-                    competing.map((sound) => ({
-                        _id: sound.id,
-                        playing: false,
-                    }))
-                );
-            } else if (competing.length) {
-                await Promise.all(
-                    competing.map((sound) =>
-                        sound.update({
-                            playing: false,
-                        })
-                    )
-                );
-            }
             if (playlist?.playSound) await playlist.playSound(doc);
             else
                 await doc.update({
                     playing: true,
                 });
+            this.#markStarted(doc);
             return;
         }
         if (!exclusive) {
-            const sounds = doc.sounds?.contents ?? [...(doc.sounds?.values?.() ?? [])];
-            const sound = sounds[0] ?? null;
-            if (sound) await this.#start(sound, duration, false);
+            const sound = this.#soundsOf(doc)[0] ?? null;
+            if (sound) await this.#start(sound, duration, false, loop);
             return;
         }
         this.#saveFade(doc);
         await doc.update({
             fade: duration,
         });
-        const sounds = doc.sounds?.contents ?? [...(doc.sounds?.values?.() ?? [])];
+        const sounds = this.#soundsOf(doc);
         const sound = sounds.find((entry) => entry.playing) ?? sounds[0] ?? null;
-        if (sound) {
-            const competing = sounds.filter((entry) => entry.id !== sound.id && entry.playing);
-            if (competing.length && doc.updateEmbeddedDocuments) {
-                await doc.updateEmbeddedDocuments(
-                    'PlaylistSound',
-                    competing.map((entry) => ({
-                        _id: entry.id,
-                        playing: false,
-                    }))
-                );
-            } else if (competing.length) {
-                await Promise.all(
-                    competing.map((entry) =>
-                        entry.update({
-                            playing: false,
-                        })
-                    )
-                );
-            }
-            if (!sound.playing) await doc.playSound(sound);
+        if (sound && !sound.playing) {
+            await this.#applyRepeat(sound, loop);
+            if (doc.playSound) await doc.playSound(sound);
+            else
+                await sound.update({
+                    playing: true,
+                });
+            this.#markStarted(sound);
         }
+    }
+    #soundsOf(doc) {
+        return doc?.sounds?.contents ?? [...(doc?.sounds?.values?.() ?? [])];
+    }
+    async #applyRepeat(doc, loop) {
+        if (loop === undefined || loop === null || !doc?.update) return;
+        if (!this.#savedRepeats.has(doc.uuid))
+            this.#savedRepeats.set(doc.uuid, doc.repeat === true);
+        if (doc.repeat !== (loop === true))
+            await doc.update({
+                repeat: loop === true,
+            });
+    }
+    #markStarted(sound) {
+        const playlistId = sound?.parent?.id ?? null;
+        if (!playlistId || !sound?.id) return;
+        this.#started.set(`${playlistId}:${sound.id}`, {
+            playlistId,
+            soundId: sound.id,
+        });
+    }
+    #forgetStarted(playlistId, soundId) {
+        if (playlistId && soundId) this.#started.delete(`${playlistId}:${soundId}`);
     }
     async #stop(doc, duration) {
         if (doc.documentName === 'PlaylistSound') {
             this.#saveFade(doc);
+            this.#forgetStarted(doc.parent?.id ?? null, doc.id);
+            const repeat = this.#savedRepeats.get(doc.uuid);
+            this.#savedRepeats.delete(doc.uuid);
             await doc.update({
                 fade: duration,
                 playing: false,
+                ...(repeat === undefined
+                    ? {}
+                    : {
+                          repeat,
+                      }),
             });
             return;
         }
         this.#saveFade(doc);
+        const owned = [...this.#started.values()].filter((entry) => entry.playlistId === doc.id);
+        for (const entry of owned) this.#started.delete(`${entry.playlistId}:${entry.soundId}`);
         await doc.update({
             fade: duration,
+            ...(owned.length
+                ? {
+                      playing: false,
+                  }
+                : {}),
         });
-        await doc.stopAll();
+        if (!owned.length) return;
+        const ids = new Set(owned.map((entry) => entry.soundId));
+        const targets = this.#soundsOf(doc).filter((sound) => ids.has(sound.id));
+        if (!targets.length) return;
+        if (doc.updateEmbeddedDocuments) {
+            await doc.updateEmbeddedDocuments(
+                'PlaylistSound',
+                targets.map((sound) => ({
+                    _id: sound.id,
+                    playing: false,
+                }))
+            );
+        } else {
+            await Promise.all(
+                targets.map((sound) =>
+                    sound.update({
+                        playing: false,
+                    })
+                )
+            );
+        }
     }
     async applyMode(mode, currentSources, targetSources, duration = 3e3, curve = 'linear') {
         if (this.#transitioning) return 'ignored';
@@ -239,6 +275,7 @@ export class LumennAudioEngine {
                     entries.push({
                         doc,
                         role: source.role === 'sfx' ? 'sfx' : 'music',
+                        loop: source.loop,
                     });
                 }
                 return entries;
@@ -261,7 +298,7 @@ export class LumennAudioEngine {
             const startMissing = async (desired, fade) => {
                 for (const entry of desired) {
                     if (!entry.doc.playing)
-                        await this.#start(entry.doc, fade, entry.role === 'music');
+                        await this.#start(entry.doc, fade, entry.role === 'music', entry.loop);
                 }
             };
             if (mode !== 'fadeout' && targets.length) await this.#preload(targets);

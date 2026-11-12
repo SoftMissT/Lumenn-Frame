@@ -13,3 +13,8 @@ CLAUDE.md
 /graphify-out
 /.agents
 /.gitnexus
+/.tang-rou
+/.playwright-mcp
+/.playwright-cli
+!/assets/fonts/
+!/assets/stingers/

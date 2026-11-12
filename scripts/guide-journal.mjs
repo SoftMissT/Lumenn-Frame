@@ -56,27 +56,36 @@ export function buildGuideJournalData() {
         name: GUIDE_JOURNAL_NAME,
         ownership: { default: observer },
         flags: { [MODULE_ID]: { guide: true, guideVersion: GUIDE_VERSION } },
-        pages: [{
-            name: 'Guia rápido',
-            type: 'text',
-            text: { format, content: GUIDE_HTML },
-        }],
+        pages: [
+            {
+                name: 'Guia rápido',
+                type: 'text',
+                text: { format, content: GUIDE_HTML },
+            },
+        ],
     };
 }
 
 export async function openLumennGuide() {
-    const existing = game.journal?.find?.((journal) =>
-        journal.getFlag?.(MODULE_ID, 'guide') === true || journal.name === GUIDE_JOURNAL_NAME
+    const existing = game.journal?.find?.(
+        (journal) =>
+            journal.getFlag?.(MODULE_ID, 'guide') === true || journal.name === GUIDE_JOURNAL_NAME
     );
-    const journal = existing ?? (game.user?.isGM && globalThis.JournalEntry?.create
-        ? await JournalEntry.create(buildGuideJournalData())
-        : null);
+    const journal =
+        existing ??
+        (game.user?.isGM && globalThis.JournalEntry?.create
+            ? await JournalEntry.create(buildGuideJournalData())
+            : null);
     if (!journal) {
         ui.notifications?.warn?.(game.i18n.localize('LUMENN_FRAME.GuideUnavailable'));
         return null;
     }
     // Guia antigo: o GM atualiza o texto da página no lugar, sem criar outro Journal.
-    if (existing && game.user?.isGM && (existing.getFlag?.(MODULE_ID, 'guideVersion') ?? 1) < GUIDE_VERSION) {
+    if (
+        existing &&
+        game.user?.isGM &&
+        (existing.getFlag?.(MODULE_ID, 'guideVersion') ?? 1) < GUIDE_VERSION
+    ) {
         const page = existing.pages?.contents?.[0] ?? existing.pages?.find?.(() => true);
         if (page) await page.update({ 'text.content': GUIDE_HTML });
         await existing.setFlag?.(MODULE_ID, 'guideVersion', GUIDE_VERSION);

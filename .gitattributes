@@ -1,2 +1,8 @@
 * text=auto eol=lf
 *.zip binary
+# Binarios do modulo: o git nunca converte fim de linha neles.
+packs/** binary
+*.webm binary
+*.webp binary
+*.ttf binary
+*.woff2 binary

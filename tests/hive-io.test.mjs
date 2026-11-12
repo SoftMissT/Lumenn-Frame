@@ -9,7 +9,6 @@ import {
     sanitizeHivePorts,
 } from '../scripts/hive-io.mjs';
 import { detectHiveCycles, resolveHivePort, validateHiveExport } from '../scripts/hive-runtime.mjs';
-
 const makeHive = () => ({
     id: 'g1',
     name: 'Escola',
@@ -33,19 +32,16 @@ const makeHive = () => ({
         { id: 'e2', type: 'audio', from: 'mus', to: 'enc' },
     ],
 });
-
 test('resolveHivePort e validação leem as portas de graph.hive.ports', () => {
     const hive = makeHive();
     assert.equal(resolveHivePort(hive, 'portão').node.id, 'gate');
     assert.deepEqual(validateHiveExport({ hives: [hive] }), { valid: true, errors: [] });
 });
-
 test('ciclo é visto pelo formato real do store (data.graphId)', () => {
     const a = { id: 'a', nodes: [{ id: 'r', type: 'hive-ref', data: { graphId: 'b' } }] };
     const b = { id: 'b', nodes: [{ id: 'r', type: 'hive-ref', data: { graphId: 'a' } }] };
     assert.deepEqual(detectHiveCycles([a, b]), [['a', 'b', 'a']]);
 });
-
 test('Hive aninhada é recusada na validação da v1', () => {
     const hive = { ...makeHive(), nodes: [{ id: 'r', type: 'hive-ref', data: { graphId: 'x' } }] };
     hive.hive.ports = [];
@@ -53,7 +49,6 @@ test('Hive aninhada é recusada na validação da v1', () => {
     assert.equal(result.valid, false);
     assert.match(result.errors[0], /aninhada/);
 });
-
 test('hiveEntryPort prefere a pedida e cai na primeira de entrada', () => {
     const hive = makeHive();
     assert.equal(hiveEntryPort(hive, 'p1').id, 'p1');
@@ -62,13 +57,14 @@ test('hiveEntryPort prefere a pedida e cai na primeira de entrada', () => {
     hive.hive.ports = [{ id: 'p2', name: 'Fundos', direction: 'exit', nodeId: 'back' }];
     assert.equal(hiveEntryPort(hive), null);
 });
-
 test('hiveExitPortsAt devolve só saídas da sala', () => {
     const hive = makeHive();
-    assert.deepEqual(hiveExitPortsAt(hive, 'back').map((port) => port.id), ['p2']);
+    assert.deepEqual(
+        hiveExitPortsAt(hive, 'back').map((port) => port.id),
+        ['p2']
+    );
     assert.deepEqual(hiveExitPortsAt(hive, 'gate'), []);
 });
-
 test('sanitizeHivePorts corrige direção, id e sala inexistente', () => {
     let count = 0;
     const clean = sanitizeHivePorts(
@@ -85,20 +81,15 @@ test('sanitizeHivePorts corrige direção, id e sala inexistente', () => {
         { id: 'dup', name: 'B', direction: 'entry', nodeId: null },
     ]);
 });
-
 test('listHivePending acusa cena apagada e importação sem par', () => {
     const hive = makeHive();
     hive.nodes.push({ id: 'x', type: 'scene', data: { sceneId: null, pendingName: 'Pátio' } });
-    const pending = listHivePending(hive, {
-        hasScene: (id) => id === 'S1',
-        hasAudio: () => true,
-    });
+    const pending = listHivePending(hive, { hasScene: (id) => id === 'S1', hasAudio: () => true });
     assert.deepEqual(pending, [
         { nodeId: 'back', kind: 'scene', name: null },
         { nodeId: 'x', kind: 'scene', name: 'Pátio' },
     ]);
 });
-
 test('exporta nomes no lugar de ids do mundo', () => {
     const payload = buildHiveExport(makeHive(), {
         sceneName: (id) => ({ S1: 'Portão da Escola', S2: 'Fundos' })[id] ?? null,
@@ -113,7 +104,6 @@ test('exporta nomes no lugar de ids do mundo', () => {
     assert.equal('audioId' in hive.nodes[2].data, false);
     assert.equal(validateHiveExport(payload).valid, true);
 });
-
 test('importa com ids novos, casa por nome e deixa pendente o resto', () => {
     const payload = buildHiveExport(makeHive(), {
         sceneName: (id) => ({ S1: 'Portão da Escola', S2: 'Fundos' })[id] ?? null,
@@ -157,4 +147,91 @@ test('importa com ids novos, casa por nome e deixa pendente o resto', () => {
         true
     );
     assert.equal(validateHiveExport({ hives: [graph] }).valid, true);
+});
+test('round-trip preserva hive.exit e as portas da aresta de saída', () => {
+    const source = makeHive();
+    source.hive.exit = {
+        scope: 'both',
+        scene: { type: 'film:cutscene', duration: 2600, color: '#000000' },
+        audio: { mode: 'none' },
+    };
+    source.edges.push({
+        id: 'e3',
+        type: 'flow',
+        from: 'back',
+        to: 'gate',
+        portId: 'p1',
+        exitPortId: 'p2',
+    });
+    const payload = buildHiveExport(source, {
+        sceneName: (id) => ({ S1: 'Portão da Escola', S2: 'Fundos' })[id] ?? null,
+        audioRef: () => null,
+    });
+    const exported = payload.hives[0];
+    assert.deepEqual(exported.hive.exit, source.hive.exit);
+    assert.equal(exported.hive.transition.scene.type, 'fade');
+    const exportedEdge = exported.edges.find((edge) => edge.id === 'e3');
+    assert.equal(exportedEdge.exitPortId, 'p2');
+    assert.equal(exportedEdge.portId, 'p1');
+    let count = 0;
+    const { graph } = planHiveImport(
+        exported,
+        {
+            scenes: [
+                { id: 'W1', name: 'Portão da Escola' },
+                { id: 'W2', name: 'Fundos' },
+            ],
+            audio: [],
+        },
+        (prefix) => `${prefix}_${++count}`
+    );
+    assert.deepEqual(graph.hive.exit, source.hive.exit);
+    assert.equal(validateHiveExport({ hives: [graph] }).valid, true);
+    const back = graph.nodes.find((node) => node.data.sceneId === 'W2');
+    const importedEdge = graph.edges.find((edge) => edge.from === back.id && edge.portId);
+    assert.ok(importedEdge?.exitPortId, 'aresta manteve a porta de saída');
+    const exitPort = graph.hive.ports.find((port) => port.id === importedEdge.exitPortId);
+    assert.equal(exitPort.direction, 'exit');
+    assert.equal(exitPort.nodeId, back.id);
+    const entryPort = graph.hive.ports.find((port) => port.id === importedEdge.portId);
+    assert.equal(entryPort.direction, 'entry');
+    assert.equal(entryPort.nodeId, graph.nodes.find((node) => node.data.sceneId === 'W1').id);
+});
+test('round-trip preserva kind, address, âncoras e endereço do nó', () => {
+    const source = makeHive();
+    source.kind = 'mini-hive';
+    source.address = 'Universo/Planeta/Brasil/Escola';
+    source.anchors = { intro: 'gate', output: 'back' };
+    source.nodes.find((node) => node.id === 'gate').address =
+        'Universo/Planeta/Brasil/Escola/Portão';
+    const payload = buildHiveExport(source, {
+        sceneName: (id) => ({ S1: 'Portão da Escola', S2: 'Fundos' })[id] ?? null,
+        audioRef: () => null,
+    });
+    const exported = payload.hives[0];
+    assert.equal(exported.kind, 'mini-hive');
+    assert.equal(exported.address, 'Universo/Planeta/Brasil/Escola');
+    assert.deepEqual(exported.anchors, { intro: 'gate', output: 'back' });
+    let count = 0;
+    const { graph } = planHiveImport(
+        exported,
+        {
+            scenes: [
+                { id: 'W1', name: 'Portão da Escola' },
+                { id: 'W2', name: 'Fundos' },
+            ],
+            audio: [],
+        },
+        (prefix) => `${prefix}_${++count}`
+    );
+    assert.equal(graph.kind, 'mini-hive');
+    assert.equal(graph.address, 'Universo/Planeta/Brasil/Escola');
+    const gate = graph.nodes.find((node) => node.data.sceneId === 'W1');
+    const back = graph.nodes.find((node) => node.data.sceneId === 'W2');
+    assert.deepEqual(graph.anchors, { intro: gate.id, output: back.id });
+    assert.equal(
+        gate.address,
+        'Universo/Planeta/Brasil/Escola/Portão',
+        'endereço do nó sobrevive ao round-trip'
+    );
 });

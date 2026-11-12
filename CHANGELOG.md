@@ -4,6 +4,39 @@ As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-12
+
+> Estúdio de transição, Hives de verdade no "+ Hive", "Ver Hive", topo enxuto e fim do duplo link. **179 testes Node verdes.** Verificado no Foundry 14.367 isolado (:30001): estúdio (stinger, Swirl arrastado, cutscene com título), pré-load com selo, ligação legada unificada, menu Mais e Ver Hive; console sem erros nem avisos. Foundry 13.350 e app desktop com mesa real não testados.
+
+### Added
+
+- **Workspaces no editor: Grafo · Transição · Cena** (abas no topo, como no Premiere e no DaVinci). O estúdio deixou de ser janela e mora dentro do editor (`LumennStudioPanel`); a coluna da esquerda lista todas as ligações do storyboard para pular entre elas. O painel é criado uma vez e só muda de lugar a cada render, mantendo o monitor e o contexto WebGL.
+- **Identidade LUMENN** (fonte: `lumenn-roll-relay/specs/LUMENN-design.md`): canvas azul-negro, painéis de vidro com borda ciano holográfico, ciano em interação/foco/seleção, **crimson #D01452 só em ação** (Tocar, botões principais, progresso), títulos em Bebas Neue branca, marca do diamante com runa no título da janela (`assets/brand/`). Cards de cena em dourado; nós antigos com o âmbar padrão aparecem no dourado sem regravar dado.
+- **Dip to Black** e **Dip to White** (a cena some na cor e a nova sai dela) e **Glitch Lumenn** (faixas deslocadas, RGB separado, blocos de ruído, scanline; as faixas trocam de cena aos poucos). Atalhos "Dip to Black" e "Glitch" no Inspector; o Glitch do Foundry segue em "Efeitos do Foundry".
+- **Compêndio de transições com 19 macros**: entraram Dip to Black, Dip to White e Glitch Lumenn (`_id` fixos `lfTransition0016`–`0018`; as 16 anteriores mantêm o id).
+- **Tempos em segundos** no Inspector, na Hive e no estúdio (o dado continua em milissegundos; helper `lumenn-sec`).
+- **Estúdio de transição** (`scripts/transition-studio.mjs`). Abre por **duplo clique na ligação** ou pelo botão **Abrir no estúdio**, no topo do Inspector. Aba **Transição**: monitor que toca a transição de verdade entre a cena A e a B (shaders do Foundry e do Lumenn num PIXI próprio; cinema e stinger no mesmo overlay da mesa, em escala); linha do tempo com início, corte e fim, arrastável nos efeitos contínuos e pelo teclado; Tocar/Repetir; painel com efeito por grupos, duração, cor, título da cutscene, stingers prontos com ponto de corte e modo do áudio, gravando na ligação na hora. Aba **Cena**: as duas cenas com o estado do pré-load e o botão, "Visitável pelos jogadores", trilhas ligadas, Configurar cena e Ver só na minha tela. Modelo puro em `scripts/studio-model.mjs` (4 testes).
+- **Selo de pré-load no card da cena**: girando (carregando), verde (pronta), vermelho (falhou), cinza (cancelado). Atualiza sem redesenhar o editor.
+- **Ver Hive** (conceito, seção 02): o nível atual como mapa, com uma ficha por Hive (locais, sub-hives, portas) e **Abrir Hive**. Modelo puro em `scripts/hive-map.mjs` (2 testes).
+- **Escopo no estúdio** (Beat, só Cena, só Áudio), com aviso no monitor quando a ligação só troca o áudio, mais Fade In, Fade Out e Curva do áudio.
+- **Menu "⋮ Mais"** no topo: Enquadrar tudo, Zoom 100%, Expandir, INTRO, OUTPUT, Renomear, Organizar, Excluir e Guia.
+
+### Changed
+
+- **Topo enxuto** como no conceito: Edição/Ao Vivo, + Storyboard, + Hive, Ver Hive, Destinos e zoom. O resto foi para o menu Mais.
+- **Inspector sem "Grupo"**: criar ou mover nó para grupo saiu (o "+ Hive" substitui). Nó que já está num grupo antigo continua com "Remover do grupo".
+- **README reescrito** para a 0.1.0: estúdio, Hives, transições prontas, pré-load e o estado real de validação, em português e inglês.
+- O overlay de cinema passou de `#lumenn-film` para a classe `.lff-root`, para poder morar dentro do monitor do estúdio. A tela cheia continua com o mesmo id.
+
+### Fixed
+
+- **"+ Hive" criava um Grupo.** Agora cria uma Hive de verdade (storyboard marcado, na biblioteca) e insere o nó dela no centro da vista.
+- **Duplo link.** Ligar B → A com A → B já gravada criava uma segunda ligação. Agora devolve a existente. Mundos de antes da 0.1.0 com o par gravado mostram uma linha só, e o Inspector oferece **Unificar** (`flowTwins`/`reverseFlow` em `scripts/links.mjs`, 2 testes).
+- **Título da cutscene perdia campos.** Mudar só o texto apagava fonte, cor e tamanho, porque o título não era mesclado em profundidade.
+- **Rótulo da ligação mostrava o id cru** ("film:video…"); agora usa o nome do efeito.
+- **A volta escondida comandava a navegação.** Com A → B e B → A gravadas, ir de B para A usava a transição da ligação escondida, não a que o mestre vê e edita. `linkBetween` agora ignora a gêmea (teste novo; o teste antigo foi atualizado para a regra nova).
+- **"Ver Hive → Abrir Hive" no Ao Vivo moveria a mesa.** No Ao Vivo o mapa só mostra; abrir fica para a Edição.
+
 ## [0.1.0] - 2026-11-12
 
 > Primeira versão validada em runtime real (Foundry 14.367, GM + jogador). Reúne as entregas de 0.0.34 e 0.0.35, que não chegaram a ser publicadas, mais o que segue.

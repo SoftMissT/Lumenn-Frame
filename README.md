@@ -28,7 +28,7 @@ sem caçar arquivos enquanto a mesa espera.
 - editor de grafo com cenas, áudio, notas e **Hives** (lugares dentro de lugares);
 - **estúdio de transição**, com prévia da troca entre a cena atual e a próxima;
 - transições do Foundry, efeitos próprios, efeitos de cinema e **6 stingers de vídeo**;
-- compêndio **Lumenn Frame: Transições**, com 16 transições prontas;
+- compêndio **Lumenn Frame: Transições**, com 19 transições prontas;
 - modo **Ao Vivo** com salto direto, HUD de destinos e pré-carregamento.
 
 ## Como funciona em 30 segundos
@@ -46,6 +46,23 @@ Você desenha um **grafo**: caixas (nós) ligadas por linhas.
   A → B já permite voltar de B para A, com a mesma transição.
 - **AUDIO** liga um áudio a uma cena. Esse tem mão única.
 - Dois modos: **Edição** (você monta) e **Ao Vivo** (você joga e navega).
+
+## Conheça a tela
+
+![O editor do Lumenn Frame em modo Edição, com o grafo da campanha de exemplo "Cidade Velha"](assets/readme/01-editor-grafo.png)
+
+*O editor em modo Edição, com uma campanha de exemplo: uma cidade, uma taverna e
+umas catacumbas. As imagens deste guia mostram a interface em português.*
+
+1. **Topo, à esquerda:** o seletor de storyboards e as abas **Grafo ·
+   Transição · Cena**.
+2. **Topo, no meio:** **Edição / Ao Vivo**, **+ Storyboard**, **+ Hive**,
+   **Ver Hive** e **Destinos**.
+3. **Canvas:** cada caixa é um **nó** (cena, áudio, nota ou Hive). Cada linha é
+   uma **ligação**, com o nome da transição escrito nela.
+4. **Barra da esquerda:** selecionar, criar Nota (`N`) e enquadrar tudo.
+5. **Inspector, à direita:** mostra e edita o que está selecionado. Sem seleção,
+   mostra **Onde estou** e a biblioteca de Hives.
 
 ## Instalação
 
@@ -83,6 +100,15 @@ não são apagados.
    Inspector.
 8. **Jogue.** Mude para **Ao Vivo** e clique na próxima cena.
 
+### Selecionar e mover vários nós
+
+![Dois nós selecionados por um retângulo, e o Inspector mostrando "2 nós selecionados"](assets/readme/02-selecao.png)
+
+Em **Edição**, arraste no vazio para desenhar um retângulo: tudo que ele toca
+entra na seleção. `Shift` + clique soma um nó, `Ctrl`/`Cmd` + clique tira.
+Arrastar um nó move todos os selecionados, e o Inspector oferece cor,
+**Visitável** e excluir para o grupo inteiro. `Esc` limpa a seleção.
+
 ## Estúdio de transição
 
 É onde você vê como a troca vai ficar antes de ir ao vivo, como no modo estúdio
@@ -92,6 +118,11 @@ Premiere e do DaVinci). À esquerda fica a lista de ligações do storyboard. To
 os tempos são em **segundos**.
 
 **Aba Transição**
+
+![Aba Transição: lista de ligações à esquerda, monitor com a prévia no meio e os ajustes do efeito à direita](assets/readme/05-transicao.png)
+
+*À esquerda, as ligações. No meio, o monitor e a linha do tempo. À direita, o
+efeito, o tempo e o áudio. A ligação escolhida aqui usa o **Glitch Lumenn**.*
 
 - **Monitor:** toca a transição de verdade entre a imagem da cena **A** (de
   onde sai) e a da cena **B** (para onde vai). Sem fundo, a cena aparece como
@@ -104,6 +135,11 @@ os tempos são em **segundos**.
   Toda mudança é gravada na ligação na hora.
 
 **Aba Cena**
+
+![Aba Cena: as duas cenas da ligação lado a lado, com pré-carregamento e a opção Visitável](assets/readme/06-cena.png)
+
+*As duas pontas da ligação escolhida, cada uma com o estado do
+pré-carregamento.*
 
 - As duas cenas lado a lado, com o **estado do pré-carregamento** e o botão para
   pré-carregar, cancelar ou tentar de novo.
@@ -132,7 +168,7 @@ vazada, Corte de espada, Glitch e Hiperespaço). Cada um cobre a tela inteira na
 metade, e é nesse instante que a cena troca por baixo. Você também pode usar o
 seu próprio WebM com transparência (VP9).
 
-**Compêndio "Lumenn Frame: Transições":** 16 macros prontas. Selecione uma
+**Compêndio "Lumenn Frame: Transições":** 19 macros prontas. Selecione uma
 ligação no editor e rode a macro: a transição fica gravada nela. Por script:
 `game.modules.get("lumenn-frame").api.applyTransition("stinger-slash")`.
 
@@ -142,7 +178,7 @@ ligação no editor e rode a macro: a transição fica gravada nela. Por script:
 | :----- | :------------------ |
 | **Cena** | Troca somente a cena. |
 | **Áudio** | Troca somente o áudio. |
-| **Beat** (cena + áudio) | Troca os dois juntos. É o padrão. |
+| **Cena + áudio** | Troca os dois juntos. É o padrão. |
 
 ### Áudio
 
@@ -166,11 +202,30 @@ um distrito com salas.
 - **+ Hive**, no topo, cria uma Hive nova e coloca o nó dela no centro da vista.
 - **Ver Hive** mostra o nível atual como mapa: cada Hive com os locais de
   dentro, as sub-hives e as portas. **Abrir Hive** entra nela.
-- Cada Hive tem **portas** de entrada e saída. No Ao Vivo, entrar numa Hive leva
-  a mesa para a cena da porta de entrada.
+- Cada Hive tem **portas** de entrada e saída, e elas nascem sozinhas: a Hive com
+  pelo menos uma cena já tem uma entrada e uma saída. Você renomeia, move e
+  apaga, mas a última de cada lado fica. No Ao Vivo, entrar numa Hive leva a mesa
+  para a cena da porta de entrada.
+- **De Hive para Hive:** ligue a porta de saída de uma Hive ao nó de outra e a
+  mesa sai de uma e aterrissa dentro da outra, na porta de entrada ligada, numa
+  transição só.
+- **Música da Hive:** a música ligada ao nó da Hive vale para as cenas de dentro
+  que não têm música própria. Entrar não corta a música; música própria da cena
+  vence; o SFX é sempre da cena.
+- **Foto da Hive:** vem da primeira cena com imagem (descendo pelas sub-Hives) ou
+  da cena que você escolher no Inspector, em **Capa da Hive**.
 - **Exportar** guarda a Hive no compêndio do mundo e em arquivo: no app desktop,
   em `worlds/<mundo>/lumenn-exports/`; no navegador, como download.
   **Importar Hive…** traz de volta.
+
+![Ver Hive: o mapa do nível atual, com duas Hives e os locais de cada uma](assets/readme/03-ver-hive.png)
+
+*Ver Hive: cada Hive do nível, com os locais de dentro e o botão **Abrir Hive**.*
+
+![Dentro de uma Hive: o Inspector com a capa, as portas e as transições de entrada e saída](assets/readme/04-hive-portas.png)
+
+*Dentro de uma Hive, o Inspector mostra a **Capa da Hive**, as **portas** (com a
+sala de cada uma) e as transições de entrada e saída.*
 
 ## Modo Ao Vivo
 
@@ -182,11 +237,39 @@ um distrito com salas.
   a troca sair sem espera. O estado aparece no estúdio e num selo no card da
   cena: girando (carregando), verde (pronta) e vermelho (falhou).
 - **Pedidos de visita:** você marca uma cena como **Visitável pelos jogadores**.
-  O jogador pede para olhar, você aprova, e ele vê a cena numa janela só dele,
-  sem mudar a mesa.
+  O jogador pede para olhar, você aprova, e ele é levado à cena de verdade, só
+  no computador dele, com uma faixa **Voltar à mesa**. A mesa não mexe. Se você
+  ativar outra cena, ele acompanha. Se a cena tem visão de token ligada, o
+  módulo a desliga só na tela dele (nada é gravado no servidor).
+- **Notas:** o painel **Notas** (embaixo à esquerda) lista as Notas do nó ativo
+  e as soltas, e você edita ali mesmo durante o jogo. Só o mestre vê as Notas.
 - Clique num **nó de Áudio** para tocar a música ou o SFX sem trocar de cena.
 - **INTRO** e **OUTPUT** (no menu **⋮ Mais**) levam ao início e ao fim
   marcados da campanha.
+
+![Modo Ao Vivo: o grafo com a cena ativa em destaque e o painel Notas, embaixo à esquerda](assets/readme/07-ao-vivo.png)
+
+*Ao Vivo: a cena atual aparece em destaque e as Notas do mestre ficam à mão.*
+
+![HUD de Destinos com busca, filtros, recentes e os botões Pré-carregar e Entrar](assets/readme/08-destinos.png)
+
+*Destinos: busque qualquer cena, Hive ou nota da campanha, pré-carregue com
+**P** e salte com **Enter**.*
+
+## Para os jogadores
+
+Quando o mestre marca uma cena como **visitável**, você pode pedir para dar uma
+olhada nela sem mexer na mesa:
+
+1. No grupo de **Tokens** (à esquerda), clique no ícone de porta **Pedir visita**.
+2. Escolha a cena e clique em **Pedir visita**. O mestre decide.
+3. Se ele aprovar, só a **sua** tela vai para a cena, com uma faixa no topo.
+4. Clique em **Voltar à mesa** quando terminar. Se o mestre mudar de cena, você
+   acompanha sozinho.
+
+![Visão do jogador numa visita aprovada, com a faixa "Voltar à mesa" no topo](assets/readme/09-visita.png)
+
+*A visita privada, vista pelo jogador. A mesa continua onde estava.*
 
 ## Topo do editor e canvas
 
@@ -197,6 +280,14 @@ um distrito com salas.
 | Roda do mouse | Desloca o canvas (`Shift` desloca na horizontal) |
 | `Ctrl`/`Cmd` + roda | Zoom no cursor |
 | `Espaço` + arrastar, ou botão do meio | Move a câmera |
+| Arrastar no vazio | Retângulo de seleção (só em Edição) |
+| `Shift` + clique / `Ctrl`/`Cmd` + clique | Soma / tira um nó da seleção |
+| `Ctrl`/`Cmd` + `A`, `Esc`, `Delete` | Seleciona tudo, limpa a seleção, exclui os selecionados (com confirmação) |
+| `N` ou duplo clique no vazio | Cria uma Nota |
+
+Com vários nós selecionados, arrastar um move todos juntos e o Inspector oferece
+cor, **Visitável** e excluir em lote. Os atalhos só valem com o foco dentro do
+editor.
 
 ## Cores e símbolos
 
@@ -253,15 +344,16 @@ Os storyboards, **inclusive o texto das Notas**, ficam nas configurações do
 mundo. Jogadores com conhecimento técnico conseguem ler esses dados pelo
 navegador; a Nota só fica escondida na interface do editor. **Não guarde
 segredos de campanha nas Notas.** Os pedidos de visita são uma experiência, não
-um controle de acesso.
+um controle de acesso: os dados da cena já chegam ao navegador de todo jogador.
 
 Detalhes e como reportar uma vulnerabilidade: [SECURITY.md](SECURITY.md).
 
 ## Estado do projeto
 
-A **0.1.0** é a primeira versão testada em runtime: Foundry 14.367, com mestre e
-jogador conectados (navegação, transições, stinger no cliente do jogador, áudio,
-pré-carregamento, pedidos de visita, exportação e importação).
+A **0.1.5** foi testada em runtime no Foundry 14.367, com mestre e jogador
+conectados (navegação, transições, stinger no cliente do jogador, áudio herdado
+pela Hive, pré-carregamento, seleção múltipla, Notas, visita real, exportação e
+importação).
 
 Ainda sem teste: Foundry 13.350, o app desktop com uma mesa real, telas
 pequenas e transparência de vídeo no Safari/Firefox. O histórico está no
@@ -295,7 +387,7 @@ tools/     gerador dos stingers e do compêndio
 Antes de abrir um PR:
 
 ```powershell
-node --test tests/
+node --test tests/*.test.mjs
 Get-ChildItem scripts -Filter *.mjs | ForEach-Object { node --check $_.FullName }
 git diff --check
 ```
@@ -339,7 +431,7 @@ hunting for files while the table waits.
 - a **transition studio** that previews the switch between the current scene
   and the next;
 - Foundry transitions, Lumenn effects, cinema effects and **6 video stingers**;
-- the **Lumenn Frame: Transições** compendium with 16 ready-made transitions;
+- the **Lumenn Frame: Transições** compendium with 19 ready-made transitions;
 - **Live** mode with direct jumps, a destinations HUD and preloading.
 
 ## How it works in 30 seconds
@@ -357,6 +449,23 @@ You draw a **graph**: boxes (nodes) joined by lines.
   lets you go back from B to A with the same transition.
 - **AUDIO** links an audio node to a scene. That one is one-way.
 - Two modes: **Edit** (you build) and **Live** (you play and navigate).
+
+## Get to know the screen
+
+![The Lumenn Frame editor in Edit mode, showing the sample campaign graph "Cidade Velha"](assets/readme/01-editor-grafo.png)
+
+*The editor in Edit mode, with a sample campaign: a city, a tavern and some
+catacombs. The screenshots in this guide show the Portuguese interface; the
+English one has the same layout.*
+
+1. **Top left:** the storyboard picker and the **Graph · Transition · Scene** tabs.
+2. **Top middle:** **Edit / Live**, **+ Storyboard**, **+ Hive**, **View Hive**
+   and **Destinations**.
+3. **Canvas:** each box is a **node** (scene, audio, note or Hive). Each line is
+   a **link**, with the transition name written on it.
+4. **Left bar:** select, create a Note (`N`) and fit all.
+5. **Inspector, on the right:** shows and edits what is selected. With nothing
+   selected it shows **Where am I** and the Hive library.
 
 ## Installation
 
@@ -392,6 +501,15 @@ reload (F5). Your storyboards live in the world and are not deleted.
    Inspector.
 8. **Play.** Switch to **Live** and click the next scene.
 
+### Selecting and moving several nodes
+
+![Two nodes selected by a rectangle, with the Inspector showing "2 nodes selected"](assets/readme/02-selecao.png)
+
+In **Edit** mode, drag on empty space to draw a rectangle: everything it touches
+joins the selection. `Shift` + click adds a node, `Ctrl`/`Cmd` + click removes
+one. Dragging a node moves every selected node, and the Inspector offers color,
+**Visitable** and delete for the whole group. `Esc` clears the selection.
+
 ## Transition studio
 
 This is where you see how the switch will look before going live, like OBS's
@@ -401,6 +519,11 @@ and DaVinci workspaces). The storyboard's links are listed on the left. All
 times are in **seconds**.
 
 **Transition tab**
+
+![Transition tab: the link list on the left, the preview monitor in the middle and the effect settings on the right](assets/readme/05-transicao.png)
+
+*Links on the left. Monitor and timeline in the middle. Effect, time and audio
+on the right. The link chosen here uses **Glitch Lumenn**.*
 
 - **Monitor:** plays the real transition between the image of scene **A** (where
   you leave) and scene **B** (where you go). A scene without a background shows
@@ -413,6 +536,10 @@ times are in **seconds**.
   change is saved on the link right away.
 
 **Scene tab**
+
+![Scene tab: both scenes of the link side by side, with preload and the Visitable option](assets/readme/06-cena.png)
+
+*Both ends of the chosen link, each with its preload state.*
 
 - Both scenes side by side, with the **preload state** and a button to preload,
   cancel or retry.
@@ -441,7 +568,7 @@ leak, Sword slash, Glitch and Hyperspace). Each covers the whole screen at its
 midpoint, and that is when the scene switches underneath. You can also use your
 own transparent WebM (VP9).
 
-**"Lumenn Frame: Transições" compendium:** 16 ready-made macros. Select a link
+**"Lumenn Frame: Transições" compendium:** 19 ready-made macros. Select a link
 in the editor and run the macro: the transition is saved on it. By script:
 `game.modules.get("lumenn-frame").api.applyTransition("stinger-slash")`.
 
@@ -451,7 +578,7 @@ in the editor and run the macro: the transition is saved on it. By script:
 | :---- | :----------------- |
 | **Scene** | Switches only the scene. |
 | **Audio** | Switches only the audio. |
-| **Beat** (scene + audio) | Switches both together. Default. |
+| **Scene + audio** | Switches both together. Default. |
 
 ### Audio
 
@@ -476,11 +603,31 @@ district with rooms.
   of the view.
 - **View Hive** shows the current level as a map: each Hive with its places,
   sub-hives and ports. **Open Hive** goes inside.
-- Each Hive has entry and exit **ports**. In Live mode, entering a Hive takes the
-  table to the entry port's scene.
+- Each Hive has entry and exit **ports**, and they appear on their own: a Hive
+  with at least one scene already has an entry and an exit. You can rename, move
+  and delete them, but the last one on each side stays. In Live mode, entering a
+  Hive takes the table to the entry port's scene.
+- **Hive to Hive:** link one Hive's exit port to another Hive's node and the
+  table leaves one and lands inside the other, at the linked entry port, in a
+  single transition.
+- **Hive music:** music attached to the Hive node applies to the scenes inside
+  that have no music of their own. Entering does not cut the music; a scene's own
+  music wins; SFX always belongs to the scene.
+- **Hive picture:** comes from the first scene with an image (going down through
+  sub-Hives) or from the scene you pick in the Inspector, under **Hive cover**.
 - **Export** saves the Hive to the world compendium and to a file: in the desktop
   app, in `worlds/<world>/lumenn-exports/`; in a browser, as a download.
   **Import Hive…** brings it back.
+
+![View Hive: the current level as a map, with two Hives and the places inside each](assets/readme/03-ver-hive.png)
+
+*View Hive: each Hive on this level, with the places inside and the **Open
+Hive** button.*
+
+![Inside a Hive: the Inspector with the cover, the ports and the entry and exit transitions](assets/readme/04-hive-portas.png)
+
+*Inside a Hive, the Inspector shows the **Hive cover**, the **ports** (with each
+one's room) and the entry and exit transitions.*
 
 ## Live mode
 
@@ -492,11 +639,40 @@ district with rooms.
   so the switch has no wait. The state shows in the studio and as a badge on the
   scene card: spinning (loading), green (ready), red (failed).
 - **Visit requests:** mark a scene as **Visitable by players**. A player asks to
-  look, you approve, and they see the scene in a private window without moving
-  the table.
+  look, you approve, and they are taken to the scene for real, on their computer
+  only, with a **Back to the table** bar. The table does not move. If you
+  activate another scene, they follow. If the scene has token vision on, the
+  module turns it off on their screen only (nothing is written to the server).
+- **Notes:** the **Notes** panel (bottom left) lists the active node's Notes and
+  the loose ones, and you edit them right there during play. Only the GM sees
+  Notes.
 - Click an **Audio node** to play its music or SFX without changing scene.
 - **INTRO** and **OUTPUT** (in the **⋮ More** menu) jump to the campaign's
   marked start and end.
+
+![Live mode: the graph with the active scene highlighted and the Notes panel at the bottom left](assets/readme/07-ao-vivo.png)
+
+*Live: the current scene is highlighted and your Notes are at hand.*
+
+![Destinations HUD with search, filters, recents and the Preload and Enter buttons](assets/readme/08-destinos.png)
+
+*Destinations: search any scene, Hive or note in the campaign, preload with **P**
+and jump with **Enter**.*
+
+## For players
+
+When the GM marks a scene as **visitable**, you can ask to take a look at it
+without moving the table:
+
+1. In the **Tokens** group (on the left), click the door icon **Request a visit**.
+2. Pick the scene and click **Request visit**. The GM decides.
+3. If approved, only **your** screen goes to the scene, with a bar at the top.
+4. Click **Back to the table** when you are done. If the GM changes scene, you
+   follow on your own.
+
+![The player's view during an approved visit, with the "Back to the table" bar at the top](assets/readme/09-visita.png)
+
+*A private visit, as the player sees it. The table stays where it was.*
 
 ## Editor top bar and canvas
 
@@ -507,6 +683,14 @@ district with rooms.
 | Mouse wheel | Pans the canvas (`Shift` pans horizontally) |
 | `Ctrl`/`Cmd` + wheel | Zooms at the cursor |
 | `Space` + drag, or middle button | Moves the camera |
+| Drag on empty space | Selection rectangle (Edit mode only) |
+| `Shift` + click / `Ctrl`/`Cmd` + click | Adds / removes a node from the selection |
+| `Ctrl`/`Cmd` + `A`, `Esc`, `Delete` | Select all, clear selection, delete selected (with confirmation) |
+| `N` or double-click on empty space | Creates a Note |
+
+With several nodes selected, dragging one moves them all and the Inspector offers
+bulk color, **Visitable** and delete. Shortcuts only work with focus inside the
+editor.
 
 ## Colors and symbols
 
@@ -562,15 +746,16 @@ mode.
 Storyboards, **including Note text**, are stored in the world settings.
 Technically savvy players can read that data through the browser; a Note is
 only hidden in the editor interface. **Do not keep campaign secrets in Notes.**
-Visit requests are an experience, not access control.
+Visit requests are an experience, not access control: the scene data already
+reaches every player's browser.
 
 Details and how to report a vulnerability: [SECURITY.md](SECURITY.md).
 
 ## Project status
 
-**0.1.0** is the first version tested at runtime: Foundry 14.367 with a GM and a
-player connected (navigation, transitions, stinger on the player's client,
-audio, preloading, visit requests, export and import).
+**0.1.5** was tested at runtime on Foundry 14.367 with a GM and a player
+connected (navigation, transitions, stinger on the player's client, Hive-inherited
+audio, preloading, multi-select, Notes, real visits, export and import).
 
 Not tested yet: Foundry 13.350, the desktop app with a real table, small screens
 and video transparency in Safari/Firefox. History is in
@@ -604,7 +789,7 @@ tools/     stinger and compendium generators
 Before opening a PR:
 
 ```powershell
-node --test tests/
+node --test tests/*.test.mjs
 Get-ChildItem scripts -Filter *.mjs | ForEach-Object { node --check $_.FullName }
 git diff --check
 ```

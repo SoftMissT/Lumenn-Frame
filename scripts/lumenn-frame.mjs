@@ -2,7 +2,7 @@ import { LumennAudioEngine, LumennInvalidAudioSourceError } from './audio-engine
 import { LumennTransitionController } from './transition-controller.mjs';
 import { LumennGraphStore } from './graph-store.mjs';
 import { LumennSettings } from './settings.mjs';
-import { LumennCompat, SOCKET_NAME } from './foundry-compat.mjs';
+import { LumennCompat } from './foundry-compat.mjs';
 import { LumennGraphApp, lumennClientSceneFade } from './storyboard-app.mjs';
 import { registerHandlebarsHelpers } from './handlebars-helpers.mjs';
 import { registerLumennTransitions } from './custom-transitions.mjs';
@@ -80,14 +80,24 @@ Hooks.once('init', () => {
 });
 Hooks.once('ready', () => {
     if (game.user?.isGM) {
-        LumennGraphStore.migrate().then((result) => {
-            if (result?.migrated)
-                ui.notifications.info(game.i18n.localize('LUMENN_FRAME.Migrated'));
-            else if (result?.blocked)
-                ui.notifications.warn(game.i18n.localize('LUMENN_FRAME.WarnMigrationBlocked'));
-            else if (result?.unreadable)
-                ui.notifications.warn(game.i18n.localize('LUMENN_FRAME.WarnMigrationUnreadable'));
-        });
+        LumennGraphStore.migrate()
+            .then((result) => {
+                if (result?.migrated)
+                    ui.notifications.info(game.i18n.localize('LUMENN_FRAME.Migrated'));
+                else if (result?.blocked)
+                    ui.notifications.warn(game.i18n.localize('LUMENN_FRAME.WarnMigrationBlocked'));
+                else if (result?.unreadable)
+                    ui.notifications.warn(game.i18n.localize('LUMENN_FRAME.WarnMigrationUnreadable'));
+                // Com 2+ GMs online, só o designado escreve (evita duas escritas iguais).
+                if (game.user !== LumennCompat.activeGM) return 0;
+                return LumennGraphStore.ensureAllHivePorts();
+            })
+            .then((count) => {
+                if (count)
+                    ui.notifications.info(
+                        game.i18n.format('LUMENN_FRAME.Hive.AutoPortsAdded', { n: count })
+                    );
+            });
     }
     // O core entrega (payload, senderUserId): a autoria vem do servidor, não do payload.
     registerVisits();

@@ -4,6 +4,7 @@ import { LumennSettings } from './settings.mjs';
 import { childrenOf, GROUP_COLOR } from './graph-groups.mjs';
 import { detectHiveCycles } from './hive-runtime.mjs';
 import { planGroupToHive, sanitizeHivePorts } from './hive-io.mjs';
+import { ensureHivePorts } from './hive-ports.mjs';
 import { reverseFlow } from './links.mjs';
 import {
     anchorOf,
@@ -233,6 +234,32 @@ export class LumennGraphStore {
     static #newId(prefix) {
         return `${prefix}_${foundry.utils.randomID(16)}`;
     }
+    static #portLabel(direction) {
+        return game.i18n.localize(
+            direction === 'exit' ? 'LUMENN_FRAME.Hive.AutoExit' : 'LUMENN_FRAME.Hive.AutoEntry'
+        );
+    }
+    /** Hive com sala sempre tem entrada e saída. Muda o grafo no lugar; devolve se mudou. */
+    static #autoPorts(graph) {
+        if (graph?.isHive !== true) return false;
+        const out = ensureHivePorts(graph, {
+            newId: LumennGraphStore.#newId,
+            labelOf: LumennGraphStore.#portLabel,
+        });
+        if (out.changed) graph.hive = { ...(graph.hive ?? {}), ports: out.ports };
+        return out.changed;
+    }
+    /** Migração leve e idempotente (só um GM roda): Hives antigas ganham portas. Uma escrita. */
+    static async ensureAllHivePorts() {
+        if (!game.user.isGM) return 0;
+        const data = foundry.utils.duplicate(
+            game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
+        );
+        let count = 0;
+        for (const graph of data.graphs ?? []) if (LumennGraphStore.#autoPorts(graph)) count++;
+        if (count) await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
+        return count;
+    }
     static #applyHive(graph, patch = {}) {
         const merged = {
             ...(graph.hive ?? {}),
@@ -245,6 +272,7 @@ export class LumennGraphStore {
         );
         graph.isHive = true;
         graph.hive = merged;
+        LumennGraphStore.#autoPorts(graph);
     }
     static async markHive(graphId, patch = {}) {
         if (!game.user.isGM) return null;
@@ -302,6 +330,7 @@ export class LumennGraphStore {
         graph.nodes = plan.parent.nodes;
         graph.edges = plan.parent.edges;
         graph.activeNodeId = plan.parent.activeNodeId;
+        LumennGraphStore.#autoPorts(plan.hive);
         data.graphs.push(plan.hive);
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
         return plan;
@@ -313,7 +342,9 @@ export class LumennGraphStore {
             game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
         );
         if (data.graphs.some((candidate) => candidate.id === graph.id)) return null;
-        data.graphs.push(foundry.utils.duplicate(graph));
+        const copy = foundry.utils.duplicate(graph);
+        LumennGraphStore.#autoPorts(copy);
+        data.graphs.push(copy);
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
         return graph;
     }
@@ -411,6 +442,7 @@ export class LumennGraphStore {
         if (n.type === 'audio' && n.data && n.data.loop === undefined)
             n.data.loop = n.data.audioRole !== 'sfx';
         graph.nodes.push(n);
+        if (n.type === 'scene') LumennGraphStore.#autoPorts(graph);
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
         return n;
     }
@@ -474,31 +506,41 @@ export class LumennGraphStore {
         return updated;
     }
     static async deleteNode(graphId, nodeId) {
-        if (!game.user.isGM) return false;
+        return (await LumennGraphStore.deleteNodes(graphId, [nodeId])) > 0;
+    }
+    /** Apaga vários nós com uma única escrita do setting. Devolve quantos existiam. */
+    static async deleteNodes(graphId, nodeIds) {
+        if (!game.user.isGM) return 0;
         const data = foundry.utils.duplicate(
             game.settings.get(MODULE_ID, LumennGraphStore.#GRAPHS_KEY)
         );
         const graph = data.graphs.find((g) => g.id === graphId);
-        if (!graph) return false;
-        const node = graph.nodes.find((n) => n.id === nodeId);
-        if (!node) return false;
+        if (!graph) return 0;
+        const doomed = new Set((nodeIds ?? []).filter((id) => graph.nodes.some((n) => n.id === id)));
+        if (!doomed.size) return 0;
         // Apagar grupo = desagrupar: filhos e edges internas ficam.
-        if (node.type === 'group') {
-            for (const child of childrenOf(graph.nodes, nodeId)) child.parentId = null;
+        for (const id of doomed) {
+            const node = graph.nodes.find((n) => n.id === id);
+            if (node?.type !== 'group') continue;
+            for (const child of childrenOf(graph.nodes, id)) {
+                if (!doomed.has(child.id)) child.parentId = null;
+            }
         }
-        graph.nodes = graph.nodes.filter((n) => n.id !== nodeId);
-        graph.edges = graph.edges.filter((e) => e.from !== nodeId && e.to !== nodeId);
-        if (graph.activeNodeId === nodeId) graph.activeNodeId = null;
+        graph.nodes = graph.nodes.filter((n) => !doomed.has(n.id));
+        graph.edges = graph.edges.filter((e) => !doomed.has(e.from) && !doomed.has(e.to));
+        if (doomed.has(graph.activeNodeId)) graph.activeNodeId = null;
         // Sala apagada: porta e Encontro que apontavam para ela ficam sem sala (nunca órfãos).
         for (const port of graph.hive?.ports ?? []) {
-            if (port.nodeId === nodeId) port.nodeId = null;
+            if (doomed.has(port.nodeId)) port.nodeId = null;
         }
         for (const other of graph.nodes) {
-            if (other.type === 'encounter' && other.data?.sceneNodeId === nodeId)
+            if (other.type === 'encounter' && doomed.has(other.data?.sceneNodeId))
                 other.data.sceneNodeId = null;
         }
+        // Porta `auto` que perdeu a sala volta para a sala de pouso; a do mestre fica sem sala.
+        LumennGraphStore.#autoPorts(graph);
         await game.settings.set(MODULE_ID, LumennGraphStore.#GRAPHS_KEY, data);
-        return true;
+        return doomed.size;
     }
     static async setActiveNode(graphId, nodeId) {
         if (!game.user.isGM) return;

@@ -64,6 +64,7 @@
     <div class="lf-toolbar-left">
       {{#if editable}}
       <button class="lf-tool{{#if (lumenn-eq tool 'select')}} active{{/if}}" data-tool="select" title="{{label.select}}"><i class="fa-solid fa-mouse-pointer"></i></button>
+      <button class="lf-tool{{#if (lumenn-eq tool 'note')}} active{{/if}}" data-tool="note" title="{{label.addNote}} (N)" aria-label="{{label.addNote}}"><i class="fa-solid fa-note-sticky"></i></button>
       {{!-- Barra enxuta (conceito 07): cena e áudio chegam arrastando da sidebar; link sai da porta; mover = espaço ou botão do meio; Hive nasce no "+ Hive" do topo. --}}
       <button class="lf-tool" data-camera="fit" title="{{label.fit}}" aria-label="{{label.fit}}"><i class="fa-solid fa-expand"></i></button>
       {{#if isHiveGraph}}
@@ -73,6 +74,17 @@
     </div>
 
     <div class="lf-viewport">
+      {{#if notesPanel.length}}
+      <details class="lf-notes-panel" open>
+        <summary><i class="fa-solid fa-note-sticky" aria-hidden="true"></i> {{label.notesPanel}} <span class="lf-notes-count">{{notesPanel.length}}</span></summary>
+        {{#each notesPanel}}
+        <div class="lf-note-entry{{#if this.anchored}} is-anchored{{/if}}">
+          <input type="text" data-note-field="data.title" data-note-id="{{this.id}}" value="{{this.title}}" placeholder="{{../label.title}}">
+          <textarea data-note-field="data.body" data-note-id="{{this.id}}" rows="3">{{this.body}}</textarea>
+        </div>
+        {{/each}}
+      </details>
+      {{/if}}
       {{#if hiveMap}}
       <section class="lf-map" role="dialog" aria-label="{{label.viewHive}}">
         <header class="lf-map-head">
@@ -290,6 +302,27 @@
     </div>
 
     <div class="lf-inspector">
+      {{#if (lumenn-eq inspector.kind 'multi')}}
+        <h3 class="lf-insp-title">{{inspector.countLabel}}</h3>
+        <p class="lf-insp-p">{{label.selectionHint}}</p>
+        <label class="lf-insp-label">{{label.color}}</label>
+        <div class="lf-swatches">
+          {{#each inspector.colors}}
+          <span class="lf-swatch" data-insp-swatch data-color="{{this}}" style="background:{{this}}"></span>
+          {{/each}}
+        </div>
+        {{#if inspector.sceneCount}}
+        <label class="lf-insp-label">{{label.visitable}}</label>
+        <div class="lf-insp-actions">
+          <button data-insp-action="multi-visitable-on">{{label.selectionVisitableOn}}</button>
+          <button data-insp-action="multi-visitable-off">{{label.selectionVisitableOff}}</button>
+        </div>
+        {{/if}}
+        <div class="lf-insp-actions">
+          <button data-insp-action="multi-clear">{{label.selectionClear}}</button>
+          <button class="danger" data-insp-action="multi-delete">{{label.selectionDelete}}</button>
+        </div>
+      {{/if}}
       {{#if (lumenn-eq inspector.kind 'node')}}
         {{#if (lumenn-eq inspector.nodeType 'scene')}}
         <h3 class="lf-insp-title">{{label.scene}}</h3>
@@ -389,6 +422,14 @@
         <input type="text" data-insp-input="data.title" value="{{inspector.node.data.title}}">
         <label class="lf-insp-label">{{label.body}}</label>
         <textarea data-insp-input="data.body" rows="4">{{inspector.node.data.body}}</textarea>
+        <label class="lf-insp-label">{{label.noteAnchor}}</label>
+        <select data-insp="data.anchorNodeId">
+          <option value="">{{label.noteAnchorNone}}</option>
+          {{#each inspector.anchorOptions}}
+          <option value="{{this.id}}" {{#if (lumenn-eq this.id ../inspector.node.data.anchorNodeId)}}selected{{/if}}>{{this.name}}</option>
+          {{/each}}
+        </select>
+        <p class="lf-insp-p">{{label.noteWorldHint}}</p>
         {{/if}}
         {{#if (lumenn-eq inspector.nodeType 'hive-ref')}}
         <h3 class="lf-insp-title">{{label.hiveBadge}}</h3>
@@ -628,6 +669,13 @@
       <h3 class="lf-insp-title">{{label.hiveSection}}</h3>
       {{#if inspector.hive.isHive}}
       <p class="lf-insp-p">{{label.hiveIntro}}</p>
+      <label class="lf-insp-label">{{label.hiveCover}}</label>
+      <select data-hive-field="cover.sceneId">
+        <option value="">{{label.hiveCoverAuto}}</option>
+        {{#each inspector.scenes}}
+        <option value="{{this.id}}" {{#if (lumenn-eq this.id ../inspector.hive.coverSceneId)}}selected{{/if}}>{{this.name}}</option>
+        {{/each}}
+      </select>
       <label class="lf-insp-label">{{label.hivePorts}}</label>
       <ul class="lf-hive-ports">
         {{#each inspector.hive.ports}}

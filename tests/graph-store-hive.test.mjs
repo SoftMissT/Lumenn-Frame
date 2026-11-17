@@ -6,6 +6,7 @@ let counter = 0;
 
 globalThis.game = {
     user: { isGM: true },
+    i18n: { localize: (key) => key, format: (key) => key },
     settings: {
         get: (namespace, key) => settings[key],
         set: async (namespace, key, value) => {
@@ -37,9 +38,12 @@ test('updateHive grava portas saneadas e a transição padrão sem bump de schem
         ],
         transition: { scene: { type: 'fade', duration: 500 } },
     });
-    assert.equal(hive.ports.length, 2);
+    // A saída do mestre aponta para sala que não existe: fica sem sala, e a Hive ganha
+    // uma saída automática (Hive com sala sempre tem entrada e saída válidas).
+    assert.equal(hive.ports.length, 3);
     assert.equal(hive.ports[0].nodeId, 'a');
     assert.equal(hive.ports[1].nodeId, null);
+    assert.deepEqual([hive.ports[2].direction, hive.ports[2].nodeId, hive.ports[2].auto], ['exit', 'a', true]);
     assert.ok(hive.ports[0].id.startsWith('port_'));
     assert.equal(hive.transition.scene.duration, 500);
     assert.equal(settings.graphs.schemaVersion, 2);
@@ -146,6 +150,85 @@ test('convertGroupToHive grava pai e Hive numa escrita só', async () => {
     assert.equal(hive.hive.ports[0].nodeId, 'a');
     assert.deepEqual(LumennGraphStore.getHiveUsages(hive.id).map((use) => use.graphId), ['root']);
     assert.equal(await LumennGraphStore.convertGroupToHive('root', 'g'), null);
+});
+
+const countWrites = async (fn) => {
+    let writes = 0;
+    const set = game.settings.set;
+    game.settings.set = async (...args) => {
+        writes += 1;
+        return set(...args);
+    };
+    try {
+        await fn();
+    } finally {
+        game.settings.set = set;
+    }
+    return writes;
+};
+
+test('primeira cena numa Hive vazia já cria entrada e saída, na mesma escrita', async () => {
+    seed({ id: 'h', name: 'H', activeNodeId: null, isHive: true, hive: { ports: [] }, nodes: [], edges: [] });
+    const writes = await countWrites(() => LumennGraphStore.addNode('h', room('a')));
+    assert.equal(writes, 1);
+    const ports = LumennGraphStore.getGraph('h').hive.ports;
+    assert.deepEqual(ports.map((p) => [p.direction, p.nodeId, p.auto]), [
+        ['entry', 'a', true],
+        ['exit', 'a', true],
+    ]);
+});
+
+test('nota numa Hive não cria porta', async () => {
+    seed({ id: 'h', name: 'H', activeNodeId: null, isHive: true, hive: { ports: [] }, nodes: [], edges: [] });
+    await LumennGraphStore.addNode('h', { id: 'n', type: 'note', data: { title: '', body: '' } });
+    assert.deepEqual(LumennGraphStore.getGraph('h').hive.ports, []);
+});
+
+test('deleteNodes apaga vários numa escrita e religa a porta auto', async () => {
+    seed({
+        id: 'h',
+        name: 'H',
+        activeNodeId: 'a',
+        isHive: true,
+        hive: {
+            ports: [
+                { id: 'p1', name: 'Entrada', direction: 'entry', nodeId: 'a', auto: true },
+                { id: 'p2', name: 'Saída', direction: 'exit', nodeId: 'a', auto: true },
+            ],
+        },
+        nodes: [room('a'), { ...room('b'), position: { x: 10, y: 10 } }, room('c')],
+        edges: [{ id: 'e', type: 'flow', from: 'a', to: 'b' }],
+    });
+    let count = 0;
+    const writes = await countWrites(async () => {
+        count = await LumennGraphStore.deleteNodes('h', ['a', 'c', 'fantasma']);
+    });
+    assert.equal(writes, 1);
+    assert.equal(count, 2);
+    const graph = LumennGraphStore.getGraph('h');
+    assert.deepEqual(graph.nodes.map((n) => n.id), ['b']);
+    assert.equal(graph.edges.length, 0);
+    assert.equal(graph.activeNodeId, null);
+    assert.deepEqual(graph.hive.ports.map((p) => p.nodeId), ['b', 'b']);
+    assert.equal(await LumennGraphStore.deleteNodes('h', []), 0);
+});
+
+test('ensureAllHivePorts: uma escrita, só Hives, e a segunda rodada não escreve', async () => {
+    seed(
+        { id: 'h1', name: 'H1', activeNodeId: null, isHive: true, hive: { ports: [] }, nodes: [room('a')], edges: [] },
+        { id: 'h2', name: 'H2', activeNodeId: null, isHive: true, hive: { ports: [] }, nodes: [], edges: [] },
+        { id: 'sb', name: 'SB', activeNodeId: null, nodes: [room('x')], edges: [] }
+    );
+    let count = 0;
+    const first = await countWrites(async () => {
+        count = await LumennGraphStore.ensureAllHivePorts();
+    });
+    assert.equal(first, 1);
+    assert.equal(count, 1);
+    assert.equal(LumennGraphStore.getGraph('h1').hive.ports.length, 2);
+    assert.equal(LumennGraphStore.getGraph('sb').hive, undefined);
+    const second = await countWrites(() => LumennGraphStore.ensureAllHivePorts());
+    assert.equal(second, 0);
 });
 
 test('importHive grava a Hive nova e recusa id repetido', async () => {

@@ -37,6 +37,7 @@ SUPPORTED RANGE         13.350 ? 14.999
 | Folder drag payload (uuid)                             | `TextEditor.getDragEventData`                                   | idêntico                     | `LumennCompat.getDragData`                                                                          |
 | Folder subfolders recursivo                            | `Folder#getSubfolders(true)`                                    | idêntico                     | `LumennCompat.collectFolderDocuments` (fallback `children`)                                         |
 | Scene transitions nativas                              | `CONFIG.Canvas.sceneTransitions` + `canvas.transition.run`      | não documentado publicamente | `LumennCompat.getSceneTransitions` / `runSceneTransition` (feature-detected; fallback cut/fade/dip) |
+| Scene.view() (visita privada)                          | `Scene#view()` funciona para o jogador em cena inativa, mesmo com permissão NONE; com `tokenVision` ligado e sem token dele o canvas fica preto | não testado                  | `LumennCompat.visitScene` (desliga `tokenVision` só no cliente via `updateSource`; testado 14.367)   |
 | ResizeObserver                                         | DOM padrão                                                      | DOM padrão                   | sem adapter                                                                                         |
 
 ## Documentação dos métodos da camada (`foundry-compat.mjs`)
@@ -56,6 +57,7 @@ Cada método traz no JSDoc: implementação **V14**, fallback **V13**, fonte.
 | `getSceneTransitions`                             | `CONFIG.Canvas.sceneTransitions` (runtime)             | fallback cut/fade/dip                            | feature-detected                         |
 | `runSceneTransition`                              | `canvas.transition.run`                                | fallback cut / fade/dip Lumenn                   | feature-detected                         |
 | `collectFolderDocuments`                          | `Folder#getSubfolders(true)`                           | walk `children` recursivo                        | v13+v14                                  |
+| `visitScene`                                      | `scene.updateSource({tokenVision:false})` + `Scene#view()` (devolve `restore()`) | não testado                     | `docs/spikes/visita-view.md` (matriz medida) |
 
 ## Regras
 

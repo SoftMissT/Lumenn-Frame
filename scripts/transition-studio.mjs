@@ -164,7 +164,11 @@ export class LumennStudioPanel {
         if (!this.#data) {
             root.querySelector('.lf-st-route').textContent = L('LUMENN_FRAME.Studio.PickLink');
             root.querySelector('.lf-st-panel').replaceChildren();
-            root.querySelector('.lf-st-scenes').replaceChildren();
+            // Sem ligação a aba Cena não pode ficar em branco: explica o que falta.
+            const hint = document.createElement('p');
+            hint.className = 'lf-st-hint';
+            hint.textContent = L('LUMENN_FRAME.Studio.NoLinks');
+            root.querySelector('.lf-st-scenes').replaceChildren(hint);
             return;
         }
         const { from, to } = this.#data;

@@ -17,6 +17,8 @@ const visits = {
     mine: null,
     picker: null,
     preview: null,
+    /** Visita real em curso neste cliente: { sceneId, restore, bar }. */
+    real: null,
     queueWindow: null,
     timer: null,
     playerTimer: null,
@@ -331,6 +333,48 @@ export function cancelMyVisit() {
     repaintPicker();
 }
 
+/** Faixa fixa da visita real: lembra que é privada e dá a volta à mesa. */
+function showVisitBar(scene) {
+    document.getElementById('lumenn-visit-bar')?.remove();
+    const bar = document.createElement('div');
+    bar.id = 'lumenn-visit-bar';
+    bar.className = 'lumenn-frame lf-visit-bar';
+    bar.innerHTML = `<i class="fa-solid fa-eye" aria-hidden="true"></i>
+        <span><strong>${esc(scene.name)}</strong> · ${esc(L('LUMENN_FRAME.Visit.PrivateBanner'))}</span>
+        <button type="button" data-back><i class="fa-solid fa-arrow-rotate-left" aria-hidden="true"></i> ${esc(L('LUMENN_FRAME.Visit.Back'))}</button>`;
+    bar.querySelector('[data-back]').addEventListener('click', () => endRealVisit());
+    document.body.appendChild(bar);
+    return bar;
+}
+/**
+ * Leva o jogador à cena de verdade (só no cliente dele). Falhou: abre a janela com a imagem,
+ * para ele nunca ficar sem nada.
+ */
+async function startRealVisit(sceneId) {
+    const scene = game.scenes.get(sceneId);
+    if (!scene) return;
+    await endRealVisit({ goBack: false });
+    visits.preview?.close();
+    try {
+        const { restore } = await LumennCompat.visitScene(scene);
+        visits.real = { sceneId, restore, bar: showVisitBar(scene) };
+    } catch (error) {
+        console.warn('Lumenn Frame: a visita real falhou; abrindo a janela de imagem.', error);
+        visits.preview = new LumennVisitPreview(sceneId);
+        visits.preview.render({ force: true });
+        ui.notifications.warn(L('LUMENN_FRAME.Visit.FallbackPreview'));
+    }
+}
+/** Volta à mesa: religa a visão local e olha a cena ativa. `goBack: false` só limpa. */
+export async function endRealVisit({ goBack = true } = {}) {
+    const real = visits.real;
+    if (!real) return;
+    visits.real = null;
+    real.bar?.remove();
+    real.restore?.();
+    const active = game.scenes.active;
+    if (goBack && active && game.scenes.viewed?.id !== active.id) await active.view();
+}
 function handleResultAsPlayer(payload, senderId) {
     // Só um GM pode decidir, e só para mim.
     if (!game.users.get(senderId)?.isGM || payload.targetUserId !== game.user.id) return;
@@ -338,11 +382,7 @@ function handleResultAsPlayer(payload, senderId) {
     visits.mine.state = payload.state;
     repaintPicker();
     if (payload.state === 'approved' && game.scenes.get(payload.sceneId)) {
-        visits.preview?.close();
-        visits.preview = new LumennVisitPreview(payload.sceneId);
-        visits.preview.render({
-            force: true,
-        });
+        startRealVisit(payload.sceneId);
         ui.notifications.info(
             F('LUMENN_FRAME.Visit.Approved', {
                 scene: game.scenes.get(payload.sceneId).name,
@@ -367,7 +407,13 @@ export function handleVisitMessage(payload, senderId) {
 export function registerVisits() {
     // O GM ativa outra cena: a visita privada acaba para todos, o jogador segue a mesa.
     Hooks.on('updateScene', (scene, changes) => {
-        if (changes?.active === true && visits.preview) visits.preview.close();
+        if (changes?.active !== true) return;
+        // O core já leva todo mundo à cena ativada: só falta limpar a faixa e a visão local.
+        visits.preview?.close();
+        endRealVisit({ goBack: false });
+    });
+    Hooks.on('deleteScene', (scene) => {
+        if (visits.real?.sceneId === scene.id) endRealVisit();
     });
     clearInterval(visits.timer);
     if (!LumennCompat.isGM()) return;
@@ -385,6 +431,7 @@ export const LumennVisits = {
     request: requestVisit,
     cancel: cancelMyVisit,
     openPicker: openVisitPicker,
+    end: endRealVisit,
     handle: handleVisitMessage,
     ttl: VISIT_TTL_MS,
 };

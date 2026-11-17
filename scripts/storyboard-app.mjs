@@ -38,7 +38,6 @@ import {
     normalizeHiveTransition,
     orphanExitEdges,
     portHubView,
-    resolveHiveExitEdge,
     HIVE_EXPORT_FORMAT,
     hiveEntryPort,
     hiveExitPortsAt,
@@ -55,6 +54,20 @@ import {
     parentMap,
 } from './graph-groups.mjs';
 import { parentGraphId, planJump } from './neural-address.mjs';
+import { canRemovePort, landingRoom } from './hive-ports.mjs';
+import { planExitLanding } from './hive-landing.mjs';
+import { effectiveAudioSources } from './audio-inherit.mjs';
+import { coverFor, graphNoun } from './hive-cover.mjs';
+import { anchorOptions, notesFor, shouldRerenderForPath } from './notes.mjs';
+import {
+    createSelection,
+    replace as selectOnly,
+    selectAll,
+    applyClick,
+    applyRect,
+    rectHits,
+    prune as pruneSelection,
+} from './selection-model.mjs';
 import { flowTwins, linkBetween, linkedFrom } from './links.mjs';
 import { hiveMap } from './hive-map.mjs';
 import { LumennStudioPanel } from './transition-studio.mjs';
@@ -237,6 +250,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         kind: null,
         id: null,
     };
+    /** Multisseleção de nós (só Edição). `#selected` segue como o primário do Inspector. */
+    #selection = createSelection();
+    /** O último clique foi dentro do grafo: o render devolve o foco ao viewport. */
+    #wantsFocus = false;
+    #noteTimers = new Map();
     #connectState = null;
     #edgeFrame = null;
     #pendingEdgeNodes = new Map();
@@ -291,33 +309,39 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         super(options);
         this.#dragDrop = this.#createDragDropHandlers();
         this.#camera.zoom = clampGraphZoom(LumennSettings.getCameraDefaults().zoom);
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
+        this.#docHandlers.keydown = (e) => {
+            // Esc que desfaz algo do editor não vaza: o core fecharia a janela junto. Sem nada a
+            // desfazer, o Esc segue e fecha a janela como sempre. `rendered` evita reabrir a janela fechada.
+            if (e.key === 'Escape' && this.rendered) {
+                let consumed = false;
                 if (this.#browserOpen) {
                     this.#browserOpen = false;
                     this.render();
-                    return;
-                }
-                if (this.#previewing) {
+                    consumed = true;
+                } else if (this.#previewing) {
                     canvas.transition?.cancel?.();
+                    consumed = true;
+                } else {
+                    if (this.#connectState) {
+                        const armed = this.#connectState.armed === true;
+                        this.#connectState = null;
+                        this.#updateGhost();
+                        if (armed) this.render();
+                        consumed = true;
+                    }
+                    if (this.#selected.kind) {
+                        this.#clearSelection();
+                        this.render();
+                        consumed = true;
+                    }
+                }
+                if (consumed) {
                     e.preventDefault();
-                    return;
-                }
-                if (this.#connectState) {
-                    const armed = this.#connectState.armed === true;
-                    this.#connectState = null;
-                    this.#updateGhost();
-                    if (armed) this.render();
-                }
-                if (this.#selected.kind) {
-                    this.#selected = {
-                        kind: null,
-                        id: null,
-                    };
-                    this.render();
+                    e.stopPropagation();
                 }
             }
-            if (e.code === 'Space') {
+            // Com a janela fechada o Espaço volta a ser do Foundry (pausa), não do pan do editor.
+            if (e.code === 'Space' && this.rendered) {
                 const t = e.target;
                 if (t && (t.matches?.('input, textarea, select') || t.isContentEditable)) return;
                 if (!this.#spaceDown) {
@@ -326,16 +350,127 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 }
                 e.preventDefault();
             }
-        });
-        document.addEventListener('keyup', (e) => {
+        };
+        this.#docHandlers.keyup = (e) => {
             if (e.code === 'Space') {
                 this.#spaceDown = false;
                 this.element?.classList.remove('space-hold');
             }
-        });
+        };
+        // Captura: Delete e Ctrl+A do editor não podem chegar aos atalhos de tokens do Foundry.
+        this.#docHandlers.editorKey = (e) => this.#onEditorKey(e);
+        // Clicar fora do editor tira o "quer foco": o render não pode roubar o foco do canvas.
+        this.#docHandlers.pointer = (e) => {
+            if (this.#wantsFocus && !this.element?.contains(e.target)) this.#wantsFocus = false;
+        };
+    }
+    #docHandlers = {};
+    #docBound = false;
+    /** Listeners do `document` entram na primeira renderização e saem no fechamento (sem vazar). */
+    #bindDocument() {
+        if (this.#docBound) return;
+        this.#docBound = true;
+        document.addEventListener('keydown', this.#docHandlers.keydown);
+        document.addEventListener('keyup', this.#docHandlers.keyup);
+        document.addEventListener('keydown', this.#docHandlers.editorKey, true);
+        document.addEventListener('pointerdown', this.#docHandlers.pointer, true);
+    }
+    #unbindDocument() {
+        if (!this.#docBound) return;
+        this.#docBound = false;
+        document.removeEventListener('keydown', this.#docHandlers.keydown);
+        document.removeEventListener('keyup', this.#docHandlers.keyup);
+        document.removeEventListener('keydown', this.#docHandlers.editorKey, true);
+        document.removeEventListener('pointerdown', this.#docHandlers.pointer, true);
+        this.#spaceDown = false;
+    }
+    _onFirstRender(context, options) {
+        super._onFirstRender?.(context, options);
+        this.#bindDocument();
     }
     #editable() {
         return this.#mode === 'edit' && LumennCompat.isGM();
+    }
+    /** Nós selecionados. A multisseleção só vale enquanto o primário bate com `#selected`. */
+    #selectedNodeIds() {
+        if (this.#selected.kind !== 'node' || !this.#selected.id) return [];
+        const sel = this.#selection;
+        return sel.primary === this.#selected.id && sel.ids.size > 1
+            ? [...sel.ids]
+            : [this.#selected.id];
+    }
+    #selectionModel() {
+        const ids = this.#selectedNodeIds();
+        return ids.length
+            ? { ids: new Set(ids), primary: this.#selected.id }
+            : createSelection();
+    }
+    #setNodeSelection(sel) {
+        this.#selection = sel;
+        this.#selected = sel.primary
+            ? { kind: 'node', id: sel.primary }
+            : { kind: null, id: null };
+    }
+    #clearSelection() {
+        this.#selection = createSelection();
+        this.#selected = { kind: null, id: null };
+    }
+    #paintSelection(root) {
+        const ids = new Set(this.#selectedNodeIds());
+        root.querySelectorAll('.lf-node').forEach((el) =>
+            el.classList.toggle('selected', ids.has(el.dataset.id))
+        );
+    }
+    /** Ctrl+A e Delete, só com o foco dentro do editor e fora de campos de texto. */
+    #onEditorKey(e) {
+        const root = this.element;
+        if (!root?.isConnected || !this.#editable() || this.#workspace !== 'graph') return;
+        const target = e.target;
+        if (!(target instanceof Element) || !root.contains(target)) return;
+        if (target.matches('input, textarea, select') || target.isContentEditable) return;
+        if (this.#browserOpen || this.#previewing) return;
+        // Com o foco no editor, estas teclas nunca vazam para o canvas (nem sem nada selecionado).
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+            e.preventDefault();
+            e.stopPropagation();
+            const ids = [...root.querySelectorAll('.lf-node')].map((el) => el.dataset.id);
+            if (!ids.length) return;
+            this.#setNodeSelection(selectAll(createSelection(), ids));
+            this.render();
+            return;
+        }
+        if (e.key === 'Delete') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (this.#selectedNodeIds().length) this.#deleteSelected();
+            return;
+        }
+        // N cria uma Nota no centro da tela.
+        if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            const viewport = root.querySelector('.lf-viewport');
+            if (!viewport) return;
+            e.preventDefault();
+            e.stopPropagation();
+            this.#createNodeAt(
+                'note',
+                this.#screenToWorld({ x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 })
+            );
+        }
+    }
+    /** Apaga todos os selecionados: um diálogo, uma escrita. */
+    async #deleteSelected() {
+        const ids = this.#selectedNodeIds();
+        if (!ids.length || !this.#editable()) return;
+        const ok = await foundry.applications.api.DialogV2.confirm({
+            title: game.i18n.localize('LUMENN_FRAME.Selection.DeleteTitle'),
+            content: game.i18n.format('LUMENN_FRAME.Selection.ConfirmDelete', { n: ids.length }),
+            yes: { label: game.i18n.localize('LUMENN_FRAME.Beat.Delete') },
+            no: { label: game.i18n.localize('LUMENN_FRAME.Config.Cancel') },
+        });
+        if (!ok) return;
+        await LumennGraphStore.deleteNodes(this.#graphId, ids);
+        this.#clearSelection();
+        this.render();
     }
     /** Storyboard exibido; dentro de uma Hive no Ao Vivo, o nó ativo vem da trilha, nunca da Hive. */
     #graph() {
@@ -725,8 +860,16 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const defaultColors = LumennGraphStore.getDefaultColors();
         const allNodes = activeGraph?.nodes ?? [];
         const collapsed = this.#collapsedSet(activeGraph);
-        const visible = allNodes.filter((n) => !(n.parentId && collapsed.has(n.parentId)));
+        // Nota é anotação do mestre: o jogador não a vê no grafo (podem ter spoiler).
+        const visible = allNodes.filter(
+            (n) =>
+                !(n.parentId && collapsed.has(n.parentId)) &&
+                (n.type !== 'note' || LumennCompat.isGM())
+        );
         visible.sort((a, b) => (a.type === 'group' ? 0 : 1) - (b.type === 'group' ? 0 : 1));
+        if (this.#selection.ids.size)
+            this.#selection = pruneSelection(this.#selection, allNodes.map((n) => n.id));
+        const selectedIds = new Set(this.#selectedNodeIds());
         const nodes = visible.map((n) => {
             const kids = n.type === 'group' ? childrenOf(allNodes, n.id) : [];
             const bounds =
@@ -791,7 +934,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         isActive: isHere,
                         enabled: LumennSettings.get('dimUnreachable'),
                     }),
-                selected: this.#selected.kind === 'node' && this.#selected.id === n.id,
+                selected: selectedIds.has(n.id),
                 targetHi: this.#connectState?.targetHi === n.id,
                 armed: this.#connectState?.armed === true && this.#connectState.nodeId === n.id,
                 anchorIntro: !!anchors?.intro && anchors.intro === n.id,
@@ -827,13 +970,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             } else if (n.type === 'hive-ref') {
                 const hive = LumennGraphStore.getGraph(n.data?.graphId);
                 const rooms = (hive?.nodes ?? []).filter((room) => room.type === 'scene');
-                const cover = rooms
-                    .map((room) => (room.data?.sceneId ? game.scenes.get(room.data.sceneId) : null))
-                    .find(Boolean);
                 out.hiveName = hive?.isHive ? hive.name : L('LUMENN_FRAME.Hive.Missing');
                 out.hiveMissing = !hive?.isHive;
                 out.hiveRooms = rooms.length;
-                out.hiveThumb = cover?.thumbnail || LumennCompat.sceneBackgroundSrc(cover) || null;
+                out.hiveThumb = hive ? this.#graphThumb(hive) : null;
                 out.hivePortName =
                     (hive ? hiveEntryPort(hive, n.data?.portId)?.name : '') ||
                     L('LUMENN_FRAME.Hive.AutoPort');
@@ -891,6 +1031,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 rooms: (h.nodes ?? []).filter((n) => n.type === 'scene').length,
             }));
         const inspector = this.#buildInspector(activeGraph);
+        // Painel de Notas do mestre no Ao Vivo: as do nó ativo primeiro, depois as soltas.
+        const notesPanel =
+            this.#mode === 'live' && LumennCompat.isGM()
+                ? notesFor(activeGraph, activeGraph?.activeNodeId).all
+                : [];
         const neural = this.#neuralView(activeGraph);
         let connectHint = null;
         if (this.#editable() && this.#connectState) {
@@ -938,6 +1083,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             transitioning: this.#transitioning,
             showEdgeLabels: LumennSettings.get('showTransitionLabels'),
             inspector,
+            notesPanel,
             navigableIds: [...navigable],
             label: {
                 editMode: L('LUMENN_FRAME.Toolbar.EditMode'),
@@ -949,6 +1095,15 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 emptyHint: L('LUMENN_FRAME.EmptyHint'),
                 dropHint: L('LUMENN_FRAME.DropHint'),
                 select: L('LUMENN_FRAME.Tool.Select'),
+                notesPanel: L('LUMENN_FRAME.Notes.Panel'),
+                noteAnchor: L('LUMENN_FRAME.Notes.Anchor'),
+                noteAnchorNone: L('LUMENN_FRAME.Notes.AnchorNone'),
+                noteWorldHint: L('LUMENN_FRAME.Notes.WorldHint'),
+                selectionHint: L('LUMENN_FRAME.Selection.Hint'),
+                selectionVisitableOn: L('LUMENN_FRAME.Selection.VisitableOn'),
+                selectionVisitableOff: L('LUMENN_FRAME.Selection.VisitableOff'),
+                selectionClear: L('LUMENN_FRAME.Selection.Clear'),
+                selectionDelete: L('LUMENN_FRAME.Selection.Delete'),
                 hand: L('LUMENN_FRAME.Tool.Hand'),
                 connect: L('LUMENN_FRAME.Tool.Connect'),
                 addScene: L('LUMENN_FRAME.Tool.AddScene'),
@@ -1117,8 +1272,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 source: L('LUMENN_FRAME.Inspector.Source'),
                 sceneDoc: L('LUMENN_FRAME.Config.Scene'),
                 createGraph: L('LUMENN_FRAME.Toolbar.CreateStoryboard'),
-                renameGraph: L('LUMENN_FRAME.Toolbar.RenameStoryboard'),
-                deleteGraph: L('LUMENN_FRAME.Toolbar.DeleteStoryboard'),
+                // Dentro de uma Hive o menu diz "Hive", não "Storyboard" (queixa F7).
+                renameGraph: L(`LUMENN_FRAME.Toolbar.Rename${graphNoun(activeGraph)}`),
+                deleteGraph: L(`LUMENN_FRAME.Toolbar.Delete${graphNoun(activeGraph)}`),
+                hiveCover: L('LUMENN_FRAME.Hive.Cover'),
+                hiveCoverAuto: L('LUMENN_FRAME.Hive.CoverAuto'),
                 sortGraphs: L('LUMENN_FRAME.Toolbar.SortStoryboards'),
                 liveAudioEditing: L('LUMENN_FRAME.Inspector.LiveAudioEditing'),
                 transition: L('LUMENN_FRAME.Transitioning'),
@@ -1181,6 +1339,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /** O HUD aponta para este editor: fecha junto para não agir num app fechado. */
     _onClose(options) {
         super._onClose(options);
+        this.#unbindDocument();
         this.#destinationsHud?.close();
         this.#studio?.destroy();
         this.#studio = null;
@@ -1456,6 +1615,8 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#drawEdges(root);
         this.#applyCamera(root);
         this.#bindCamera(root);
+        // O render recria o DOM e leva o foco; sem ele, Delete e Ctrl+A não chegam ao editor.
+        if (this.#wantsFocus) root.querySelector('.lf-viewport')?.focus({ preventScroll: true });
         this.#observeResize(root);
         root.querySelector('.lf-viewport')?.classList.toggle(
             'connect-mode',
@@ -1470,6 +1631,16 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         root.querySelector('.lf-viewport')?.addEventListener('click', (e) =>
             this.#viewportClick(e)
         );
+        root.querySelector('.lf-viewport')?.addEventListener('dblclick', (e) =>
+            this.#viewportDblClick(e)
+        );
+        root.querySelectorAll('[data-note-field]').forEach((el) =>
+            el.addEventListener('input', (e) => this.#noteFieldInput(e))
+        );
+        // Rolar o texto do painel de Notas não pode mover a câmera.
+        root.querySelector('.lf-notes-panel')?.addEventListener('wheel', (e) => e.stopPropagation(), {
+            passive: true,
+        });
         root.querySelectorAll('.lf-node').forEach((node) =>
             node.addEventListener('click', (e) => this.#nodeClick(e))
         );
@@ -1538,14 +1709,24 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             e.preventDefault();
             e.stopPropagation();
             this.#suppressNodeClick = false;
-            this.#selected = {
-                kind: 'node',
-                id: node.dataset.id,
-            };
-            root.querySelectorAll('.lf-node.selected').forEach((el) =>
-                el.classList.remove('selected')
-            );
-            node.classList.add('selected');
+            // Foco no editor: Delete e Ctrl+A ficam com ele, não com o canvas do Foundry.
+            this.#wantsFocus = true;
+            root.querySelector('.lf-viewport')?.focus({ preventScroll: true });
+            const clickedId = node.dataset.id;
+            const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+            if (additive || !this.#selectedNodeIds().includes(clickedId))
+                this.#setNodeSelection(
+                    applyClick(this.#selectionModel(), clickedId, {
+                        shiftKey: e.shiftKey,
+                        ctrlKey: e.ctrlKey,
+                        metaKey: e.metaKey,
+                    })
+                );
+            this.#paintSelection(root);
+            // Com modificador o clique só muda a seleção; o `click` atualiza o Inspector.
+            if (additive) return;
+            const group = this.#selectedNodeIds();
+            if (group.length > 1) return this.#startMultiDrag(root, node, e, group);
             node.setPointerCapture(e.pointerId);
             const viewport = root.querySelector('.lf-viewport');
             const viewportRect = viewport.getBoundingClientRect();
@@ -1681,6 +1862,155 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             });
         });
     }
+    /** Arrasto de vários nós: todos andam juntos, uma escrita no fim. */
+    #startMultiDrag(root, node, e, ids) {
+        const viewport = root.querySelector('.lf-viewport');
+        const viewportRect = viewport.getBoundingClientRect();
+        const graph = this.#graph();
+        const nodes = graph?.nodes ?? [];
+        const items = new Map();
+        const groups = [];
+        const take = (id, start) => {
+            if (!items.has(id)) items.set(id, { x: start?.x ?? 0, y: start?.y ?? 0 });
+        };
+        for (const id of ids) {
+            const beat = nodes.find((candidate) => candidate.id === id);
+            if (!beat) continue;
+            if (beat.type !== 'group') {
+                take(id, beat.position);
+                continue;
+            }
+            const el = root.querySelector(`.lf-node[data-id="${id}"]`);
+            groups.push(id);
+            take(id, { x: el?.offsetLeft ?? 0, y: el?.offsetTop ?? 0 });
+            for (const child of childrenOf(nodes, id)) take(child.id, child.position);
+        }
+        const pointerToWorld = (event) =>
+            this.#screenToWorld({
+                x: event.clientX - viewportRect.left,
+                y: event.clientY - viewportRect.top,
+            });
+        const w0 = pointerToWorld(e);
+        let delta = { x: 0, y: 0 };
+        let moved = false;
+        node.setPointerCapture(e.pointerId);
+        const move = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            const w = pointerToWorld(ev);
+            delta = { x: Math.round(w.x - w0.x), y: Math.round(w.y - w0.y) };
+            if (!moved && Math.hypot(delta.x, delta.y) >= 3) moved = true;
+            if (!moved) return;
+            const overrides = new Map();
+            for (const [id, start] of items) {
+                const el = root.querySelector(`.lf-node[data-id="${id}"]`);
+                if (groups.includes(id)) {
+                    if (el) el.style.transform = `translate3d(${delta.x}px, ${delta.y}px, 0)`;
+                    continue;
+                }
+                const position = { x: start.x + delta.x, y: start.y + delta.y };
+                overrides.set(id, position);
+                this.#pendingEdgeNodes.set(id, position);
+                if (el) {
+                    el.style.left = `${position.x}px`;
+                    el.style.top = `${position.y}px`;
+                }
+            }
+            this.#groupDragOverrides = overrides;
+            this.#edgeGraphSnapshot = graph;
+            this.#scheduleEdgeDraw(root);
+        };
+        const up = async (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (node.hasPointerCapture?.(ev.pointerId)) node.releasePointerCapture(ev.pointerId);
+            node.removeEventListener('pointermove', move);
+            node.removeEventListener('pointerup', up);
+            node.removeEventListener('pointercancel', up);
+            if (this.#edgeFrame !== null) cancelAnimationFrame(this.#edgeFrame);
+            this.#edgeFrame = null;
+            this.#pendingEdgeNodes.clear();
+            this.#edgeGraphSnapshot = null;
+            this.#groupDragOverrides = null;
+            // Sem arrasto, o `click` colapsa a seleção no nó clicado.
+            this.#suppressNodeClick = moved;
+            if (!moved) return;
+            const patches = [...items].map(([id, start]) => ({
+                id,
+                position: { x: start.x + delta.x, y: start.y + delta.y },
+            }));
+            await LumennGraphStore.updateNodes(this.#graphId, patches);
+            this.render();
+        };
+        node.addEventListener('pointermove', move);
+        node.addEventListener('pointerup', up, { once: true });
+        node.addEventListener('pointercancel', up, { once: true });
+    }
+    /** Retângulo de seleção: arrasto com o botão esquerdo no vazio (Shift soma, Ctrl alterna). */
+    #startMarquee(e, root, viewport) {
+        if (e.button !== 0 || this.#spaceDown || !this.#editable()) return;
+        if (this.#tool !== 'select' || this.#connectState?.armed) return;
+        if (
+            e.target.closest(
+                '.lf-node, [data-port], .lf-edge-hit, .lf-camera-bar, button, input, select, textarea'
+            )
+        )
+            return;
+        this.#wantsFocus = true;
+        viewport.focus({ preventScroll: true });
+        const rect = viewport.getBoundingClientRect();
+        const start = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        const modifiers = { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey };
+        const box = document.createElement('div');
+        box.className = 'lf-marquee';
+        let active = false;
+        const at = (ev) => ({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
+        const move = (ev) => {
+            const p = at(ev);
+            if (!active) {
+                if (Math.hypot(p.x - start.x, p.y - start.y) < 4) return;
+                active = true;
+                viewport.setPointerCapture(e.pointerId);
+                viewport.appendChild(box);
+            }
+            box.style.left = `${Math.min(start.x, p.x)}px`;
+            box.style.top = `${Math.min(start.y, p.y)}px`;
+            box.style.width = `${Math.abs(p.x - start.x)}px`;
+            box.style.height = `${Math.abs(p.y - start.y)}px`;
+        };
+        const up = (ev) => {
+            viewport.removeEventListener('pointermove', move);
+            viewport.removeEventListener('pointerup', up);
+            viewport.removeEventListener('pointercancel', up);
+            if (viewport.hasPointerCapture?.(e.pointerId)) viewport.releasePointerCapture(e.pointerId);
+            box.remove();
+            if (!active || ev.type === 'pointercancel') return;
+            // O `click` que vem depois não pode limpar a seleção que acabou de nascer.
+            this.#suppressClick = true;
+            const a = this.#screenToWorld(start);
+            const b = this.#screenToWorld(at(ev));
+            const graph = this.#graph();
+            const probes = (graph?.nodes ?? [])
+                .filter((n) => root.querySelector(`.lf-node[data-id="${n.id}"]`))
+                .map((n) => {
+                    const bounds = this.#nodeBounds(n.id, null, graph);
+                    return bounds
+                        ? {
+                              id: n.id,
+                              position: { x: bounds.x, y: bounds.y },
+                              size: { w: bounds.width, h: bounds.height },
+                          }
+                        : null;
+                })
+                .filter(Boolean);
+            const hits = rectHits(probes, { x1: a.x, y1: a.y, x2: b.x, y2: b.y });
+            this.#setNodeSelection(applyRect(this.#selectionModel(), hits, modifiers));
+            this.render();
+        };
+        viewport.addEventListener('pointermove', move);
+        viewport.addEventListener('pointerup', up);
+        viewport.addEventListener('pointercancel', up);
+    }
     #nodeClick(e) {
         const nodeEl = e.target.closest?.('.lf-node');
         if (!nodeEl) return;
@@ -1711,7 +2041,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (intent === 'jump') return void this.#jumpTo(this.#graphId, id);
         if (intent === 'follow') return void this.#navigateTo(id);
         if (intent === 'play') return void this.#playAudioNode(id);
-        if (intent === 'select') this.#focusNode(id, true);
+        if (intent !== 'select') return;
+        // Clique com modificador já mudou a seleção no pointerdown: só redesenha o Inspector.
+        if (e.shiftKey || e.ctrlKey || e.metaKey) return void this.render();
+        if (this.#selectedNodeIds().length > 1) this.#setNodeSelection(selectOnly(null, id));
+        this.#focusNode(id, true);
     }
     #focusNode(nodeId, boostZoom = false) {
         const viewport = this.element.querySelector('.lf-viewport');
@@ -1787,14 +2121,15 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.#tool === 'encounter'
         ) {
             const point = this.#clientToCanvas(e, this.element.querySelector('.lf-viewport'));
-            this.#createNodeAt(this.#tool, point);
+            const tool = this.#tool;
+            // Nota é de uso único: criada, a ferramenta volta para Selecionar.
+            if (tool === 'note') this.#tool = 'select';
+            this.#createNodeAt(tool, point);
             return;
         }
+        if (e.shiftKey || e.ctrlKey || e.metaKey) return;
         if (this.#selected.kind) {
-            this.#selected = {
-                kind: null,
-                id: null,
-            };
+            this.#clearSelection();
             this.render();
         }
     }
@@ -1863,6 +2198,8 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #bindCamera(root) {
         const viewport = root.querySelector('.lf-viewport');
         if (!viewport) return;
+        // Focável sem entrar no Tab: recebe Delete/Ctrl+A depois de um clique no grafo.
+        viewport.tabIndex = -1;
         viewport.addEventListener(
             'wheel',
             (e) => {
@@ -1884,7 +2221,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         );
         viewport.addEventListener('pointerdown', (e) => {
             const isPan = (this.#spaceDown && e.button === 0) || e.button === 1;
-            if (!isPan) return;
+            if (!isPan) return void this.#startMarquee(e, root, viewport);
             e.preventDefault();
             this.#suppressClick = true;
             viewport.setPointerCapture(e.pointerId);
@@ -2111,9 +2448,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         svg.innerHTML = '';
         const collapsed = this.#collapsedSet(graph);
         const parents = parentMap(graph?.nodes ?? []);
+        const selectedNodes = new Set(this.#selectedNodeIds());
         let hotEdges = 0;
         // Retângulos dos cards: o rótulo (sob os cards, ADR-002) só pode ocupar o vão entre eles.
         const nodeRects = (graph?.nodes ?? [])
+            .filter((node) => node.type !== 'note' || LumennCompat.isGM())
             .map((node) => this.#nodeBounds(node.id, null, graph))
             .filter(Boolean);
         // Volta gravada em dobro (antes da 0.1.0): desenha só uma; o Inspector oferece unificar.
@@ -2123,6 +2462,8 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const from = graph.nodes.find((node) => node.id === e.from);
             const to = graph.nodes.find((node) => node.id === e.to);
             if (!from || !to) continue;
+            // O jogador não vê Notas: a aresta delas não pode ficar apontando para o vazio.
+            if (!LumennCompat.isGM() && (from.type === 'note' || to.type === 'note')) continue;
             const ids = this.#effectiveEdgeIds(e, graph, collapsed, parents);
             if (ids.from === ids.to) continue;
             const {
@@ -2198,9 +2539,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
             svg.appendChild(path);
             // Sinapse "quente": sai do nó ativo (Ao Vivo) ou toca o nó selecionado. Teto de 24 por desenho.
-            const touchesSelected =
-                this.#selected.kind === 'node' &&
-                (e.from === this.#selected.id || e.to === this.#selected.id);
+            const touchesSelected = selectedNodes.has(e.from) || selectedNodes.has(e.to);
             const leavesActive = this.#mode === 'live' && e.from === graph.activeNodeId;
             if ((touchesSelected || leavesActive) && hotEdges < 24) {
                 hotEdges++;
@@ -2659,8 +2998,21 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (action === 'workspace') {
             const ws = event.currentTarget.dataset.ws;
             this.#workspace = ['graph', 'transition', 'scene'].includes(ws) ? ws : 'graph';
-            if (this.#workspace !== 'graph' && !this.#studioRef && this.#selected.kind === 'edge')
-                this.#studioRef = { graphId: this.#graphId, edgeId: this.#selected.id };
+            if (this.#workspace !== 'graph') {
+                // Abas Transição e Cena nunca abrem vazias: a ligação selecionada, a última usada
+                // neste storyboard ou, na falta delas, a primeira ligação de fluxo.
+                const edges = LumennGraphStore.getGraph(this.#graphId)?.edges ?? [];
+                const usable = (id) => edges.some((edge) => edge.id === id && edge.type === 'flow');
+                const keep =
+                    this.#studioRef?.graphId === this.#graphId && usable(this.#studioRef.edgeId);
+                if (!keep) {
+                    const pick =
+                        this.#selected.kind === 'edge' && usable(this.#selected.id)
+                            ? this.#selected.id
+                            : edges.find((edge) => edge.type === 'flow')?.id;
+                    this.#studioRef = pick ? { graphId: this.#graphId, edgeId: pick } : null;
+                }
+            }
             return this.render();
         }
         if (action === 'more-toggle') {
@@ -2763,7 +3115,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const graph = this.#graph();
             const raw = await foundry.applications.api.DialogV2.prompt({
                 window: {
-                    title: game.i18n.localize('LUMENN_FRAME.Toolbar.RenameStoryboard'),
+                    title: game.i18n.localize(`LUMENN_FRAME.Toolbar.Rename${graphNoun(graph)}`),
                 },
                 content: `<input type="text" name="name" value="${String(graph?.name ?? '').replace(/"/g, '&quot;')}" autofocus>`,
                 ok: {
@@ -2777,9 +3129,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.render();
             }
         } else if (action === 'delete-graph') {
+            const noun = graphNoun(this.#graph());
             const ok = await foundry.applications.api.DialogV2.confirm({
-                title: game.i18n.localize('LUMENN_FRAME.Toolbar.DeleteStoryboard'),
-                content: game.i18n.localize('LUMENN_FRAME.ConfirmDeleteStoryboard'),
+                title: game.i18n.localize(`LUMENN_FRAME.Toolbar.Delete${noun}`),
+                content: game.i18n.localize(`LUMENN_FRAME.ConfirmDelete${noun}`),
                 yes: {
                     label: game.i18n.localize('LUMENN_FRAME.Beat.Delete'),
                 },
@@ -2877,7 +3230,9 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             e.currentTarget.value = val;
         }
         if (
-            ['data.sceneNodeId', 'data.portId', 'data.graphId', 'exitPortId'].includes(path) &&
+            ['data.sceneNodeId', 'data.portId', 'data.graphId', 'exitPortId', 'data.anchorNodeId'].includes(
+                path
+            ) &&
             val === ''
         )
             val = null;
@@ -2922,6 +3277,52 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             );
         }
     }
+    /** Atualiza o texto do cartão no lugar (sem render) enquanto o mestre digita. */
+    #patchNodeCard(nodeId, path, value) {
+        const card = this.element?.querySelector(`.lf-node[data-id="${nodeId}"]`);
+        if (!card) return;
+        if (path === 'data.title') {
+            const title = card.querySelector('.lf-node-title');
+            if (title) title.textContent = value;
+        } else if (path === 'data.body') {
+            const body = card.querySelector('.lf-node-body');
+            if (body) body.textContent = value;
+        }
+    }
+    /** Painel de Notas do Ao Vivo (só GM): grava com debounce, sem render, sem perder o foco. */
+    #noteFieldInput(e) {
+        const el = e.currentTarget;
+        const id = el.dataset.noteId;
+        const path = el.dataset.noteField;
+        if (!LumennCompat.isGM() || !id || !['data.title', 'data.body'].includes(path)) return;
+        const key = `${id}:${path}`;
+        clearTimeout(this.#noteTimers.get(key));
+        const value = el.value;
+        this.#noteTimers.set(
+            key,
+            setTimeout(async () => {
+                this.#noteTimers.delete(key);
+                const node = LumennGraphStore.getNode(this.#graphId, id);
+                if (node?.type !== 'note') return;
+                const field = path.split('.')[1];
+                await LumennGraphStore.updateNode(this.#graphId, id, {
+                    data: { ...node.data, [field]: value },
+                });
+                this.#patchNodeCard(id, path, value);
+            }, 400)
+        );
+    }
+    #viewportDblClick(e) {
+        if (!this.#editable() || this.#tool !== 'select' || this.#spaceDown) return;
+        if (
+            e.target.closest(
+                '.lf-node, [data-port], .lf-edge-hit, .lf-camera-bar, .lf-map, button, input, select, textarea'
+            )
+        )
+            return;
+        const point = this.#clientToCanvas(e, this.element.querySelector('.lf-viewport'));
+        this.#createNodeAt('note', point);
+    }
     #inspectorInput(e) {
         clearTimeout(this._inspTimer);
         const path = e.currentTarget.dataset.inspInput;
@@ -2941,7 +3342,11 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         ...node.data,
                         ...(patch.data ?? {}),
                     },
-                }).then(() => this.render());
+                }).then(() => {
+                    // Redesenhar tudo recria o campo e o mestre perde o cursor no meio da frase.
+                    if (shouldRerenderForPath(path, node.type)) return this.render();
+                    this.#patchNodeCard(id, path, val);
+                });
             } else if (kind === 'edge') {
                 const edge = LumennGraphStore.getEdge(this.#graphId, id);
                 const patch = {};
@@ -3059,6 +3464,20 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         parentId,
                     });
             }
+            if (!patches.length) return;
+            await LumennGraphStore.updateNodes(this.#graphId, patches);
+            this.render();
+        } else if (action === 'multi-delete') {
+            await this.#deleteSelected();
+        } else if (action === 'multi-clear') {
+            this.#clearSelection();
+            this.render();
+        } else if (action === 'multi-visitable-on' || action === 'multi-visitable-off') {
+            const on = action === 'multi-visitable-on';
+            const ids = new Set(this.#selectedNodeIds());
+            const patches = (this.#graph()?.nodes ?? [])
+                .filter((n) => ids.has(n.id) && n.type === 'scene')
+                .map((n) => ({ id: n.id, data: { ...(n.data ?? {}), visitable: on } }));
             if (!patches.length) return;
             await LumennGraphStore.updateNodes(this.#graphId, patches);
             this.render();
@@ -3182,6 +3601,12 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!this.#editable()) return;
         const color = e.currentTarget.dataset.color;
         if (!color) return;
+        const many = this.#selectedNodeIds();
+        if (many.length > 1)
+            return void LumennGraphStore.updateNodes(
+                this.#graphId,
+                many.map((id) => ({ id, color }))
+            ).then(() => this.render());
         const kind = this.#selected.kind;
         const id = this.#selected.id;
         if (kind !== 'node' || !id) return;
@@ -3336,6 +3761,27 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             Object.assign(base, audioEdge.transition?.audio ?? {});
         }
         return base;
+    }
+    /**
+     * Áudio de um nó dentro de uma Hive: o dele; sem música própria, a música do nó Hive
+     * no pai. `via` diz por onde se entrou (`{ graphId, nodeId }` do nó `hive-ref`); sem ele
+     * vale o nível da trilha atual e, por fim, o primeiro nó Hive que aponta para a Hive.
+     */
+    #audioSourcesInherited(graph, nodeId, via = null) {
+        return effectiveAudioSources({
+            graphs: LumennGraphStore.getAll(),
+            graphId: graph?.id,
+            nodeId,
+            audioSourcesIn: (g, id) => this.#audioSourcesFor(g, id),
+            parentOf: (graphId) => {
+                if (via && graphId === graph?.id) return via;
+                const at = this.#trail.findIndex((level) => level.graphId === graphId);
+                const level = this.#trail[at];
+                return at > 0 && level?.refNodeId
+                    ? { graphId: this.#trail[at - 1].graphId, nodeId: level.refNodeId }
+                    : null;
+            },
+        });
     }
     /** Áudio que pode estar tocando agora: o de todos os níveis da trilha, não só do storyboard exibido. */
     #currentAudioSources(graph) {
@@ -3508,7 +3954,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             },
             audioTrans: this.#audioTransitionFor(graph, edge),
             currentSources: this.#currentAudioSources(graph),
-            targetSources: this.#audioSourcesFor(graph, id),
+            targetSources: this.#audioSourcesInherited(graph, id),
             film: {
                 caption: this.#nodeLabel(target),
                 subtitle: LumennGraphStore.getGraph(graph.id)?.name ?? '',
@@ -3561,23 +4007,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             return void this.render();
         }
         if (plan.graphId === this.#graphId && plan.nodeId === current?.activeNodeId) return;
-        if (plan.kind === 'hive-entry') {
-            const pending = listHivePending(target, this.#worldChecks());
-            if (pending.length) {
-                const items = pending
-                    .map(
-                        (item) =>
-                            item.name ??
-                            this.#nodeLabel(target.nodes.find((n) => n.id === item.nodeId))
-                    )
-                    .join(', ');
-                return void ui.notifications.warn(
-                    game.i18n.format('LUMENN_FRAME.Warn.HivePending', {
-                        items,
-                    })
-                );
-            }
-        }
+        if (plan.kind === 'hive-entry' && this.#warnHivePending(target)) return;
         const trail = this.#jumpTrail(plan.graphId, plan.nodeId, false, graphs);
         const cfg =
             plan.kind === 'hive-entry' && target.hive?.transition
@@ -3599,7 +4029,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                           transition: cfg,
                       }),
             currentSources: this.#currentAudioSources(current),
-            targetSources: this.#audioSourcesFor(target, plan.nodeId),
+            targetSources: this.#audioSourcesInherited(target, plan.nodeId),
             film:
                 cfg.caption === false
                     ? null
@@ -4051,6 +4481,28 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#cameraFadeIn = true;
     }
     /** Entra na Hive pela porta, com a transição de entrada dela. `edge` pode faltar (botão Entrar). */
+    /** Hive com cena ou áudio que não existe no mundo: avisa quais e devolve true (não dá para entrar). */
+    #warnHivePending(hive) {
+        const pending = listHivePending(hive, this.#worldChecks());
+        if (!pending.length) return false;
+        const items = pending
+            .map(
+                (item) =>
+                    item.name ?? this.#nodeLabel(hive.nodes.find((n) => n.id === item.nodeId))
+            )
+            .join(', ');
+        ui.notifications.warn(game.i18n.format('LUMENN_FRAME.Warn.HivePending', { items }));
+        return true;
+    }
+    /** Transição de entrada da Hive: a própria; sem ela, o padrão com o que a ligação trouxer. */
+    #hiveEntryConfig(hive, edge) {
+        return hive.hive?.transition
+            ? normalizeHiveTransition(hive.hive.transition, DEFAULT_HIVE_TRANSITIONS.transition)
+            : {
+                  ...normalizeHiveTransition(null, DEFAULT_HIVE_TRANSITIONS.transition),
+                  ...(edge?.transition ?? {}),
+              };
+    }
     async #enterHive(graph, edge, refNode) {
         const L = (k) => game.i18n.localize(k);
         const hive = LumennGraphStore.getGraph(refNode.data?.graphId);
@@ -4058,26 +4510,8 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!hive.isHive) return void ui.notifications.warn(L('LUMENN_FRAME.Warn.HiveNotHive'));
         const port = hiveEntryPort(hive, edge?.portId ?? refNode.data?.portId);
         if (!port?.node) return void ui.notifications.warn(L('LUMENN_FRAME.Warn.HiveNoEntry'));
-        const pending = listHivePending(hive, this.#worldChecks());
-        if (pending.length) {
-            const items = pending
-                .map(
-                    (item) =>
-                        item.name ?? this.#nodeLabel(hive.nodes.find((n) => n.id === item.nodeId))
-                )
-                .join(', ');
-            return void ui.notifications.warn(
-                game.i18n.format('LUMENN_FRAME.Warn.HivePending', {
-                    items,
-                })
-            );
-        }
-        const cfg = hive.hive?.transition
-            ? normalizeHiveTransition(hive.hive.transition, DEFAULT_HIVE_TRANSITIONS.transition)
-            : {
-                  ...normalizeHiveTransition(null, DEFAULT_HIVE_TRANSITIONS.transition),
-                  ...(edge?.transition ?? {}),
-              };
+        if (this.#warnHivePending(hive)) return;
+        const cfg = this.#hiveEntryConfig(hive, edge);
         const scope = ['audio', 'scene', 'both'].includes(cfg.scope) ? cfg.scope : 'both';
         await this.#zoomInto(refNode.id);
         await this.#playTransition({
@@ -4093,7 +4527,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                           transition: cfg,
                       }),
             currentSources: this.#currentAudioSources(graph),
-            targetSources: this.#audioSourcesFor(hive, port.node.id),
+            targetSources: this.#audioSourcesInherited(hive, port.node.id, {
+                graphId: graph.id,
+                nodeId: refNode.id,
+            }),
             film:
                 cfg.caption === false
                     ? null
@@ -4137,14 +4574,33 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             : roomPorts.length === 1
               ? roomPorts[0]
               : null;
-        const exitEdge = ref ? resolveHiveExitEdge(parent, ref.id, port?.id ?? null) : null;
-        const target = exitEdge ? (parent.nodes.find((n) => n.id === exitEdge.to) ?? null) : null;
+        const plan = planExitLanding({
+            parent,
+            refId: ref?.id ?? null,
+            portId: port?.id ?? null,
+            getGraph: (id) => LumennGraphStore.getGraph(id),
+        });
+        // Hive de destino que não dá para entrar: aviso e a mesa fica onde está.
+        if (['hive-missing', 'hive-not-hive', 'hive-no-entry'].includes(plan.status))
+            return void ui.notifications.warn(
+                game.i18n.localize(
+                    {
+                        'hive-missing': 'LUMENN_FRAME.Warn.HiveMissing',
+                        'hive-not-hive': 'LUMENN_FRAME.Warn.HiveNotHive',
+                        'hive-no-entry': 'LUMENN_FRAME.Warn.HiveNoEntry',
+                    }[plan.status]
+                )
+            );
+        if (plan.status === 'hive')
+            return this.#exitIntoHive(plan, { parent, parentLevel, hive, port });
+        const target = plan.target;
         const cfg = normalizeHiveTransition(hive?.hive?.exit, DEFAULT_HIVE_TRANSITIONS.exit);
-        const resume = parent && ref ? this.#audioSourcesFor(parent, ref.id) : [];
+        // Ao sair, volta a música do nó Hive no pai, com a herança de cima (pai do pai).
+        const resume = parent && ref ? this.#audioSourcesInherited(parent, ref.id) : [];
         const fallback = resume.length
             ? resume
             : parent && level.fromNodeId
-              ? this.#audioSourcesFor(parent, level.fromNodeId)
+              ? this.#audioSourcesInherited(parent, level.fromNodeId)
               : [];
         if (this.#mode === 'live') this.#cameraFadeIn = true;
         await this.#playTransition({
@@ -4153,7 +4609,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             sceneTrans: cfg.scene,
             audioTrans: cfg.audio,
             currentSources: this.#currentAudioSources(hive),
-            targetSources: target ? this.#audioSourcesFor(parent, target.id) : fallback,
+            targetSources: target ? this.#audioSourcesInherited(parent, target.id) : fallback,
             film:
                 cfg.caption === false
                     ? null
@@ -4173,6 +4629,61 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 };
                 this.#fitPending = true;
                 if (target) await this.#commitActive(this.#graph(), target.id);
+                await this.#saveTrail();
+            },
+        });
+    }
+    /**
+     * Sai da Hive A direto para dentro da Hive B (a saída está ligada ao nó da B): uma
+     * transição só, que sai do nível da A e aterrissa na porta de entrada da B.
+     */
+    async #exitIntoHive(plan, { parent, parentLevel, hive, port }) {
+        const { target, hive: dest, entry, edge } = plan;
+        if (this.#warnHivePending(dest)) return;
+        // Entra como numa entrada comum: valem a transição e o áudio da Hive de destino.
+        const cfg = this.#hiveEntryConfig(dest, edge);
+        const scope = ['audio', 'scene', 'both'].includes(cfg.scope) ? cfg.scope : 'both';
+        if (this.#mode === 'live') this.#cameraFadeIn = true;
+        await this.#playTransition({
+            scene: entry.node.data?.sceneId ? game.scenes.get(entry.node.data.sceneId) : null,
+            scope,
+            sceneTrans: cfg.scene,
+            audioTrans:
+                cfg.audio?.mode === 'none'
+                    ? cfg.audio
+                    : this.#audioTransitionFor(dest, {
+                          ...(edge ?? {}),
+                          to: entry.node.id,
+                          transition: cfg,
+                      }),
+            currentSources: this.#currentAudioSources(hive),
+            targetSources: this.#audioSourcesInherited(dest, entry.node.id, {
+                graphId: parent.id,
+                nodeId: target.id,
+            }),
+            film:
+                cfg.caption === false
+                    ? null
+                    : {
+                          caption: dest.name,
+                          subtitle: entry.name || (port?.name ?? hive?.name ?? ''),
+                      },
+            commit: async () => {
+                const fromNodeId = parentLevel.activeNodeId ?? null;
+                this.#trail = popNavigationLevel(this.#trail).trail;
+                await this.#commitActive(parent, target.id);
+                this.#trail = pushNavigationLevel(this.#trail, {
+                    graphId: dest.id,
+                    activeNodeId: entry.node.id,
+                    viaPortId: entry.id,
+                    refNodeId: target.id,
+                    fromNodeId,
+                });
+                this.#graphId = dest.id;
+                this.#clearSelection();
+                this.#collapsedGroups.clear();
+                this.#lockedGroups.clear();
+                this.#fitPending = true;
                 await this.#saveTrail();
             },
         });
@@ -4198,14 +4709,17 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#cameraFadeIn = true;
         return this.render();
     }
+    #sceneImage(sceneId) {
+        const scene = sceneId ? game.scenes.get(sceneId) : null;
+        return scene?.thumbnail || LumennCompat.sceneBackgroundSrc(scene) || null;
+    }
+    /** Capa: a escolhida pelo mestre; senão a primeira cena com imagem, descendo pelas sub-Hives. */
     #graphThumb(graph) {
-        for (const node of graph?.nodes ?? []) {
-            if (node.type !== 'scene' || !node.data?.sceneId) continue;
-            const scene = game.scenes.get(node.data.sceneId);
-            const src = scene?.thumbnail || LumennCompat.sceneBackgroundSrc(scene);
-            if (src) return src;
-        }
-        return null;
+        if (!graph) return null;
+        const cover = coverFor(LumennGraphStore.getAll(), graph.id, {
+            hasScene: (id) => !!this.#sceneImage(id),
+        });
+        return cover.img ?? this.#sceneImage(cover.sceneId);
     }
     #browserView(graphs, currentId) {
         const filter = this.#browserFilter;
@@ -4364,21 +4878,23 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     })
                 );
         } else if (action === 'hive-port-add') {
-            const rooms = graph.nodes.filter((n) => n.type === 'scene');
-            if (!rooms.length)
-                return void ui.notifications.warn(L('LUMENN_FRAME.Warn.HivePortNoRoom'));
+            // Sem sala, a porta nasce pendente ("sem sala"); a primeira cena a liga depois.
+            const room = landingRoom(graph);
             const ports = [
                 ...(graph.hive?.ports ?? []),
                 {
                     name: `${L('LUMENN_FRAME.Hive.PortDefaultName')} ${(graph.hive?.ports?.length ?? 0) + 1}`,
                     direction: 'entry',
-                    nodeId: rooms[0].id,
+                    nodeId: room?.id ?? null,
                 },
             ];
             await LumennGraphStore.updateHive(graph.id, {
                 ports,
             });
         } else if (action === 'hive-port-remove') {
+            const check = canRemovePort(graph, data.portId);
+            if (!check.ok && check.reason === 'last')
+                return void ui.notifications.warn(L('LUMENN_FRAME.Warn.HivePortLast'));
             await LumennGraphStore.updateHive(graph.id, {
                 ports: (graph.hive?.ports ?? []).filter((port) => port.id !== data.portId),
             });
@@ -4412,6 +4928,12 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const el = e.currentTarget;
         const graph = LumennGraphStore.getGraph(this.#graphId);
         if (!graph?.isHive) return;
+        if (el.dataset.hiveField === 'cover.sceneId') {
+            await LumennGraphStore.updateHive(graph.id, {
+                cover: el.value ? { sceneId: el.value } : null,
+            });
+            return this.render();
+        }
         if (el.dataset.hivePort) {
             const ports = (graph.hive?.ports ?? []).map((port) =>
                 port.id === el.dataset.hivePort
@@ -4743,6 +5265,16 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 })),
             })),
         };
+        const multi = this.#selectedNodeIds();
+        if (this.#editable() && multi.length > 1) {
+            const picked = (graph?.nodes ?? []).filter((n) => multi.includes(n.id));
+            return {
+                ...base,
+                kind: 'multi',
+                countLabel: game.i18n.format('LUMENN_FRAME.Selection.Count', { n: multi.length }),
+                sceneCount: picked.filter((n) => n.type === 'scene').length,
+            };
+        }
         if (this.#selected.kind === 'node') {
             const node = graph?.nodes?.find((n) => n.id === this.#selected.id);
             if (node) {
@@ -4758,6 +5290,10 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     kind: 'node',
                     node,
                     nodeType: node.type,
+                    anchorOptions:
+                        node.type === 'note'
+                            ? anchorOptions(graph, (n) => this.#nodeLabel(n))
+                            : [],
                     audioRole: node.data?.audioRole === 'sfx' ? 'sfx' : 'music',
                     nodeEdges: edges,
                     hasConnections: ['scene', 'hive-ref', 'encounter'].includes(node.type),
@@ -4965,6 +5501,7 @@ export class LumennGraphApp extends HandlebarsApplicationMixin(ApplicationV2) {
             : [];
         return {
             isHive: graph.isHive === true,
+            coverSceneId: graph.hive?.cover?.sceneId ?? '',
             rooms,
             hasRooms: rooms.length > 0,
             ports: (graph.hive?.ports ?? []).map((port) => ({

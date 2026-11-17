@@ -85,6 +85,26 @@ export const LumennCompat = {
         if (typeof scene.preload === 'function') return Promise.resolve(scene.preload());
         return Promise.resolve(null);
     },
+    /**
+     * Visita privada: leva SÓ este cliente à cena, sem tocar no servidor nem na mesa. Com a visão
+     * de token ligada e sem token do jogador, `Scene#view()` deixa o canvas preto ("There is no
+     * Token in this Scene…"); por isso a visão é desligada localmente (`updateSource` não grava)
+     * antes de olhar. Devolve `restore()`, que religa o valor local. Medido no Foundry 14.367.
+     */
+    async visitScene(scene) {
+        const original = scene.tokenVision === true;
+        if (original) scene.updateSource({ tokenVision: false });
+        const restore = () => {
+            if (original) scene.updateSource({ tokenVision: true });
+        };
+        try {
+            await scene.view();
+        } catch (error) {
+            restore();
+            throw error;
+        }
+        return { restore };
+    },
     /** Fundo principal da cena: v14 mora no nível inicial; v13 no próprio documento. */
     sceneBackgroundSrc(scene) {
         if (!scene) return '';

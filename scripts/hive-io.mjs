@@ -293,6 +293,8 @@ export function sanitizeHivePorts(ports, nodes, newId) {
             name: String(port?.name ?? '').trim(),
             direction: DIRECTIONS.has(port?.direction) ? port.direction : 'entry',
             nodeId: nodeIds.has(port?.nodeId) ? port.nodeId : null,
+            // `auto` marca a porta criada pela Hive; sem preservar, a próxima gravação a apagaria.
+            ...(port?.auto === true ? { auto: true } : {}),
         });
     }
     return clean;

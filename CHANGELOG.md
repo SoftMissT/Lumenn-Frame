@@ -4,6 +4,35 @@ As versões 0.0.x permanecem pré-validação de runtime em Foundry real. Semver
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-17
+
+> Seleção múltipla, portas automáticas, Hive para Hive, música herdada pela Hive, Notas que funcionam, visita real do jogador e um README com prints para ensinar passo a passo. **236 testes Node verdes.** Verificado no Foundry 14.367 isolado (:30001) com mestre e jogador conectados; console do módulo sem erros. Foundry 13.350 e app desktop com mesa real não testados.
+
+### Added
+
+- **Seleção múltipla** (Edição): retângulo no vazio, `Shift` soma, `Ctrl`/`Cmd` alterna, `Ctrl+A`, `Delete` com uma confirmação e uma escrita, arrasto em lote numa escrita e Inspector "N nós selecionados" (cor, visitável, excluir). As teclas só valem com o foco no editor e não vazam para o canvas.
+- **Portas automáticas**: toda Hive com cena tem entrada e saída (`auto: true`), criadas na mesma escrita de `addNode`, `deleteNodes`, `markHive`, `updateHive`, `convertGroupToHive` e `importHive`; mundos antigos migram no `ready` (só pelo GM designado, idempotente). A última porta de cada lado não pode ser apagada.
+- **Hive para Hive**: sair por uma porta ligada ao nó de outra Hive aterrissa dentro dela, na porta de entrada ligada, numa transição só. Destino sem cena, inexistente ou sem entrada: aviso e a mesa fica onde está.
+- **Música herdada**: a sala sem música própria usa a música ligada ao nó da Hive no pai, subindo os níveis; música própria vence e o SFX é sempre local.
+- **Capa da Hive**: primeira cena com imagem (descendo pelas sub-Hives) ou a cena escolhida no Inspector (`hive.cover`, aditivo; não vai para o arquivo exportado). Dentro de uma Hive o menu, o diálogo de excluir e o Inspector dizem "Hive", não "Storyboard".
+- **Notas**: ferramenta na barra, `N` e duplo clique no vazio. Painel **Notas** do mestre no Ao Vivo (as do nó ativo primeiro, depois as soltas), com edição ao vivo, e "Anexar a um nó" (`data.anchorNodeId`, aditivo). O jogador não vê Notas nem as arestas delas.
+- **Visita real**: o jogador aprovado é levado à cena de verdade, só no cliente dele, com a faixa "Voltar à mesa"; a mesa não mexe e, se o GM ativar outra cena, ele acompanha. Com visão de token ligada a visão é desligada **localmente** (`LumennCompat.visitScene`: `updateSource` + `Scene#view()`), sem escrita no servidor e sem estado a restaurar. Se falhar, abre a janela de imagem de antes. Spike e matriz medida em `docs/spikes/visita-view.md`.
+- **README com 9 prints** (`assets/readme/`) em português e inglês: a tela, seleção, estúdio, Hives, Ao Vivo, Destinos e uma seção "Para os jogadores".
+- Módulos puros com testes: `selection-model`, `hive-ports`, `hive-landing`, `audio-inherit`, `hive-cover`, `notes`.
+
+### Changed
+
+- `LumennGraphStore.deleteNodes` apaga vários nós com uma única escrita (`deleteNode` passou a usá-lo). `sanitizeHivePorts` preserva o campo opcional `auto`.
+- O termo "Beat" saiu da interface ("Cena + áudio", "Nada aqui ainda" etc.) e do README; o texto de excluir storyboard não fala mais em Beats. README: o compêndio tem **19** macros, não 16; comando de teste `node --test tests/*.test.mjs`.
+
+### Fixed
+
+- **Aba Cena em branco**: sem ligação escolhida, as abas Transição e Cena agora abrem já na ligação selecionada, na última usada ou na primeira do storyboard; sem ligações, mostram a dica em vez de uma tela vazia.
+- Digitar numa Nota no Inspector redesenhava o editor inteiro e o campo perdia foco e cursor após 300 ms.
+- `Esc` com seleção, porta armada ou painel aberto fechava a janela do editor junto (o core); `Delete` sem seleção chegaria aos atalhos do canvas.
+- Cada abertura do editor deixava 4 listeners no `document` para sempre, e o Espaço continuava sendo tratado como pan com a janela fechada. Agora entram na primeira renderização e saem no fechamento.
+- Visita: `Scene#view()` deixava o canvas preto ("There is no Token in this Scene…") para o jogador sem token com visão ligada.
+- Removidas 7 chaves de texto mortas da era dos Beats e um import sem uso.
 ## [0.1.1] - 2026-11-12
 
 > Estúdio de transição, Hives de verdade no "+ Hive", "Ver Hive", topo enxuto e fim do duplo link. **179 testes Node verdes.** Verificado no Foundry 14.367 isolado (:30001): estúdio (stinger, Swirl arrastado, cutscene com título), pré-load com selo, ligação legada unificada, menu Mais e Ver Hive; console sem erros nem avisos. Foundry 13.350 e app desktop com mesa real não testados.
